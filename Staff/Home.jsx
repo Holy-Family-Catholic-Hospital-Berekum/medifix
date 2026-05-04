@@ -1,6 +1,9 @@
 import electricity from "../images/electricity.jpg";
 import carpentry from "../images/carpentry.jpg";
 import plumbing from "../images/plumbing.jpg";
+import toolsIcon from "../images/toolsIcon.png";
+import worker from "../images/worker.png";
+import masonery from "../images/masonery.jpg";
 
 export default function Home() {
   const services = [
@@ -18,6 +21,11 @@ export default function Home() {
       name: "Carpentry",
       provisions: ["Repairs", "Suplies"],
       image: carpentry,
+    },
+    {
+      name: "Masonery",
+      provisions: ["Repairs", "Suplies"],
+      image: masonery,
     },
   ];
 
@@ -39,15 +47,51 @@ export default function Home() {
 
       <img
         src={service.image}
-        alt=""
+        alt="service image"
         className="hidden rounded md:flex max-h-40 w-full"
       />
     </div>
   ));
 
+  const systemWorkflows = [
+    "Staff submit maintenance reports",
+    "Reports are recorded with a status of pending ",
+    "Estate Manager reviews incoming reports",
+    "Estate Manager assigns tasks to technician",
+    "Technician executes the task and updates progress",
+    "Staff review completed work and provide feedback",
+    "Task data is logged for performance evaluation",
+  ];
+
+  const systemWorkflowDiv = systemWorkflows.map((workflow) => (
+    <div className="flex items-center gap-4 bg-red-300">
+      <img
+        src={toolsIcon}
+        alt="tools icon"
+        className="w-12 h-12 bg-[#2563EB]"
+      />
+      <h2 className="md:text-lg px-2">{workflow}</h2>
+    </div>
+  ));
+
+  const Guidelines = [
+    {
+      text1: "Reports that has it's priority set to",
+      text2: "will be attended to within a period of",
+      priority: "Urgent",
+      time: "12 hrs",
+    },
+    {
+      text1: "Reports that has it's priority set to",
+      text2: "will be attended to within a period of",
+      priority: "Routine",
+      time: "1 to 2 days",
+    },
+  ];
+
   return (
-    <>
-      <nav className="shadow flex justify-between gap-20 w-full fixed bottom-auto top-0 px-10 py-5 md:top-auto md:bottom-0">
+    <div>
+      <nav className="md:hidden z-50 flex justify-between w-full fixed bottom-auto top-0 px-10 py-5 md:top-auto md:bottom-0">
         <button className="text-[#111827]  cursor-pointer hover:text-red-300 transition">
           SignUp
         </button>
@@ -56,19 +100,47 @@ export default function Home() {
         </button>
       </nav>
 
-      <nav className="bg-[#2563EB] flex justify-center gap-20 w-full fixed bottom-0 top-auto px-10 py-5 md:top-0 md:bottom-auto">
-        <button className="text-[#111827] cursor-pointer hover:text-white transition">
-          Home
+      <nav className="bg-[#2563EB] flex md:justify-between z-50 justify-center gap-20 w-full fixed bottom-0 top-auto px-10 py-5 md:top-0 md:bottom-auto">
+        <button className="text-[#111827] hidden md:block  cursor-pointer hover:text-red-300 transition">
+          SignUp
         </button>
-        <button className="text-[#111827] cursor-pointer hover:text-white transition">
-          Reports
+        <div className="flex gap-20">
+          <button className="text-[#111827] cursor-pointer hover:text-red-300 transition">
+            Home
+          </button>
+          <button className="text-[#111827] cursor-pointer hover:text-red-300 transition">
+            Reports
+          </button>
+        </div>
+
+        <button className="bg-red-300 text-white hidden md:block  text-lg bg-[#2563EB] px-4 py-1 rounded-full cursor-pointer hover:shadow hover:bg-red-400 shadow-white transition">
+          Report
         </button>
       </nav>
-      <main className="py-30">
+      <main className="pt-20 md:pt-24 pb-20">
+        <div className="w-full mb-5 md:mb-10 text-center">
+          <h1 className="text-2xl md:text-4xl text-[#2563EB]">Services</h1>
+        </div>
         <div className="flex justify-center px-10 gap-5  flex-wrap mx-auto">
           {serviceCard}
         </div>
+        <div className="flex flex-col md:mb-20 mt-20 md:mt-40 ">
+          <h1 className="bg-[#2563EB] text-xl text-center py-4 md:2xl">
+            System Workflow
+          </h1>
+          <div className="flex flex-col relative">
+            {systemWorkflowDiv}
+            <img
+              src={worker}
+              alt="cartoon image"
+              className="absolute max-w-[500px] right-0 bottom-20 hidden md:block"
+            />
+          </div>
+        </div>
+        <h1 className="text-[#2563EB] text-2xl md:4xl text-center mb-5 mt-10">
+          Guidelines
+        </h1>
       </main>
-    </>
+    </div>
   );
 }
