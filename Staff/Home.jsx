@@ -4,8 +4,11 @@ import plumbing from "../images/plumbing.jpg";
 import toolsIcon from "../images/toolsIcon.png";
 import worker from "../images/worker.png";
 import masonery from "../images/masonery.jpg";
+import ac from "../images/ac.jpg";
+import refrigerator from "../images/Refrigerator.jpg";
 import Footer from "../components/footer";
 import ReportForm from "./reportForm";
+
 import { useState } from "react";
 
 export default function Home() {
@@ -32,6 +35,16 @@ export default function Home() {
       provisions: ["Repairs", "Suplies"],
       image: masonery,
     },
+    {
+      name: "Refrigerator",
+      provisions: ["Repairs"],
+      image: refrigerator,
+    },
+    {
+      name: "Air Conditioner",
+      provisions: ["Repairs"],
+      image: ac,
+    },
   ];
 
   const serviceCard = services.map((service) => (
@@ -43,12 +56,14 @@ export default function Home() {
         </span>
         <span>{service.provisions[0]}</span>
       </div>
-      <div className="flex justify-center items-center gap-2 mb-2">
-        <span className="material-symbols-outlined">
-          <span className="material-symbols-outlined">chevron_right</span>
-        </span>
-        <span className="text-lg">{service.provisions[1]}</span>
-      </div>
+      {service.provisions[1] && (
+        <div className="flex justify-center items-center gap-2 mb-2">
+          <span className="material-symbols-outlined">
+            <span className="material-symbols-outlined">chevron_right</span>
+          </span>
+          <span className="text-lg">{service.provisions[1]}</span>
+        </div>
+      )}
 
       <img
         src={service.image}

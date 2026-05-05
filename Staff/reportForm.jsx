@@ -34,6 +34,8 @@ export default function ReportForm({ formPopup, onClose }) {
             <option value="Electricity">Electricity</option>
             <option value="Carpentry">Carpentry</option>
             <option value="Masonery">Masonery</option>
+            <option value="Masonery">Refrigerator</option>
+            <option value="Masonery">Air-conditioner</option>
           </select>
         </div>
 
