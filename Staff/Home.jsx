@@ -4,6 +4,7 @@ import plumbing from "../images/plumbing.jpg";
 import toolsIcon from "../images/toolsIcon.png";
 import worker from "../images/worker.png";
 import masonery from "../images/masonery.jpg";
+import Footer from "../components/footer";
 
 export default function Home() {
   const services = [
@@ -90,8 +91,8 @@ export default function Home() {
   ];
 
   return (
-    <div>
-      <nav className="md:hidden z-50 flex justify-between w-full fixed bottom-auto top-0 px-10 py-5 md:top-auto md:bottom-0">
+    <>
+      <nav className="md:hidden z-50 flex justify-between w-full fixed bottom-auto top-0 px-10 py-5 md:top-auto md:bottom-0 shadow bg-[#eff6ff]">
         <button className="text-[#111827]  cursor-pointer hover:text-red-300 transition">
           SignUp
         </button>
@@ -100,7 +101,7 @@ export default function Home() {
         </button>
       </nav>
 
-      <nav className="bg-[#2563EB] flex md:justify-between z-50 justify-center gap-20 w-full fixed bottom-0 top-auto px-10 py-5 md:top-0 md:bottom-auto">
+      <nav className="bg-[#2563EB] border-t border-[#eff6ff] flex md:justify-between z-50 justify-center gap-20 w-full fixed bottom-0 top-auto px-10 py-5 md:top-0 md:bottom-auto">
         <button className="text-[#111827] hidden md:block  cursor-pointer hover:text-red-300 transition">
           SignUp
         </button>
@@ -137,10 +138,42 @@ export default function Home() {
             />
           </div>
         </div>
-        <h1 className="text-[#2563EB] text-2xl md:4xl text-center mb-5 mt-10">
-          Guidelines
-        </h1>
+        <h1 className="text-center text-2xl md:4xl mt-10">Report Timelines</h1>
+        <div className="flex justify-center gap-2 md:gap-10 md:gap-10 mb-10 mt-4 md:mt-10">
+          <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
+            <h1 className="text-[#2563EB]  rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
+              Urgent Reports
+            </h1>
+            <p className="text-white">
+              Reports with priority set to URGENT will be attend to within a
+              period of {<span className="text-red-400 font-bold">12 hrs</span>}
+            </p>
+          </div>
+
+          <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
+            <h1 className="text-[#2563EB] bg-red-300 rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
+              Routine Reports
+            </h1>
+            <p className="text-white">
+              Reports with priority set to ROUTINE will be attend to within a
+              period of{" "}
+              {<span className="text-red-400 font-bold">1 to 2 days</span>}
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full">
+          <h1 className="text-center text-2xl md:4xl mt-10 mb-2">
+            Working Hours
+          </h1>
+          <p className="text-red-400 bg-black text-center py-2">
+            Monday to Friday from{" "}
+            {<span className="font-bold">8am to 4pm</span>}
+          </p>
+        </div>
       </main>
-    </div>
+
+      <Footer />
+    </>
   );
 }
