@@ -1,6 +1,6 @@
 import Home from "../Staff/Home";
-import Reports from "../Staff/Reports";
+import History from "../Staff/History";
 
 export default function App() {
-  return <Reports />;
+  return <Home />;
 }

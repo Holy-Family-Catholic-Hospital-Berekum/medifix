@@ -13,6 +13,8 @@ import NavBars from "./navBars";
 import { useState } from "react";
 
 export default function Home() {
+  const [sidePopup, setSidePopup] = useState(false);
+
   const services = [
     {
       name: "Electricity",
@@ -115,6 +117,13 @@ export default function Home() {
     <>
       <NavBars />
       <main className="pt-20 md:pt-24 pb-20">
+        <span
+          className={`material-symbols-outlined md:hidden z-50 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400`}
+          onClick={() => setSidePopup((prev) => !prev)}
+        >
+          {sidePopup ? "chevron_right" : "chevron_left"}
+        </span>
+
         <div className="w-full mb-5 md:mb-10 text-center">
           <h1 className="text-2xl md:text-4xl text-[#2563EB]">Services</h1>
         </div>
