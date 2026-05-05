@@ -9,10 +9,6 @@ h1 {
   font-family: serif;
 }
 
-nav {
-  z-index: 999;
-}
-
 @keyframes slideUp {
   from {
     transform: translateY(100%);
@@ -41,4 +37,64 @@ nav {
 
 .slide-down {
   animation: slideDown 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.slide-out-right {
+  animation: slideOutRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes slideInTop {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutTop {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+.slide-in-top {
+  animation: slideInTop 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.slide-out-top {
+  animation: slideOutTop 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }

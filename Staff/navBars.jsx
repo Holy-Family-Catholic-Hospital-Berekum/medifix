@@ -1,14 +1,26 @@
 import { useState } from "react";
 import ReportForm from "./reportForm";
+import Alerts from "./Alerts";
+import { useNavigate, NavLink } from "react-router";
 export default function NavBars() {
   const [formPopup, setFormPopup] = useState(false);
+  const navigate = useNavigate();
+
+  const [alertsPopup, setAlertsPopup] = useState(false);
 
   const handleClose = () => {
     // give slide-down time to finish before hiding
     setTimeout(() => setFormPopup(false), 300);
   };
+
+  const navClass = ({ isActive }) =>
+    `cursor-pointer transition ${
+      isActive ? "text-red-300" : "text-[#111827] hover:text-red-300"
+    }`;
+
   return (
     <>
+      <Alerts alertsPopup={alertsPopup} />
       {formPopup && <ReportForm formPopup={formPopup} onClose={handleClose} />}
       <nav className="md:hidden z-50 flex justify-between w-full fixed bottom-auto top-0 px-5 py-5 md:top-auto md:bottom-0 shadow bg-[#eff6ff]">
         <button className="text-[#111827]  cursor-pointer hover:text-red-300 transition">
@@ -16,11 +28,14 @@ export default function NavBars() {
         </button>
 
         <div className="flex items-center justify-center gap-4">
-          <div className="flex relative">
+          <div
+            className="flex relative"
+            onClick={() => setAlertsPopup((prev) => !prev)}
+          >
             <span className="text-green-600 absolute bottom-2 font-bold">
               3
             </span>
-            <span class="material-symbols-outlined text-red-400">
+            <span className="material-symbols-outlined text-red-400 cursor-pointer">
               circle_notifications
             </span>
           </div>
@@ -38,20 +53,23 @@ export default function NavBars() {
           SignUp
         </button>
         <div className="flex gap-20">
-          <button className="text-[#111827] cursor-pointer hover:text-red-300 transition">
+          <NavLink to="/" end className={navClass}>
             Home
-          </button>
-          <button className="text-[#111827] cursor-pointer hover:text-red-300 transition">
+          </NavLink>
+          <NavLink to="/History" className={navClass}>
             History
-          </button>
+          </NavLink>
         </div>
 
         <div className="flex items-center justify-center gap-4">
-          <div className="relative cursor-pointer hidden md:flex">
+          <div
+            className="relative cursor-pointer hidden md:flex"
+            onClick={() => setAlertsPopup((prev) => !prev)}
+          >
             <span className="text-green-600 md:text-black absolute bottom-2 font-bold">
               3
             </span>
-            <span class="material-symbols-outlined text-red-400">
+            <span className="material-symbols-outlined text-red-400">
               circle_notifications
             </span>
           </div>
