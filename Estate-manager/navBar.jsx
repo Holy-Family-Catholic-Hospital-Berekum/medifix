@@ -10,7 +10,7 @@ export default function NavBar() {
     }`;
 
   return (
-    <nav className="flex justify-between items-center bg-green-500 shadow p-4 w-full z-50 fixed top-0 bottom-auto">
+    <nav className="flex justify-between items-center bg-green-500 shadow p-4 w-full z-100 fixed top-0 bottom-auto">
       <AlertsContainer
         alertsPopup={alertsPopup}
         setAlertsPopup={setAlertsPopup}

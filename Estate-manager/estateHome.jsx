@@ -3,10 +3,14 @@ import { useState } from "react";
 import SlideInRight from "../components/slideInRight";
 import AlertsContainer from "../components/AlertsContainer";
 import { NavLink } from "react-router";
+import { nanoid } from "nanoid";
+import ReportDetailsContainer from "./reportDetails";
 
 export default function EstateHome() {
   const [sidePopup, setSidePopup] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
+  const [displayDetails, setDisplayDetails] = useState(false);
+  const [currentReport, setCurrentReport] = useState([]);
 
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
@@ -26,6 +30,7 @@ export default function EstateHome() {
         "This is a description of the cost involved for this work",
       category: "electricals",
       dateConfirmed: "13/03/2026",
+      id: nanoid(),
     },
     {
       status: "approved",
@@ -39,6 +44,7 @@ export default function EstateHome() {
         "This is a description of the cost involved for this work",
       category: "electricals",
       dateConfirmed: "13/03/2026",
+      id: nanoid(),
     },
     {
       status: "approved",
@@ -65,6 +71,7 @@ export default function EstateHome() {
         "This is a description of the cost involved for this work",
       category: "plumbing",
       dateConfirmed: "13/03/2026",
+      id: nanoid(),
     },
     {
       status: "approved",
@@ -78,6 +85,7 @@ export default function EstateHome() {
         "This is a description of the cost involved for this work",
       category: "plumbing",
       dateConfirmed: "13/03/2026",
+      id: nanoid(),
     },
     {
       status: "confirmed",
@@ -91,6 +99,7 @@ export default function EstateHome() {
         "This is a description of the cost involved for this work",
       category: "electricals",
       dateConfirmed: "13/03/2026",
+      id: nanoid(),
     },
     {
       status: "confirmed",
@@ -104,6 +113,7 @@ export default function EstateHome() {
         "This is a description of the cost involved for this work",
       category: "masonery",
       dateConfirmed: "13/03/2026",
+      id: nanoid(),
     },
     {
       status: "confirmed",
@@ -112,13 +122,23 @@ export default function EstateHome() {
       dateAssigned: "12/03/2026",
       dateCompleted: "13/03/2026",
       cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
+      reportDescription:
+        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
       costDescription:
         "This is a description of the cost involved for this work",
       category: "carpentry",
       dateConfirmed: "13/03/2026",
+      id: nanoid(),
     },
   ];
+
+  const displayReportDetails = (id) => {
+    setDisplayDetails(true);
+
+    const reportToDisplay = reports.filter((report) => report.id === id);
+
+    setCurrentReport(reportToDisplay);
+  };
 
   const newReports = reports.filter((report) => report.status === "approved");
   const confirmedWorks = reports.filter(
@@ -129,6 +149,7 @@ export default function EstateHome() {
     <div
       className="bg-green-500 border border-red-300 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
+      onClick={() => displayReportDetails(report.id)}
     >
       <h1>{report.category.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
@@ -142,6 +163,7 @@ export default function EstateHome() {
     <div
       className="bg-green-500 border border-red-300 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
+      onClick={() => displayReportDetails(report.id)}
     >
       <h1>{report.category.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
@@ -153,6 +175,11 @@ export default function EstateHome() {
 
   return (
     <>
+      <ReportDetailsContainer
+        currentReport={currentReport}
+        displayDetails={displayDetails}
+        setDisplayDetails={setDisplayDetails}
+      />
       <NavBar />
       <SlideInRight sidePopup={sidePopup} />
       <div className="md:hidden">
@@ -171,7 +198,7 @@ export default function EstateHome() {
         <span>{showConfirmed ? "Close" : "Confirmed"}</span>
       </div>
 
-      <main className="flex">
+      <main className="flex bg-green-300">
         <div className="w-full fixed z-10 border-r border-green-500 max-w-[20%] h-screen bg-red-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
           <NavLink to="/assignedWorks" className={navClass}>
             Assigned
@@ -183,7 +210,7 @@ export default function EstateHome() {
             Overdue
           </NavLink>
         </div>
-        <div className="w-full h-screen md:pl-[250px]  overflow-y-auto my-24 flex flex-col items-center">
+        <div className="w-full h-screen md:pl-[250px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden  overflow-y-auto my-24 flex flex-col items-center">
           <h1 className="text-2xl md:text-4xl text-red-400 font-bold">
             New Reports
           </h1>
@@ -191,7 +218,7 @@ export default function EstateHome() {
             {newReportContainer}
           </div>
           <div
-            className={`hidden md:flex flex-col items-center py-10 border-t border-green-500`}
+            className={`flex flex-col items-center py-10 border-t border-green-500`}
           >
             <h1 className="text-2xl mt-10 md:mt-20 md:text-4xl text-red-400 font-bold">
               Confirmed Works
