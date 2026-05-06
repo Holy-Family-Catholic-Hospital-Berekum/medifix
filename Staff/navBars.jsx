@@ -1,6 +1,6 @@
 import { useState } from "react";
 import ReportForm from "./reportForm";
-import Alerts from "./Alerts";
+import AlertsContainer from "../components/AlertsContainer";
 import { useNavigate, NavLink } from "react-router";
 export default function NavBars() {
   const [formPopup, setFormPopup] = useState(false);
@@ -20,7 +20,10 @@ export default function NavBars() {
 
   return (
     <>
-      <Alerts alertsPopup={alertsPopup} />
+      <AlertsContainer
+        alertsPopup={alertsPopup}
+        setAlertsPopup={setAlertsPopup}
+      />
       {formPopup && <ReportForm formPopup={formPopup} onClose={handleClose} />}
       <nav className="md:hidden z-50 flex justify-between w-full fixed bottom-auto top-0 px-5 py-5 md:top-auto md:bottom-0 shadow bg-[#eff6ff]">
         <button className="text-[#111827]  cursor-pointer hover:text-red-300 transition">

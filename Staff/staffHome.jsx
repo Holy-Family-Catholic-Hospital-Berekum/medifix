@@ -8,12 +8,11 @@ import ac from "../images/ac.jpg";
 import refrigerator from "../images/refrigerator.jpg";
 import Footer from "../components/footer";
 import ReportForm from "./reportForm";
-import Reports from "./Reports";
 import NavBars from "./navBars";
-
+import SlideInRight from "../components/slideInRight";
 import { useState } from "react";
 
-export default function Home() {
+export default function StaffHome() {
   const [sidePopup, setSidePopup] = useState(false);
 
   const services = [
@@ -118,7 +117,7 @@ export default function Home() {
     <>
       <NavBars />
       <main className="pt-20 md:pt-24 pb-20">
-        <Reports sidePopup={sidePopup} />
+        <SlideInRight sidePopup={sidePopup} />
         <span
           className={`material-symbols-outlined md:hidden z-50 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400`}
           onClick={() => setSidePopup((prev) => !prev)}

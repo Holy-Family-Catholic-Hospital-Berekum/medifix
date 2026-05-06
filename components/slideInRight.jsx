@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export default function Reports({ sidePopup }) {
+export default function SlideInRight({ sidePopup }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
 

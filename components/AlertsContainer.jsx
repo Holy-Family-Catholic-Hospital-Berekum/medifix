@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export default function Alerts({ alertsPopup }) {
+export default function AlertsContainer({ alertsPopup, setAlertsPopup }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -22,11 +22,16 @@ export default function Alerts({ alertsPopup }) {
 
   return (
     <div
-      className={`fixed top-0 right-0 w-full md:max-w-[500px] h-screen md:top-[10%] md:h-[80%] md:right-5 md:rounded-xl bg-red-300 z-50 shadow-xl overflow-y-auto ${
+      className={`fixed top-0 right-0 w-full md:max-w-[500px] h-screen md:top-[10%] md:h-[80%] md:right-5 md:rounded-xl bg-red-300 z-10 shadow-xl overflow-y-auto ${
         closing ? "slide-out-top" : "slide-in-top"
       }`}
     >
-      {/* your content here */}
+      <span
+        className="absolute top-5 right-5 cursor-pointer"
+        onClick={() => setAlertsPopup((prev) => !prev)}
+      >
+        X
+      </span>
     </div>
   );
 }
