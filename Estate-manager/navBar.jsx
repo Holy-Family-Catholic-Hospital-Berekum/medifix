@@ -10,26 +10,28 @@ export default function NavBar() {
     }`;
 
   return (
-    <nav className="flex justify-between items-center bg-green-500 shadow p-4 w-full z-100 fixed top-0 bottom-auto">
+    <>
       <AlertsContainer
         alertsPopup={alertsPopup}
         setAlertsPopup={setAlertsPopup}
       />
-      <h1>PHIX-HFCH</h1>
+      <nav className="flex justify-between items-center bg-green-500 shadow p-4 w-full z-100 fixed top-0 bottom-auto">
+        <h1>PHIX-HFCH</h1>
 
-      <NavLink to="/" end className={navClass}>
-        Home
-      </NavLink>
+        <NavLink to="/" end className={navClass}>
+          Home
+        </NavLink>
 
-      <div
-        className="flex relative select-none"
-        onClick={() => setAlertsPopup((prev) => !prev)}
-      >
-        <span className="text-green-600 absolute bottom-2 font-bold">3</span>
-        <span className="material-symbols-outlined text-red-400 cursor-pointer">
-          circle_notifications
-        </span>
-      </div>
-    </nav>
+        <div
+          className="flex relative select-none"
+          onClick={() => setAlertsPopup((prev) => !prev)}
+        >
+          <span className="text-green-600 absolute bottom-2 font-bold">3</span>
+          <span className="material-symbols-outlined text-red-400 cursor-pointer">
+            circle_notifications
+          </span>
+        </div>
+      </nav>
+    </>
   );
 }

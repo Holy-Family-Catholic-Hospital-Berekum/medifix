@@ -5,6 +5,7 @@ import AlertsContainer from "../components/AlertsContainer";
 import { NavLink } from "react-router";
 import { nanoid } from "nanoid";
 import ReportDetailsContainer from "./reportDetails";
+import ConfirmedWorks from "./confirmedWorks";
 
 export default function EstateHome() {
   const [sidePopup, setSidePopup] = useState(false);
@@ -16,6 +17,11 @@ export default function EstateHome() {
     `cursor-pointer transition ${
       isActive ? "text-red-300" : "text-[#111827] hover:text-blue-200"
     }`;
+
+  const handleClose = () => {
+    // give slide-down time to finish before hiding
+    setTimeout(() => setFormPopup(false), 300);
+  };
 
   const reports = [
     {
@@ -147,28 +153,36 @@ export default function EstateHome() {
 
   const newReportContainer = newReports.map((report, i) => (
     <div
-      className="bg-green-500 border border-red-300 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
+      className="bg-green-500 border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
       <h1>{report.category.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
-        <span className="text-blue-200">{report.dateApproved}</span>
-        <span className="text-red-400">{report.status}</span>
+        <span className="text-blue-200 bg-yellow-800 px-1 rounded">
+          {report.dateApproved}
+        </span>
+        <span className="text-red-400 bg-gray-800 px-1 rounded">
+          {report.status}
+        </span>
       </div>
     </div>
   ));
 
   const confirmedWorksContainer = confirmedWorks.map((report, i) => (
     <div
-      className="bg-green-500 border border-red-300 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
+      className="bg-green-500 border border-yellow-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
       <h1>{report.category.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
-        <span className="text-blue-200">{report.dateConfirmed}</span>
-        <span className="text-red-400">{report.status}</span>
+        <span className="text-blue-200 bg-yellow-800 px-1 rounded">
+          {report.dateConfirmed}
+        </span>
+        <span className="text-red-400 bg-gray-800 px-1 rounded">
+          {report.status}
+        </span>
       </div>
     </div>
   ));
@@ -180,6 +194,13 @@ export default function EstateHome() {
         displayDetails={displayDetails}
         setDisplayDetails={setDisplayDetails}
       />
+      {showConfirmed && (
+        <ConfirmedWorks
+          showConfirmed={showConfirmed}
+          onClose={handleClose}
+          confirmedWorksContainer={confirmedWorksContainer}
+        />
+      )}
       <NavBar />
       <SlideInRight sidePopup={sidePopup} />
       <div className="md:hidden">
@@ -192,10 +213,12 @@ export default function EstateHome() {
       </div>
 
       <div
-        className="fixed z-10 bg-red-400 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
+        className="fixed z-70 bg-green-500 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
         onClick={() => setShowConfirmed((prev) => !prev)}
       >
-        <span>{showConfirmed ? "Close" : "Confirmed"}</span>
+        <span className="text-gray-900">
+          {showConfirmed ? "Close" : "Confirmed"}
+        </span>
       </div>
 
       <main className="flex bg-green-300">
@@ -203,7 +226,7 @@ export default function EstateHome() {
           <NavLink to="/assignedWorks" className={navClass}>
             Assigned
           </NavLink>
-          <NavLink to="/completedWorks" className={navClass}>
+          <NavLink to="/completedWorks" end className={navClass}>
             Completed
           </NavLink>
           <NavLink to="/overdueWorks" className={navClass}>
@@ -218,9 +241,9 @@ export default function EstateHome() {
             {newReportContainer}
           </div>
           <div
-            className={`flex flex-col items-center py-10 border-t border-green-500`}
+            className={`md:flex flex-col items-center py-10 border-t border-green-500 hidden`}
           >
-            <h1 className="text-2xl mt-10 md:mt-20 md:text-4xl text-red-400 font-bold">
+            <h1 className="text-2xl md:mt-20 md:text-4xl text-red-400 font-bold">
               Confirmed Works
             </h1>
             <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
