@@ -5,7 +5,7 @@ import toolsIcon from "../images/toolsIcon.png";
 import worker from "../images/worker.png";
 import masonery from "../images/masonery.jpg";
 import ac from "../images/ac.jpg";
-import refrigerator from "../images/Refrigerator.jpg";
+import refrigerator from "../images/refrigerator.jpg";
 import Footer from "../components/footer";
 import ReportForm from "./reportForm";
 import Reports from "./Reports";
@@ -15,7 +15,6 @@ import { useState } from "react";
 
 export default function Home() {
   const [sidePopup, setSidePopup] = useState(false);
-  
 
   const services = [
     {
