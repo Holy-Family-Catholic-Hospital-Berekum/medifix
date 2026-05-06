@@ -29,7 +29,7 @@ export default function NavBars() {
 
         <div className="flex items-center justify-center gap-4">
           <div
-            className="flex relative"
+            className="flex relative select-none"
             onClick={() => setAlertsPopup((prev) => !prev)}
           >
             <span className="text-green-600 absolute bottom-2 font-bold">
@@ -63,7 +63,7 @@ export default function NavBars() {
 
         <div className="flex items-center justify-center gap-4">
           <div
-            className="relative cursor-pointer hidden md:flex"
+            className="relative cursor-pointer hidden md:flex select-none"
             onClick={() => setAlertsPopup((prev) => !prev)}
           >
             <span className="text-green-600 md:text-black absolute bottom-2 font-bold">
