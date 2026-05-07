@@ -4,14 +4,13 @@ import StaffHome from "../Staff/staffHome";
 import { Routes, Route } from "react-router";
 import AssignedWorks from "../Estate-manager/assignedWorks";
 import CompletedWorks from "../Estate-manager/completedWorks";
-
-import NewReports from "../Estate-manager/newReports";
+import AdminHome from "../Admin/adminHome";
 import OverdueWorks from "../Estate-manager/overdueWorks";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<EstateHome />} />
+      <Route path="/" element={<AdminHome />} />
       <Route path="/History" element={<History />} />
       <Route path="/assignedWorks" element={<AssignedWorks />} />
       <Route path="/completedWorks" element={<CompletedWorks />} />
