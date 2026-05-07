@@ -1,13 +1,12 @@
 import NavBar from "./navBar";
 import { useState } from "react";
-import SlideInRight from "./slideInRight";
+import WorkerSlideInRight from "./workerSlideInRight";
 import AlertsContainer from "../components/AlertsContainer";
 import { NavLink } from "react-router";
 import { nanoid } from "nanoid";
 import ReportDetailsContainer from "./reportDetails";
-import Pending from "./Pending";
 
-export default function AdminHome() {
+export default function WorkerHome() {
   const [sidePopup, setSidePopup] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
   const [displayDetails, setDisplayDetails] = useState(false);
@@ -15,7 +14,7 @@ export default function AdminHome() {
 
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
-      isActive ? "text-white" : "text-[#111827] hover:text-blue-200"
+      isActive ? "text-red-300" : "text-[#111827] hover:text-blue-200"
     }`;
 
   const handleClose = () => {
@@ -25,7 +24,7 @@ export default function AdminHome() {
 
   const reports = [
     {
-      status: "incoming",
+      status: "approved",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -39,7 +38,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "incoming",
+      status: "approved",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -53,7 +52,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "incoming",
+      status: "approved",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -66,7 +65,7 @@ export default function AdminHome() {
       dateConfirmed: "13/03/2026",
     },
     {
-      status: "incoming",
+      status: "approved",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -80,7 +79,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "incoming",
+      status: "approved",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -94,7 +93,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "pending",
+      status: "confirmed",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -108,7 +107,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "pending",
+      status: "confirmed",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -122,7 +121,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "pending",
+      status: "confirmed",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -146,12 +145,11 @@ export default function AdminHome() {
     setCurrentReport(reportToDisplay);
   };
 
-  const newReports = reports.filter((report) => report.status === "incoming");
-  const pending = reports.filter((report) => report.status === "pending");
+  const newReports = reports.filter((report) => report.status === "approved");
 
   const newReportContainer = newReports.map((report, i) => (
     <div
-      className="bg-green-300 border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-[#eff6ff] rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
+      className="bg-green-500 border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
@@ -159,24 +157,6 @@ export default function AdminHome() {
       <div className="flex justify-between gap-4">
         <span className="text-blue-200 bg-yellow-800 px-1 rounded">
           {report.dateApproved}
-        </span>
-        <span className="text-red-400 bg-gray-800 px-1 rounded">
-          {report.status}
-        </span>
-      </div>
-    </div>
-  ));
-
-  const pendingConfirmation = pending.map((report, i) => (
-    <div
-      className="bg-green-300 z-60 border border-yellow-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-[#eff6ff] rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
-      key={i}
-      onClick={() => displayReportDetails(report.id)}
-    >
-      <h1>{report.category.toUpperCase()}</h1>
-      <div className="flex justify-between gap-4">
-        <span className="text-blue-200 bg-yellow-800 px-1 rounded">
-          {report.dateConfirmed}
         </span>
         <span className="text-red-400 bg-gray-800 px-1 rounded">
           {report.status}
@@ -193,14 +173,14 @@ export default function AdminHome() {
         setDisplayDetails={setDisplayDetails}
       />
       {showConfirmed && (
-        <Pending
+        <ConfirmedWorks
           showConfirmed={showConfirmed}
           onClose={handleClose}
-          pendingConfirmation={pendingConfirmation}
+          confirmedWorksContainer={confirmedWorksContainer}
         />
       )}
       <NavBar />
-      <SlideInRight sidePopup={sidePopup} />
+      <WorkerSlideInRight sidePopup={sidePopup} />
       <div className="md:hidden">
         <span
           className="material-symbols-outlined select-none z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400"
@@ -211,39 +191,29 @@ export default function AdminHome() {
       </div>
 
       <div
-        className="fixed border-t border-white z-100 bg-red-400 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
+        className="fixed z-100 bg-green-500 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
         onClick={() => setShowConfirmed((prev) => !prev)}
       >
         <span className="text-gray-900">
-          {showConfirmed ? "Close" : "Pending"}
+          {showConfirmed ? "Close" : "Confirmed"}
         </span>
       </div>
 
-      <main className="flex bg-[#eff6ff]">
-        <div className="w-full fixed z-10 border-r border-gray-800 max-w-[20%] h-screen bg-green-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
-          <NavLink to="/Assigned" className={navClass}>
-            Assigned
-          </NavLink>
-          <NavLink to="/Completed" end className={navClass}>
+      <main className="flex bg-green-300">
+        <div className="w-full fixed z-10 border-r border-green-500 max-w-[20%] h-screen bg-red-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
+          <NavLink to="/workerCompleted" end className={navClass}>
             Completed
           </NavLink>
-          <NavLink to="/Overdue" className={navClass}>
+          <NavLink to="/workerOverdue" className={navClass}>
             Overdue
           </NavLink>
         </div>
-        <div className="w-full h-screen md:pl-[250px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden  overflow-y-auto my-24 flex flex-col z-0 items-center">
-          <h1 className="text-xl bg-red-300 w-full text-center py-2 md:text-2xl text-gray-800 font-bold">
-            Incoming Reports
+        <div className="w-full h-screen md:pl-[250px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden  overflow-y-auto my-24 flex flex-col items-center">
+          <h1 className="text-2xl md:text-4xl text-red-400 font-bold">
+            Assigned to You
           </h1>
           <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
             {newReportContainer}
-          </div>
-          <h1 className="text-xl text-center border-t border-gray-800 bg-red-300 w-full py-2 md:mt-20 md:text-2xl text-gray-800 font-bold">
-            Pending Confirmation
-          </h1>
-
-          <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
-            {pendingConfirmation}
           </div>
         </div>
       </main>
