@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 export default function Pending({
   showConfirmed,
   onClose,
-  confirmedWorksContainer,
+  pendingConfirmation,
 }) {
   const [closing, setClosing] = useState(false);
 
@@ -26,10 +26,10 @@ export default function Pending({
         }`}
       >
         <h1 className="text-2xl md:text-4xl text-gray-800 font-bold">
-          Confirmed Works
+          Pending Confirmation
         </h1>
         <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
-          {confirmedWorksContainer}
+          {pendingConfirmation}
         </div>
       </div>
     </div>

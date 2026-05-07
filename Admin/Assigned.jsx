@@ -146,7 +146,7 @@ export default function AssignedWorks() {
 
   const assignedReportsContainer = assignedReports.map((report, i) => (
     <div
-      className="bg-green-500 border border-red-300 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
+      className="bg-green-300 border border-red-300 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-[#eff6ff] rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
@@ -180,16 +180,15 @@ export default function AssignedWorks() {
         </span>
       </div>
 
-
-      <main className="flex bg-green-300">
-        <div className="w-full fixed z-10 border-r border-green-500 max-w-[20%] h-screen bg-red-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
-          <NavLink to="/assignedWorks" className={navClass}>
+      <main className="flex bg-[#eff6ff]">
+        <div className="w-full fixed z-10 border-r border-gray-800 max-w-[20%] h-screen bg-green-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
+          <NavLink to="/Assigned" className={navClass}>
             Assigned
           </NavLink>
-          <NavLink to="/completedWorks" className={navClass}>
+          <NavLink to="/Completed" end className={navClass}>
             Completed
           </NavLink>
-          <NavLink to="/overdueWorks" className={navClass}>
+          <NavLink to="/Overdue" className={navClass}>
             Overdue
           </NavLink>
         </div>

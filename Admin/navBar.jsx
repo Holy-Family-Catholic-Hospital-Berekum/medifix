@@ -15,8 +15,8 @@ export default function NavBar() {
         alertsPopup={alertsPopup}
         setAlertsPopup={setAlertsPopup}
       />
-      <nav className="flex justify-between items-center bg-green-500 shadow p-4 w-full z-100 fixed top-0 bottom-auto">
-        <h1>PHIX-HFCH</h1>
+      <nav className="flex justify-between items-center bg-[#eff6ff] shadow p-4 w-full z-100 fixed top-0 bottom-auto">
+        <h1 className="text-gray-800">PHIX-HFCH</h1>
 
         <NavLink to="/" end className={navClass}>
           Home

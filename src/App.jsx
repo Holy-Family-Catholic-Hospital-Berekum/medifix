@@ -4,8 +4,12 @@ import StaffHome from "../Staff/staffHome";
 import { Routes, Route } from "react-router";
 import AssignedWorks from "../Estate-manager/assignedWorks";
 import CompletedWorks from "../Estate-manager/completedWorks";
-import AdminHome from "../Admin/adminHome";
 import OverdueWorks from "../Estate-manager/overdueWorks";
+
+import AdminHome from "../Admin/adminHome";
+import Assigned from "../Admin/Assigned";
+import Completed from "../Admin/Completed";
+import Overdue from "../Admin/Overdue";
 
 export default function App() {
   return (
@@ -14,9 +18,11 @@ export default function App() {
       <Route path="/History" element={<History />} />
       <Route path="/assignedWorks" element={<AssignedWorks />} />
       <Route path="/completedWorks" element={<CompletedWorks />} />
-
-      <Route path="/newReports" element={<newReports />} />
       <Route path="/overdueWorks" element={<OverdueWorks />} />
+
+      <Route path="/Assigned" element={<Assigned />} />
+      <Route path="/Completed" element={<Completed />} />
+      <Route path="/Overdue" element={<Overdue />} />
     </Routes>
   );
 }

@@ -1,6 +1,6 @@
 import NavBar from "./navBar";
 import { useState } from "react";
-import SlideInRight from "../components/slideInRight";
+import SlideInRight from "./slideInRight";
 import AlertsContainer from "../components/AlertsContainer";
 import { NavLink } from "react-router";
 import { nanoid } from "nanoid";
@@ -15,7 +15,7 @@ export default function AdminHome() {
 
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
-      isActive ? "text-red-300" : "text-[#111827] hover:text-blue-200"
+      isActive ? "text-white" : "text-[#111827] hover:text-blue-200"
     }`;
 
   const handleClose = () => {
@@ -25,7 +25,7 @@ export default function AdminHome() {
 
   const reports = [
     {
-      status: "approved",
+      status: "incoming",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -39,7 +39,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "approved",
+      status: "incoming",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -53,7 +53,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "approved",
+      status: "incoming",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -66,7 +66,7 @@ export default function AdminHome() {
       dateConfirmed: "13/03/2026",
     },
     {
-      status: "approved",
+      status: "incoming",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -80,7 +80,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "approved",
+      status: "incoming",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -94,7 +94,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "confirmed",
+      status: "pending",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -108,7 +108,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "confirmed",
+      status: "pending",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -122,7 +122,7 @@ export default function AdminHome() {
       id: nanoid(),
     },
     {
-      status: "confirmed",
+      status: "pending",
       dateSent: "12/03/2026",
       dateApproved: "12/03/2026",
       dateAssigned: "12/03/2026",
@@ -146,14 +146,12 @@ export default function AdminHome() {
     setCurrentReport(reportToDisplay);
   };
 
-  const newReports = reports.filter((report) => report.status === "approved");
-  const confirmedWorks = reports.filter(
-    (report) => report.status === "confirmed",
-  );
+  const newReports = reports.filter((report) => report.status === "incoming");
+  const pending = reports.filter((report) => report.status === "pending");
 
   const newReportContainer = newReports.map((report, i) => (
     <div
-      className="bg-green-500 border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
+      className="bg-green-300 border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-[#eff6ff] rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
@@ -169,9 +167,9 @@ export default function AdminHome() {
     </div>
   ));
 
-  const confirmedWorksContainer = confirmedWorks.map((report, i) => (
+  const pendingConfirmation = pending.map((report, i) => (
     <div
-      className="bg-green-500 z-60 border border-yellow-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
+      className="bg-green-300 z-60 border border-yellow-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-[#eff6ff] rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
@@ -198,7 +196,7 @@ export default function AdminHome() {
         <Pending
           showConfirmed={showConfirmed}
           onClose={handleClose}
-          confirmedWorksContainer={confirmedWorksContainer}
+          pendingConfirmation={pendingConfirmation}
         />
       )}
       <NavBar />
@@ -213,41 +211,41 @@ export default function AdminHome() {
       </div>
 
       <div
-        className="fixed z-100 bg-green-500 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
+        className="fixed border-t border-white z-100 bg-red-400 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
         onClick={() => setShowConfirmed((prev) => !prev)}
       >
         <span className="text-gray-900">
-          {showConfirmed ? "Close" : "Confirmed"}
+          {showConfirmed ? "Close" : "Pending"}
         </span>
       </div>
 
-      <main className="flex bg-green-300">
-        <div className="w-full fixed z-10 border-r border-green-500 max-w-[20%] h-screen bg-red-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
-          <NavLink to="/assignedWorks" className={navClass}>
+      <main className="flex bg-[#eff6ff]">
+        <div className="w-full fixed z-10 border-r border-gray-800 max-w-[20%] h-screen bg-green-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
+          <NavLink to="/Assigned" className={navClass}>
             Assigned
           </NavLink>
-          <NavLink to="/completedWorks" end className={navClass}>
+          <NavLink to="/Completed" end className={navClass}>
             Completed
           </NavLink>
-          <NavLink to="/overdueWorks" className={navClass}>
+          <NavLink to="/Overdue" className={navClass}>
             Overdue
           </NavLink>
         </div>
         <div className="w-full h-screen md:pl-[250px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden  overflow-y-auto my-24 flex flex-col items-center">
-          <h1 className="text-2xl md:text-4xl text-red-400 font-bold">
-            New Reports
+          <h1 className="text-2xl md:text-4xl text-gray-800 font-bold">
+            Incoming Reports
           </h1>
           <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
             {newReportContainer}
           </div>
           <div
-            className={`md:flex flex-col items-center py-10 border-t border-green-500 hidden`}
+            className={`md:flex flex-col items-center py-10 border-t border-gray-800 hidden`}
           >
-            <h1 className="text-2xl md:mt-20 md:text-4xl text-red-400 font-bold">
-              Confirmed Works
+            <h1 className="text-2xl md:mt-20 md:text-4xl text-gray-800 font-bold">
+              Pending Confirmation
             </h1>
             <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
-              {confirmedWorksContainer}
+              {pendingConfirmation}
             </div>
           </div>
         </div>
