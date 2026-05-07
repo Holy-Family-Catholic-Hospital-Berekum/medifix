@@ -20,7 +20,7 @@ import WorkerOverdue from "../Worker/workerOverdue";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<WorkerHome />} />
+      <Route path="/" element={<StaffHome />} />
       <Route path="/History" element={<History />} />
       <Route path="/assignedWorks" element={<AssignedWorks />} />
       <Route path="/completedWorks" element={<CompletedWorks />} />
