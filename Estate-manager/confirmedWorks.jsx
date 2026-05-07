@@ -19,7 +19,7 @@ export default function ConfirmedWorks({
   if (!showConfirmed && !closing) return null;
 
   return (
-    <div className="z-60 md:hidden md:pointer-events-none fixed inset-0 flex items-end justify-center bg-black/40">
+    <div className="z-70 md:hidden md:pointer-events-none fixed inset-0 flex items-end justify-center bg-black/40">
       <div
         className={`bg-red-300 w-full h-full overflow-y-auto pt-24 flex flex-col items-center gap-4 rounded-t-2xl ${
           closing ? "slide-down" : "slide-up"

@@ -171,7 +171,7 @@ export default function EstateHome() {
 
   const confirmedWorksContainer = confirmedWorks.map((report, i) => (
     <div
-      className="bg-green-500 border border-yellow-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
+      className="bg-green-500 z-60 border border-yellow-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-700 rounded-xl w-full max-w-[200px] md:max-w-[300px] p-2 md:p-4 "
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
@@ -205,7 +205,7 @@ export default function EstateHome() {
       <SlideInRight sidePopup={sidePopup} />
       <div className="md:hidden">
         <span
-          className="material-symbols-outlined select-none z-50 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400"
+          className="material-symbols-outlined select-none z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400"
           onClick={() => setSidePopup((prev) => !prev)}
         >
           {sidePopup ? "chevron_right" : "chevron_left"}
@@ -213,7 +213,7 @@ export default function EstateHome() {
       </div>
 
       <div
-        className="fixed z-70 bg-green-500 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
+        className="fixed z-100 bg-green-500 bottom-0 top-auto cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-full px-10 py-1 md:hidden"
         onClick={() => setShowConfirmed((prev) => !prev)}
       >
         <span className="text-gray-900">
