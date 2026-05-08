@@ -19,12 +19,15 @@ import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
 import WorkerOverdue from "../Worker/workerOverdue";
 
+import Pending from "../Staff/Pending";
+import StaffOverdue from "../Staff/staffOverdue";
+
 import DemoHome from "../demoHome";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<WorkerHome />} />
+      <Route path="/" element={<StaffHome />} />
       <Route path="/History" element={<History />} />
 
       <Route path="/adminAssigned" element={<AdminAssigned />} />
@@ -37,6 +40,9 @@ export default function App() {
 
       <Route path="/workerCompleted" element={<WorkerCompleted />} />
       <Route path="/workerOverdue" element={<WorkerOverdue />} />
+
+      <Route path="/Pending" element={<Pending />} />
+      <Route path="/staffOverdue" element={<StaffOverdue />} />
     </Routes>
   );
 }

@@ -1,10 +1,10 @@
 import PageLayout from "./pageLayout";
 import { useState } from "react";
 
-export default function History() {
+export default function Pending() {
   const [sidePopup, setSidePopup] = useState(false);
 
-  const History = <div className="py-24">History here</div>;
+  const pendingReports = <div className="py-24">Pending reports here</div>;
 
   return (
     <>
@@ -14,9 +14,7 @@ export default function History() {
       >
         {sidePopup ? "chevron_right" : "chevron_left"}
       </span>
-      <PageLayout content={History} sidePopup={sidePopup} />
+      <PageLayout content={pendingReports} sidePopup={sidePopup} />
     </>
   );
 }
-
-
