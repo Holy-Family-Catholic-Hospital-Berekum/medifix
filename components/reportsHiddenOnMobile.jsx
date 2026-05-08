@@ -1,22 +1,23 @@
 import { useState, useEffect } from "react";
 
-export default function Pending({
-  showConfirmed,
+export default function ReportsHiddenOnMobile({
+  showReportsHiddenOnMobile,
   onClose,
-  pendingConfirmation,
+  reportsHiddenOnMobile,
+  reportsHiddenOnMobileTitle,
 }) {
   const [closing, setClosing] = useState(false);
 
-  // ✅ When showConfirmed goes false, play slide-down before hiding
+  // ✅ When showReportsHiddenOnMobile goes false, play slide-down before hiding
   useEffect(() => {
-    if (!showConfirmed) {
+    if (!showReportsHiddenOnMobile) {
       setClosing(true);
       const t = setTimeout(() => setClosing(false), 300);
       return () => clearTimeout(t);
     }
-  }, [showConfirmed]);
+  }, [showReportsHiddenOnMobile]);
 
-  if (!showConfirmed && !closing) return null;
+  if (!showReportsHiddenOnMobile && !closing) return null;
 
   return (
     <div className="z-70 md:hidden md:pointer-events-none fixed inset-0 flex items-end justify-center bg-black/40">
@@ -26,10 +27,10 @@ export default function Pending({
         }`}
       >
         <h1 className="text-2xl md:text-4xl text-gray-800 font-bold">
-          Pending Confirmation
+          {reportsHiddenOnMobileTitle}
         </h1>
         <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
-          {pendingConfirmation}
+          {reportsHiddenOnMobile}
         </div>
       </div>
     </div>

@@ -1,28 +1,24 @@
 import Home from "../components/Home";
 
-export default function EstateHome() {
+export default function Overdue() {
   return (
     <Home
       bgColor="bg-[#eff6ff]"
-      firstReportsStatus="approved"
-      secondReportsStatus="confirmed"
+      firstReportsStatus="overdue"
       primaryColor="text-yellow-300"
-      title1="Approved Reports"
-      title2={"Confirmed Reports"}
+      title1="Overdue Works"
       secColor={"bg-blue-500"}
       titleBgColor={"bg-yellow-500"}
       reportCardHoverColor={"hover:bg-blue-600"}
-      reportDate1="dateSent"
-      reportDate2="dateAssigned" //change later to date admin confirmed
+      reportDate1="dateSent" //change to date due later
       titleBorderColor={"border-yellow-300"}
       navBarColor="bg-yellow-300"
       slideInBgColor="bg-yellow-300"
       reportDetailsBgColor="bg-green-300"
-      reportsHiddenOnMobileTitle="Confirmed Reports"
-      specificReportsPage={false}
+      specificReportsPage={true}
       overdueRedirect={"/estateOverdue"}
       completedRedirect={"/estateCompleted"}
-      assignedRedirect={"estateAssigned"}
+      assignedRedirect={"/estateAssigned"}
       logoBGColor="md:bg-blue-500"
     />
   );
