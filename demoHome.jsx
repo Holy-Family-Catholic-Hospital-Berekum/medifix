@@ -1,6 +1,6 @@
-import Home from "../components/Home";
+import Home from "./components/Home";
 
-export default function AdminHome() {
+export default function DemoHome() {
   return (
     <Home
       bgColor="bg-green-300"

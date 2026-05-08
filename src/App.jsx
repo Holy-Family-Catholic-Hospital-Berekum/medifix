@@ -17,10 +17,12 @@ import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
 import WorkerOverdue from "../Worker/workerOverdue";
 
+import DemoHome from "../demoHome";
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<StaffHome />} />
+      <Route path="/" element={<DemoHome />} />
       <Route path="/History" element={<History />} />
       <Route path="/assignedWorks" element={<AssignedWorks />} />
       <Route path="/completedWorks" element={<CompletedWorks />} />

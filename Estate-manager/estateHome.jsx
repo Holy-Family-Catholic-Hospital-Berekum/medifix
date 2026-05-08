@@ -222,7 +222,7 @@ export default function EstateHome() {
       </div>
 
       <main className="flex bg-green-300">
-        <div className="w-full fixed z-10 border-r border-green-500 max-w-[20%] h-screen bg-red-300  md:flex flex-col pt-24 px-10 gap-10 hidden">
+        <div className="w-full fixed z-10 border-r border-green-500 max-w-[20%] h-screen bg-green-500  md:flex flex-col pt-24 px-10 gap-10 hidden">
           <NavLink to="/assignedWorks" className={navClass}>
             Assigned
           </NavLink>
