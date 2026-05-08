@@ -411,9 +411,11 @@ export default function Home({
         <div
           className={`w-full fixed inset-y-0 z-10 max-w-[20%] h-screen ${secColor}  md:flex flex-col pt-24 px-10 gap-10 hidden`}
         >
-          <NavLink to={`${assignedRedirect}`} className={navClass}>
-            Assigned
-          </NavLink>
+          {assignedRedirect && (
+            <NavLink to={`${assignedRedirect}`} className={navClass}>
+              Assigned
+            </NavLink>
+          )}
           <NavLink to={`${completedRedirect}`} end className={navClass}>
             Completed
           </NavLink>

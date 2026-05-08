@@ -24,7 +24,7 @@ import DemoHome from "../demoHome";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<AdminHome />} />
+      <Route path="/" element={<WorkerHome />} />
       <Route path="/History" element={<History />} />
 
       <Route path="/adminAssigned" element={<AdminAssigned />} />

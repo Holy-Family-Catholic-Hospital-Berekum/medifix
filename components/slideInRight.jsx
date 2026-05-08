@@ -40,9 +40,11 @@ export default function SlideInRight({
           closing ? "slide-out-right" : "slide-in-right"
         }`}
       >
-        <NavLink to={`${assignedRedirect}`} className={navClass}>
-          Assigned
-        </NavLink>
+        {assignedRedirect && (
+          <NavLink to={`${assignedRedirect}`} className={navClass}>
+            Assigned
+          </NavLink>
+        )}
         <NavLink to={`${completedRedirect}`} end className={navClass}>
           Completed
         </NavLink>
