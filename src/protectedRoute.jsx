@@ -1,11 +1,13 @@
-import { Navigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 const ProtectedRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem("user"));
-
+  const navigate = useNavigate();
   // If no user is found, redirect to login
   if (!user) {
-    return <Navigate to="/" replace />;
+    navigate("/");
+
+    return;
   }
 
   // If user exists, render the actual page
