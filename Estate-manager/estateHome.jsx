@@ -22,7 +22,7 @@ export default function EstateHome() {
       specificReportsPage={false}
       overdueRedirect={"/estateOverdue"}
       completedRedirect={"/estateCompleted"}
-      assignedRedirect={"estateAssigned"}
+      assignedRedirect={"/estateAssigned"}
       logoBGColor="md:bg-blue-500"
       homeRedirect="/estateHome"
     />

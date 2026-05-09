@@ -21,7 +21,7 @@ export default function AdminHome() {
       reportsHiddenOnMobileTitle="Pending Confirmation"
       overdueRedirect={"/adminOverdue"}
       completedRedirect={"/adminCompleted"}
-      assignedRedirect={"adminAssigned"}
+      assignedRedirect={"/adminAssigned"}
       logoBGColor="md:bg-green-500"
       homeRedirect="/adminHome"
     />
