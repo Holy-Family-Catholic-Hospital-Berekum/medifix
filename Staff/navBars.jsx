@@ -62,7 +62,7 @@ export default function NavBars() {
           </button>
         </div>
         <div className="flex gap-20">
-          <NavLink to="/staffHome" end className={navClass}>
+          <NavLink to="/Home" end className={navClass}>
             Home
           </NavLink>
           <NavLink to="/History" className={navClass}>
