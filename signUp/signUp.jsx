@@ -218,6 +218,8 @@ export default function SignUp() {
         setTimeout(() => navigate("/workerHome"), 300);
       } else if (role === "admin") {
         setTimeout(() => navigate("/adminHome"), 300);
+      } else if (role === "estate") {
+        setTimeout(() => navigate("/estateHome"), 300);
       } else {
         setTimeout(() => navigate("/"), 300);
       }
