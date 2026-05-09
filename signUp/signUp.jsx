@@ -128,12 +128,12 @@ export default function SignUp() {
       const registrationData = registrationSnapshot.docs[0].data();
       const type = registrationData.type?.toLowerCase();
 
-      if (type !== "staff" && type !== "worker") {
-        alert(
-          "Registration ID type is invalid. Please contact the Estate Manager.",
-        );
-        return;
-      }
+      // if (type !== "staff" && type !== "worker") {
+      //   alert(
+      //     "Registration ID type is invalid. Please contact the Estate Manager.",
+      //   );
+      //   return;
+      // }
 
       const existingUserQuery = query(
         collection(db, "users"),
@@ -201,8 +201,12 @@ export default function SignUp() {
       const loggedInUser = loginSnapshot.docs[0].data();
       const role = loggedInUser.role || "user";
 
-      // Store user data in localStorage for session management
-      localStorage.setItem("user", JSON.stringify(loggedInUser));
+      // Store user data in localStorage with timestamp for session management
+      const userData = {
+        data: loggedInUser,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem("user", JSON.stringify(userData));
 
       alert(`Login successful! Welcome ${loggedInUser.name || "user"}.`);
       setLoginPassword("");

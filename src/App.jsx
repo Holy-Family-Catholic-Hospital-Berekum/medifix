@@ -22,8 +22,6 @@ import WorkerOverdue from "../Worker/workerOverdue";
 import Pending from "../Staff/Pending";
 import StaffOverdue from "../Staff/staffOverdue";
 
-import DemoHome from "../demoHome";
-
 import SignUp from "../signUp/signUp";
 
 import ProtectedRoute from "./protectedRoute";
