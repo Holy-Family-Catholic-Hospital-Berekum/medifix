@@ -30,7 +30,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<SignUp />} />
-      <Route path="/History" element={<History />} />
+
+      <Route path="/adminHome" element={<AdminHome />} />
+      <Route path="/estateHome" element={<EstateHome />} />
+      <Route path="/Home" element={<StaffHome />} />
+      <Route path="/workerHome" element={<WorkerHome />} />
 
       <Route path="/adminAssigned" element={<AdminAssigned />} />
       <Route path="/adminCompleted" element={<AdminCompleted />} />
@@ -45,6 +49,7 @@ export default function App() {
 
       <Route path="/Pending" element={<Pending />} />
       <Route path="/staffOverdue" element={<StaffOverdue />} />
+      <Route path="/History" element={<History />} />
     </Routes>
   );
 }

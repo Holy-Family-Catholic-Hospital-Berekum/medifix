@@ -19,6 +19,7 @@ export default function Completed() {
       completedRedirect={"/adminCompleted"}
       assignedRedirect={"/adminAssigned"}
       logoBGColor="md:bg-green-500"
+      homeRedirect="/estateHome"
     />
   );
 }

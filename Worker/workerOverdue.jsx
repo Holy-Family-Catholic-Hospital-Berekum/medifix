@@ -19,6 +19,7 @@ export default function WorkerOverdue() {
       overdueRedirect={"/workerOverdue"}
       completedRedirect={"/workerCompleted"}
       logoBGColor="md:bg-yellow-500"
+      homeRedirect="/workerHome"
     />
   );
 }

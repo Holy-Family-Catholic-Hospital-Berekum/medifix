@@ -1,6 +1,5 @@
 import Home from "../components/Home";
 
-
 export default function AdminHome() {
   return (
     <Home
@@ -24,6 +23,7 @@ export default function AdminHome() {
       completedRedirect={"/adminCompleted"}
       assignedRedirect={"adminAssigned"}
       logoBGColor="md:bg-green-500"
+      homeRedirect="/adminHome"
     />
   );
 }

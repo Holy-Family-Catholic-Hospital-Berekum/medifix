@@ -29,6 +29,7 @@ export default function Home({
   reportsHiddenOnMobileTitle,
   specificReportsPage,
   logoBGColor,
+  homeRedirect,
 }) {
   const [sidePopup, setSidePopup] = useState(false);
   const [showReportsHiddenOnMobile, SetShowReportsHiddenOnMobile] =
@@ -377,7 +378,11 @@ export default function Home({
           reportsHiddenOnMobileTitle={reportsHiddenOnMobileTitle}
         />
       )}
-      <NavBar navBarColor={navBarColor} logoBGColor={logoBGColor} />
+      <NavBar
+        navBarColor={navBarColor}
+        logoBGColor={logoBGColor}
+        homeRedirect={homeRedirect}
+      />
       <SlideInRight
         sidePopup={sidePopup}
         slideInBgColor={slideInBgColor}

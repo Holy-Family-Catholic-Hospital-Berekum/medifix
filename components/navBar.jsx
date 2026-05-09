@@ -1,7 +1,7 @@
 import { NavLink } from "react-router";
 import { useState } from "react";
 import AlertsContainer from "./AlertsContainer";
-export default function NavBar({ navBarColor, logoBGColor }) {
+export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
   const [alertsPopup, setAlertsPopup] = useState(false);
 
   const navClass = ({ isActive }) =>
@@ -26,7 +26,7 @@ export default function NavBar({ navBarColor, logoBGColor }) {
           PHIX-HFCH
         </h1>
 
-        <NavLink to="/" end className={navClass}>
+        <NavLink to={`${homeRedirect}`} end className={navClass}>
           Home
         </NavLink>
 

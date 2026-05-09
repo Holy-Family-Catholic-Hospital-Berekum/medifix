@@ -1,4 +1,14 @@
 import { useState } from "react";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "../src/firebase";
+import { useNavigate } from "react-router";
 
 export default function SignUp() {
   const [mode, setMode] = useState("login");
@@ -13,6 +23,8 @@ export default function SignUp() {
   const [loginId, setLoginId] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [closing, setClosing] = useState(false); // ✅ for smooth mode transition
+
+  const navigate = useNavigate();
 
   const steps = [
     {
@@ -96,25 +108,116 @@ export default function SignUp() {
   };
 
   // ✅ handleSubmit was missing — now defined
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canProceed) return;
-    console.log({
-      name,
-      email,
-      password,
-      phoneNumber,
-      location,
-      profession,
-      id,
-    });
-    alert("Account created successfully!");
-    setTimeout(() => setMode("login"), 200);
+
+    try {
+      const registrationQuery = query(
+        collection(db, "registration IDs"),
+        where("ID", "==", id),
+      );
+      const registrationSnapshot = await getDocs(registrationQuery);
+
+      if (registrationSnapshot.empty) {
+        alert(
+          "Invalid registration ID. Please request a valid ID from the Estate Manager.",
+        );
+        return;
+      }
+
+      const registrationData = registrationSnapshot.docs[0].data();
+      const type = registrationData.type?.toLowerCase();
+
+      if (type !== "staff" && type !== "worker") {
+        alert(
+          "Registration ID type is invalid. Please contact the Estate Manager.",
+        );
+        return;
+      }
+
+      const existingUserQuery = query(
+        collection(db, "users"),
+        where("ID", "==", id),
+      );
+      const existingUserSnapshot = await getDocs(existingUserQuery);
+
+      if (!existingUserSnapshot.empty) {
+        alert(
+          "This registration ID has already been used to create an account.",
+        );
+        return;
+      }
+
+      await addDoc(collection(db, "users"), {
+        name,
+        location,
+        profession,
+        ID: id,
+        reports: [],
+        phoneNumber,
+        email,
+        password,
+        role: type,
+        createdAt: serverTimestamp(),
+      });
+
+      alert("Account created successfully!");
+      setName("");
+      setEmail("");
+      setPassword("");
+      setPhoneNumber("");
+      setLocation("");
+      setProfession("");
+      setId("");
+      setStep(0);
+      setTimeout(() => setMode("login"), 200);
+    } catch (error) {
+      console.error("Sign up failed:", error);
+      alert("Unable to create account. Please try again later.");
+    }
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    console.log({ loginId, loginPassword });
-    alert("Login successful!");
+
+    if (!loginId.trim() || !loginPassword.trim()) {
+      alert("Please fill in both ID and password.");
+      return;
+    }
+
+    try {
+      const loginQuery = query(
+        collection(db, "users"),
+        where("ID", "==", loginId.trim()),
+        where("password", "==", loginPassword),
+      );
+      const loginSnapshot = await getDocs(loginQuery);
+
+      if (loginSnapshot.empty) {
+        alert("Invalid ID or password. Please try again.");
+        return;
+      }
+
+      const loggedInUser = loginSnapshot.docs[0].data();
+      const role = loggedInUser.role || "user";
+
+      alert(`Login successful! Welcome ${loggedInUser.name || "user"}.`);
+      setLoginPassword("");
+      setLoginId("");
+
+      if (role === "staff") {
+        setTimeout(() => navigate("/Home"), 300);
+      } else if (role === "worker") {
+        setTimeout(() => navigate("/workerHome"), 300);
+      } else if (role === "admin") {
+        setTimeout(() => navigate("/adminHome"), 300);
+      } else {
+        setTimeout(() => navigate("/"), 300);
+      }
+    } catch (error) {
+      console.error("Login failed:", error);
+      alert("Unable to log in. Please try again later.");
+    }
   };
 
   // ✅ Smooth mode switch — fade out then switch
