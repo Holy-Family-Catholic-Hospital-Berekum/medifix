@@ -201,6 +201,9 @@ export default function SignUp() {
       const loggedInUser = loginSnapshot.docs[0].data();
       const role = loggedInUser.role || "user";
 
+      // Store user data in localStorage for session management
+      localStorage.setItem("user", JSON.stringify(loggedInUser));
+
       alert(`Login successful! Welcome ${loggedInUser.name || "user"}.`);
       setLoginPassword("");
       setLoginId("");

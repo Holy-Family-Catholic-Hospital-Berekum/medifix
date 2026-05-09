@@ -26,30 +26,137 @@ import DemoHome from "../demoHome";
 
 import SignUp from "../signUp/signUp";
 
+import ProtectedRoute from "./protectedRoute";
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<SignUp />} />
 
-      <Route path="/adminHome" element={<AdminHome />} />
-      <Route path="/estateHome" element={<EstateHome />} />
-      <Route path="/Home" element={<StaffHome />} />
-      <Route path="/workerHome" element={<WorkerHome />} />
+      <Route
+        path="/adminHome"
+        element={
+          <ProtectedRoute>
+            <AdminHome />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/estateHome"
+        element={
+          <ProtectedRoute>
+            <EstateHome />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/Home"
+        element={
+          <ProtectedRoute>
+            <StaffHome />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workerHome"
+        element={
+          <ProtectedRoute>
+            <WorkerHome />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/adminAssigned" element={<AdminAssigned />} />
-      <Route path="/adminCompleted" element={<AdminCompleted />} />
-      <Route path="/adminOverdue" element={<AdminOverdue />} />
+      <Route
+        path="/adminAssigned"
+        element={
+          <ProtectedRoute>
+            <AdminAssigned />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/adminCompleted"
+        element={
+          <ProtectedRoute>
+            <AdminCompleted />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/adminOverdue"
+        element={
+          <ProtectedRoute>
+            <AdminOverdue />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/estateAssigned" element={<EstateAssigned />} />
-      <Route path="/estateCompleted" element={<EstateCompleted />} />
-      <Route path="/estateOverdue" element={<EstateOverdue />} />
+      <Route
+        path="/estateAssigned"
+        element={
+          <ProtectedRoute>
+            <EstateAssigned />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/estateCompleted"
+        element={
+          <ProtectedRoute>
+            <EstateCompleted />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/estateOverdue"
+        element={
+          <ProtectedRoute>
+            <EstateOverdue />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/workerCompleted" element={<WorkerCompleted />} />
-      <Route path="/workerOverdue" element={<WorkerOverdue />} />
+      <Route
+        path="/workerCompleted"
+        element={
+          <ProtectedRoute>
+            <WorkerCompleted />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workerOverdue"
+        element={
+          <ProtectedRoute>
+            <WorkerOverdue />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/Pending" element={<Pending />} />
-      <Route path="/staffOverdue" element={<StaffOverdue />} />
-      <Route path="/History" element={<History />} />
+      <Route
+        path="/Pending"
+        element={
+          <ProtectedRoute>
+            <Pending />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/staffOverdue"
+        element={
+          <ProtectedRoute>
+            <StaffOverdue />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/History"
+        element={
+          <ProtectedRoute>
+            <History />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }

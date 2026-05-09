@@ -15,6 +15,7 @@
     "nanoid": "^5.1.11",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-firebase-hooks": "^5.1.1",
     "react-router": "^7.15.0",
     "tailwindcss": "^4.2.4",
     "useparams": "^0.0.2"
