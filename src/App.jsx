@@ -24,10 +24,12 @@ import StaffOverdue from "../Staff/staffOverdue";
 
 import DemoHome from "../demoHome";
 
+import SignUp from "../signUp/signUp";
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<StaffHome />} />
+      <Route path="/" element={<SignUp />} />
       <Route path="/History" element={<History />} />
 
       <Route path="/adminAssigned" element={<AdminAssigned />} />
