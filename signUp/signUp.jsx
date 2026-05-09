@@ -128,12 +128,12 @@ export default function SignUp() {
       const registrationData = registrationSnapshot.docs[0].data();
       const type = registrationData.type?.toLowerCase();
 
-      // if (type !== "staff" && type !== "worker") {
-      //   alert(
-      //     "Registration ID type is invalid. Please contact the Estate Manager.",
-      //   );
-      //   return;
-      // }
+      if (type !== "staff" && type !== "worker") {
+        alert(
+          "Registration ID type is invalid. Please contact the Estate Manager.",
+        );
+        return;
+      }
 
       const existingUserQuery = query(
         collection(db, "users"),
@@ -153,7 +153,6 @@ export default function SignUp() {
         location,
         profession,
         ID: id,
-        reports: [],
         phoneNumber,
         email,
         password,

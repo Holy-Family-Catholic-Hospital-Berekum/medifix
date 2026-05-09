@@ -1,11 +1,22 @@
 import NavBar from "./navBar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SlideInRight from "../components/slideInRight";
 import AlertsContainer from "./AlertsContainer";
 import { NavLink } from "react-router";
 import { nanoid } from "nanoid";
 import ReportDetailsContainer from "./reportDetails";
 import ReportsHiddenOnMobile from "./reportsHiddenOnMobile";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  arrayUnion,
+} from "firebase/firestore";
+import { db } from "../src/firebase";
 
 export default function Home({
   bgColor,
@@ -36,6 +47,7 @@ export default function Home({
     useState(false);
   const [displayDetails, setDisplayDetails] = useState(false);
   const [currentReport, setCurrentReport] = useState([]);
+  const [reports, setReports] = useState([]);
 
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
@@ -47,269 +59,22 @@ export default function Home({
     setTimeout(() => setFormPopup(false), 300);
   };
 
-  const reports = [
-    {
-      status: "overdue",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "electricals",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "completed",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "electricals",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "overdue",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "electricals",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "completed",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "electricals",
-      dateConfirmed: "13/03/2026",
-    },
-    {
-      status: "assigned",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "plumbing",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "pending",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "plumbing",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "pending",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "electricals",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "incoming",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription: "This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "masonery",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "incoming",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "incoming",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "incoming",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "incoming",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "approved",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "approved",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "approved",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "confirmed",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "confirmed",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-    {
-      status: "assigned",
-      dateSent: "12/03/2026",
-      dateApproved: "12/03/2026",
-      dateAssigned: "12/03/2026",
-      dateCompleted: "13/03/2026",
-      cost: 1000,
-      reportDescription:
-        "This is a description of the maintenance report, This is a description of the maintenance report, This is a description of the maintenance report",
-      costDescription:
-        "This is a description of the cost involved for this work",
-      category: "carpentry",
-      dateConfirmed: "13/03/2026",
-      id: nanoid(),
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      const reportsQuery = query(collection(db, "reports"));
+
+      const reportsSnapshot = await getDocs(reportsQuery);
+
+      const reportsData = reportsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setReports(reportsData);
+    };
+
+    fetchData();
+  }, []);
 
   const displayReportDetails = (id) => {
     setDisplayDetails(true);
@@ -335,7 +100,7 @@ export default function Home({
       <h1>{report.category.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
         <span className="text-blue-200 bg-yellow-800 px-1 rounded">
-          {report[reportDate1]}
+          {report[reportDate1]?.toDate().toLocaleDateString()}
         </span>
         <span className="text-red-400 bg-gray-800 px-1 rounded">
           {report.status}
@@ -353,7 +118,7 @@ export default function Home({
       <h1>{report.category.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
         <span className="text-blue-200 bg-yellow-800 px-1 rounded">
-          {report[reportDate2]}
+          {report[reportDate2]?.toDate().toLocaleDateString()}
         </span>
         <span className="text-red-400 bg-gray-800 px-1 rounded">
           {report.status}

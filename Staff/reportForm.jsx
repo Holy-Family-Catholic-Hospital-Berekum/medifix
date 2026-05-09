@@ -6,6 +6,8 @@ import {
   query,
   where,
   getDocs,
+  updateDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 
@@ -98,24 +100,24 @@ export default function ReportForm({ formPopup, onClose }) {
         where("reporterId", "==", currentUser.ID),
       );
       const reporterReportsSnapshot = await getDocs(reporterReportsQuery);
-      const reportsThisMonth = reporterReportsSnapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          const dateSent = data.dateSent;
-          let sentDate = null;
+      const reportsThisMonthCount =
+        reporterReportsSnapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            const dateSent = data.dateSent;
+            let sentDate = null;
 
-          if (dateSent?.toDate) {
-            sentDate = dateSent.toDate();
-          } else if (dateSent instanceof Date) {
-            sentDate = dateSent;
-          } else if (typeof dateSent === "string") {
-            sentDate = new Date(dateSent);
-          }
+            if (dateSent?.toDate) {
+              sentDate = dateSent.toDate();
+            } else if (dateSent instanceof Date) {
+              sentDate = dateSent;
+            } else if (typeof dateSent === "string") {
+              sentDate = new Date(dateSent);
+            }
 
-          return { id: doc.id, sentDate };
-        })
-        .filter((item) => item.sentDate && item.sentDate >= thisMonth)
-        .map((item) => item.id);
+            return sentDate;
+          })
+          .filter((sentDate) => sentDate && sentDate >= thisMonth).length + 1;
 
       // Create the report document
       const reportData = {
@@ -141,7 +143,7 @@ export default function ReportForm({ formPopup, onClose }) {
         assignedTo: null,
         reporter: currentUser.name,
         reporterId: currentUser.ID,
-        reportsThisMonth: reportsThisMonth,
+        reportsThisMonth: reportsThisMonthCount,
 
         // Additional fields
         feedback: "",
@@ -154,13 +156,8 @@ export default function ReportForm({ formPopup, onClose }) {
         reporterContact: currentUser.phoneNumber,
       };
 
-      // Add document to Firestore
+      // Add report to Firestore
       const docRef = await addDoc(collection(db, "reports"), reportData);
-
-      // Update user's reports array
-      if (currentUser.reports) {
-        // In a real app, you'd also update the user document
-      }
 
       // Success
       alert("Report submitted successfully!");

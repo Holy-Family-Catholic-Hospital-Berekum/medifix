@@ -29,6 +29,18 @@ export default function ReportDetailsContainer({
   const reportDetails = currentReport.map((report) => (
     <div className="flex flex-col px-10 gap-10">
       <div className="flex items-center gap-2">
+        <h2 className="text-lg md:text-xl">Sent By:</h2>
+        <p className="text-red-400 md:text-lg">{report.reporter}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg md:text-xl whitespace-nowrap">
+          Priority Level:
+        </h2>
+        <p className="text-red-400 md:text-lg">{report.priorityLevel}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
         <h2 className="text-lg md:text-xl">Category:</h2>
         <p className="text-red-400 md:text-lg">{report.category}</p>
       </div>
@@ -42,23 +54,38 @@ export default function ReportDetailsContainer({
 
       <div className="flex items-center gap-2">
         <h2 className="text-lg md:text-xl">Date Sent:</h2>
-        <p className="text-red-400 md:text-lg">{report.dateSent}</p>
+        <p className="text-red-400 md:text-lg">
+          {report.dateSent?.toDate().toLocaleDateString()}
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl">Status:</h2>
-        <p className="text-red-400 md:text-lg">{report.status}</p>
+        <h2 className="text-lg md:text-xl whitespace-nowrap">
+          Sender Contact:
+        </h2>
+        <p className="text-red-400 md:text-lg">{report.reporterContact}</p>
       </div>
 
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl">Date Approved:</h2>
-        <p className="text-red-400 md:text-lg">{report.dateApproved}</p>
+        <h2 className="text-lg md:text-xl whitespace-nowrap">Location:</h2>
+        <p className="text-red-400 md:text-lg">{report.location}</p>
       </div>
+
+      {report.dateApproved && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl">Date Approved:</h2>
+          <p className="text-red-400 md:text-lg">
+            {report.dateApproved?.toDate().toLocaleDateString()}
+          </p>
+        </div>
+      )}
 
       {report.dateConfirmed && (
         <div className="flex items-center gap-2">
           <h2 className="text-lg md:text-xl">Date confirmed:</h2>
-          <p className="text-red-400 md:text-lg">{report.dateConfirmed}</p>
+          <p className="text-red-400 md:text-lg">
+            {report.dateConfirmed?.toDate().toLocaleDateString()}
+          </p>
         </div>
       )}
 
