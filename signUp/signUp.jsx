@@ -6,8 +6,14 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
+  doc,
+  setDoc,
 } from "firebase/firestore";
-import { db } from "../src/firebase";
+import { db, auth } from "../src/firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { useNavigate } from "react-router";
 
 export default function SignUp() {
@@ -113,7 +119,7 @@ export default function SignUp() {
 
     try {
       const registrationQuery = query(
-        collection(db, "registration IDs"),
+        collection(db, "registrationIDs"),
         where("ID", "==", id),
       );
       const registrationSnapshot = await getDocs(registrationQuery);
@@ -148,14 +154,22 @@ export default function SignUp() {
         return;
       }
 
-      await addDoc(collection(db, "users"), {
+      // Create Firebase Auth user
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+      const uid = userCredential.user.uid;
+
+      // Create user document in Firestore with uid as document ID
+      await setDoc(doc(db, "users", uid), {
         name,
         location,
         profession,
         ID: id,
         phoneNumber,
         email,
-        password,
         role: type,
         createdAt: serverTimestamp(),
       });
@@ -172,7 +186,13 @@ export default function SignUp() {
       setTimeout(() => setMode("login"), 200);
     } catch (error) {
       console.error("Sign up failed:", error);
-      alert("Unable to create account. Please try again later.");
+      if (error.code === "auth/email-already-in-use") {
+        alert("Email already in use. Please use a different email.");
+      } else if (error.code === "auth/weak-password") {
+        alert("Password is too weak. Please choose a stronger password.");
+      } else {
+        alert("Unable to create account. Please try again later.");
+      }
     }
   };
 
@@ -185,46 +205,56 @@ export default function SignUp() {
     }
 
     try {
-      const loginQuery = query(
+      // Query user by ID to get email
+      const userQuery = query(
         collection(db, "users"),
         where("ID", "==", loginId.trim()),
-        where("password", "==", loginPassword),
       );
-      const loginSnapshot = await getDocs(loginQuery);
+      const userSnapshot = await getDocs(userQuery);
 
-      if (loginSnapshot.empty) {
+      if (userSnapshot.empty) {
         alert("Invalid ID or password. Please try again.");
         return;
       }
 
-      const loggedInUser = loginSnapshot.docs[0].data();
-      const role = loggedInUser.role || "user";
+      const userData = userSnapshot.docs[0].data();
+      const userEmail = userData.email;
+
+      // Sign in with Firebase Auth using email and password
+      await signInWithEmailAndPassword(auth, userEmail, loginPassword);
 
       // Store user data in localStorage with timestamp for session management
-      const userData = {
-        data: loggedInUser,
+      const userInfo = {
+        data: userData,
         timestamp: Date.now(),
       };
-      localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("user", JSON.stringify(userInfo));
 
-      alert(`Login successful! Welcome ${loggedInUser.name || "user"}.`);
+      alert(`Login successful! Welcome ${userData.name || "user"}.`);
       setLoginPassword("");
       setLoginId("");
 
-      if (role === "staff") {
+      if (userData.role === "staff") {
         setTimeout(() => navigate("/Home"), 300);
-      } else if (role === "worker") {
+      } else if (userData.role === "worker") {
         setTimeout(() => navigate("/workerHome"), 300);
-      } else if (role === "admin") {
+      } else if (userData.role === "admin") {
         setTimeout(() => navigate("/adminHome"), 300);
-      } else if (role === "estate") {
+      } else if (userData.role === "estate") {
         setTimeout(() => navigate("/estateHome"), 300);
       } else {
         setTimeout(() => navigate("/"), 300);
       }
     } catch (error) {
       console.error("Login failed:", error);
-      alert("Unable to log in. Please try again later.");
+      if (
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/user-not-found"
+      ) {
+        alert("Invalid ID or password. Please try again.");
+      } else {
+        alert("Unable to log in. Please try again later.");
+      }
     }
   };
 

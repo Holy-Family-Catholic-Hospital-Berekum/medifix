@@ -1,8 +1,21 @@
-import { NavLink } from "react-router";
+import { NavLink, useNavigate } from "react-router";
 import { useState } from "react";
+import { signOut } from "firebase/auth";
+import { auth } from "../src/firebase";
 import AlertsContainer from "./AlertsContainer";
 export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
   const [alertsPopup, setAlertsPopup] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.removeItem("user");
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
@@ -39,6 +52,13 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
             circle_notifications
           </span>
         </div>
+
+        <button
+          onClick={handleLogout}
+          className="text-[#111827] hover:text-red-400 cursor-pointer transition"
+        >
+          Logout
+        </button>
       </nav>
     </>
   );

@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return getUserData().role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    function isEstateManager() {
+      return isAuthenticated() && getUserRole() == 'estate';
+    }
+
+    function isStaff() {
+      return isAuthenticated() && getUserRole() == 'staff';
+    }
+
+    function isWorker() {
+      return isAuthenticated() && getUserRole() == 'worker';
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Read: authenticated users can read their own profile, admins/estate-managers can read all
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || isEstateManager());
+      
+      // Create: allow creation during signup (but require auth for security)
+      allow create: if isAuthenticated() && request.auth.uid == userId && 
+        request.resource.data.role in ['admin', 'estate', 'staff', 'worker'] &&
+        request.resource.data.keys().hasAll(['name', 'email', 'role', 'ID']) &&
+        request.resource.data.name is string &&
+        request.resource.data.email is string &&
+        request.resource.data.role is string &&
+        request.resource.data.ID is string;
+      
+      // Update: users can update their own profile, admins can update any
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin()) &&
+        // Only admins can change roles
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin());
+      
+      // Delete: only admins
+      allow delete: if isAdmin();
+    }
+
+    // Reports collection
+    match /reports/{reportId} {
+      // Read: role-based access
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isEstateManager() ||
+        (isStaff() && resource.data.reporterId == getUserData().ID) ||
+        (isWorker() && resource.data.assignedTo == getUserData().ID)
+      );
+      
+      // Create: only staff can create reports
+      allow create: if isAuthenticated() && isStaff() &&
+        request.resource.data.status == 'incoming' &&
+        request.resource.data.reporterId == getUserData().ID &&
+        request.resource.data.keys().hasAll(['status', 'reporterId', 'reporter', 'category', 'priorityLevel', 'location', 'reportDescription']) &&
+        request.resource.data.status == 'incoming' &&
+        request.resource.data.reporterId is string &&
+        request.resource.data.reporter is string &&
+        request.resource.data.category is string &&
+        request.resource.data.priorityLevel in ['urgent', 'routine'] &&
+        request.resource.data.location is string &&
+        request.resource.data.reportDescription is string;
+      
+      // Update: role-based updates
+      allow update: if isAuthenticated() && (
+        // Estate managers can approve incoming reports and assign to workers
+        (isEstateManager() && resource.data.status == 'incoming' && 
+         request.resource.data.status in ['approved', 'assigned']) ||
+        // Workers can complete assigned reports
+        (isWorker() && resource.data.assignedTo == getUserData().ID && 
+         resource.data.status == 'assigned' && 
+         request.resource.data.status == 'completed') ||
+        // Admins can update anything
+        isAdmin() ||
+        // Staff can update their own reports if still incoming
+        (isStaff() && resource.data.reporterId == getUserData().ID && resource.data.status == 'incoming')
+      );
+      
+      // Delete: only admins
+      allow delete: if isAdmin();
+    }
+
+    // Registration IDs collection
+    match /registrationIDs/{id} {
+      // Read: estate managers and admins
+      allow read: if isAuthenticated() && (isAdmin() || isEstateManager());
+      
+      // Write: estate managers and admins can manage registration IDs
+      allow write: if isAuthenticated() && (isAdmin() || isEstateManager()) &&
+        request.resource.data.keys().hasAll(['ID', 'type']) &&
+        request.resource.data.ID is string &&
+        request.resource.data.type in ['staff', 'worker'];
+    }
+
+    // Default deny for any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

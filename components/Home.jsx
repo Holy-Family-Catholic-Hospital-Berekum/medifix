@@ -199,9 +199,15 @@ export default function Home({
           >
             {title1}
           </h1>
-          <div className="flex lg:max-w-[80%]  md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
-            {firstReportsCard}
-          </div>
+          {firstReports ? (
+            <div className="flex lg:max-w-[80%]  md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
+              {firstReportsCard}
+            </div>
+          ) : (
+            <p className="hidden md:block my-20">
+              Nothing to display here...yet
+            </p>
+          )}
           {!specificReportsPage && (
             <h1
               className={`text-xl hidden md:block md:text-2xl border-y ${titleBorderColor} ${primaryColor} font-bold w-full text-center py-2 ${secColor}`}
@@ -209,10 +215,16 @@ export default function Home({
               {title2}
             </h1>
           )}
-          {!specificReportsPage && (
+          {secondReports.length > 0 && !specificReportsPage ? (
             <div className="flex lg:max-w-[80%]  md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
               {secondReportsCard}
             </div>
+          ) : !specificReportsPage && secondReports.length <= 0 ? (
+            <p className="hidden md:block my-20">
+              Nothing to display here...yet
+            </p>
+          ) : (
+            ""
           )}
         </div>
       </main>
