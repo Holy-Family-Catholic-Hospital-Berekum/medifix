@@ -126,10 +126,14 @@ export default function ReportForm({ formPopup, onClose }) {
 
         // Date fields
         dateSent: serverTimestamp(),
+        dateReportDenied: null,
         dateApproved: null,
+        dateCostAdded: null,
+        dateCostDenied: null,
+        dateConfirmed: null,
         dateAssigned: null,
         dateCompleted: null,
-        dateConfirmed: null,
+        
         dateDue: calculateDueDate(formData.priorityLevel),
 
         // Report content

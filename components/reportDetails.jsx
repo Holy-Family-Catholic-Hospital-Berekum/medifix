@@ -22,6 +22,7 @@ import {
   canUserDownloadPDF,
   createAlert,
 } from "../src/utils";
+import { type } from "firebase/firestore/pipelines";
 
 export default function ReportDetailsContainer({
   displayDetails,
@@ -93,7 +94,9 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "approved",
         dateApproved: serverTimestamp(),
-        alerts: arrayUnion(createAlert(noteContent, "admin", "estate")),
+        alerts: arrayUnion(
+          createAlert(noteContent, "admin", "estate", report.status),
+        ),
       });
       alert("Report approved!");
       setFormData({ ...formData, note: "" });
@@ -117,7 +120,9 @@ export default function ReportDetailsContainer({
     try {
       await updateDoc(doc(db, "reports", report.id), {
         status: "denied",
-        alerts: arrayUnion(createAlert(reason, "admin", report.reporterId)),
+        alerts: arrayUnion(
+          createAlert(reason, "admin", report.reporterId, report.status),
+        ),
       });
       alert("Report denied!");
       setFormData({ ...formData, note: "" });
@@ -142,6 +147,7 @@ export default function ReportDetailsContainer({
         cost: parseFloat(formData.cost),
         costDescription: formData.costDescription,
         status: "pending",
+        dateCostAdded: serverTimestamp(),
       });
       alert("Cost information submitted for admin confirmation!");
       setFormData({ ...formData, cost: "", costDescription: "" });
@@ -162,7 +168,9 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "confirmed",
         dateConfirmed: serverTimestamp(),
-        alerts: arrayUnion(createAlert(noteContent, "admin", "estate")),
+        alerts: arrayUnion(
+          createAlert(noteContent, "admin", "estate", report.status),
+        ),
       });
       alert("Cost confirmed!");
       setFormData({ ...formData, note: "" });
@@ -186,7 +194,9 @@ export default function ReportDetailsContainer({
     try {
       await updateDoc(doc(db, "reports", report.id), {
         status: "pending",
-        alerts: arrayUnion(createAlert(reason, "admin", "estate")),
+        alerts: arrayUnion(
+          createAlert(reason, "admin", "estate", report.status),
+        ),
       });
       alert("Cost denied!");
       setFormData({ ...formData, note: "" });
@@ -216,6 +226,7 @@ export default function ReportDetailsContainer({
             `Worker assigned: ${formData.selectedWorker}`,
             "estate",
             formData.selectedWorker,
+            report.status,
           ),
         ),
       });
@@ -244,6 +255,7 @@ export default function ReportDetailsContainer({
             `Instructions: ${formData.instructions}`,
             "estate",
             report.assignedTo,
+            report.status,
           ),
         ),
       });
@@ -286,7 +298,9 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         feedback: formData.feedback,
         feedbackDate: serverTimestamp(),
-        alerts: arrayUnion(createAlert(formData.feedback, "staff", "admin")),
+        alerts: arrayUnion(
+          createAlert(formData.feedback, "staff", "admin", report.status),
+        ),
       });
       alert("Feedback submitted!");
       setFormData({ ...formData, feedback: "" });
@@ -298,6 +312,27 @@ export default function ReportDetailsContainer({
       setLoading(false);
     }
   };
+
+  // Each alert's `type` holds the status the report was in WHEN the alert was created.
+  // We match alerts sent to the current user and whose `type` reflects the current status.
+
+  const statusAlertMap = {
+    approved: { sentTo: "estate", type: "incoming" },
+    confirmed: { sentTo: "estate", type: "approved" },
+    pending: { sentTo: "estate", type: "confirmed" }, // cost denied
+    assigned: { sentTo: report.assignedTo, type: "confirmed" },
+    denied: { sentTo: user?.ID, type: "incoming" },
+  };
+
+  const currentAlertConfig = statusAlertMap[report.status];
+
+  const relevantAlert = currentAlertConfig
+    ? report.alerts?.find(
+        (a) =>
+          a.sentTo === currentAlertConfig.sentTo &&
+          a.type === currentAlertConfig.type,
+      )
+    : null;
 
   const reportDetails = (
     <div className="flex flex-col px-10 gap-10 pb-20">
@@ -357,6 +392,70 @@ export default function ReportDetailsContainer({
           <p className="text-red-400 md:text-lg">
             {formatDate(report.dateConfirmed)}
           </p>
+        </div>
+      )}
+
+      {report.dateAssigned && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">
+            Date Assigned:
+          </h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateAssigned)}
+          </p>
+        </div>
+      )}
+
+      {report.dateCompleted && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">
+            Date Completed:
+          </h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateCompleted)}
+          </p>
+        </div>
+      )}
+
+      {report.dateCostAdded && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">
+            Date Cost Added:
+          </h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateCostAdded)}
+          </p>
+        </div>
+      )}
+
+      {report.dateCostDenied && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">
+            Date Cost Denied:
+          </h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateCostDenied)}
+          </p>
+        </div>
+      )}
+
+      {report.dateReportDenied && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">
+            Date Report Denied:
+          </h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateReportDenied)}
+          </p>
+        </div>
+      )}
+
+      {relevantAlert && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">
+            {report.status === "denied" ? "Denial Reason:" : "Note:"}
+          </h2>
+          <p className="text-red-400 md:text-lg">{relevantAlert.content}</p>
         </div>
       )}
 

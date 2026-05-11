@@ -39,9 +39,7 @@ export default function StaffOverdue() {
 
   const overdueReports = (
     <div className="py-24 px-4">
-      <h1 className="text-2xl font-bold mb-6 text-center">
-         Overdue Reports
-      </h1>
+      <h1 className="text-2xl font-bold mb-6 text-center">Overdue Reports</h1>
 
       {loading ? (
         <p className="text-center">Loading...</p>
@@ -63,6 +61,7 @@ export default function StaffOverdue() {
                 <p>Priority: {report.priorityLevel}</p>
                 <p>Location: {report.location}</p>
                 <p>Submitted: {formatDate(report.dateSent)}</p>
+                <p>Due: {formatDate(report.dateDue)}</p>
               </div>
             </div>
           ))}

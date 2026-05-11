@@ -9,7 +9,7 @@ export default function Completed() {
       title1="Completed Works"
       secColor="bg-green-500"
       reportCardHoverColor={"hover:bg-green-700"}
-      reportDate1="dateAssigned"
+      reportDate1="dateCompleted"
       titleBorderColor={"border-red-300"}
       navBarColor="bg-green-300"
       slideInBgColor="bg-green-300"

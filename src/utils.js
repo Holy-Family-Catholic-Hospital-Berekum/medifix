@@ -19,12 +19,13 @@ export const formatDate = (timestamp) => {
 /**
  * Create an alert object for notifications
  */
-export const createAlert = (content, sentBy, sentTo) => {
+export const createAlert = (content, sentBy, sentTo, type) => {
   return {
     content,
     sentBy,
     sentTo,
     date: new Date().toISOString(),
+    type,
   };
 };
 

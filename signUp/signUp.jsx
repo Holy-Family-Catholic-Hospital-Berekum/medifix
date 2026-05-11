@@ -34,6 +34,7 @@ export default function SignUp() {
   const [loginPassword, setLoginPassword] = useState("");
   const [closing, setClosing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
 
@@ -235,33 +236,29 @@ export default function SignUp() {
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginId.trim() || !loginPassword.trim()) {
-      alert("Please fill in both ID and password.");
+      alert("Please fill in both email and password.");
       return;
     }
     if (loading) return;
     setLoading(true);
 
     try {
-      // ✅ Sign in anonymously so the users list rule passes
-      await signInAnonymously(auth);
-
-      const userQuery = query(
-        collection(db, "users"),
-        where("ID", "==", loginId.trim()),
-        limit(1),
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        loginId.trim(),
+        loginPassword,
       );
-      const userSnapshot = await getDocs(userQuery);
 
-      if (userSnapshot.empty) {
+      const uid = userCredential.user.uid;
+      const userSnap = await getDoc(doc(db, "users", uid));
+
+      if (!userSnap.exists()) {
         await auth.signOut();
-        alert("Invalid ID or password. Please try again.");
+        alert("Account not found. Please contact your Estate Manager.");
         return;
       }
 
-      const userData = userSnapshot.docs[0].data();
-
-      // ✅ Sign in with real credentials — replaces the anonymous session
-      await signInWithEmailAndPassword(auth, userData.email, loginPassword);
+      const userData = userSnap.data();
 
       localStorage.setItem(
         "user",
@@ -284,16 +281,13 @@ export default function SignUp() {
       setTimeout(() => navigate(routes[userData.role] || "/"), 300);
     } catch (error) {
       console.error("Login failed:", error);
-      try {
-        await auth.signOut();
-      } catch (_) {}
 
       if (
         error.code === "auth/wrong-password" ||
         error.code === "auth/user-not-found" ||
         error.code === "auth/invalid-credential"
       ) {
-        alert("Invalid ID or password. Please try again.");
+        alert("Invalid email or password. Please try again.");
       } else {
         alert("Unable to log in. Please try again later.");
       }
@@ -335,14 +329,26 @@ export default function SignUp() {
               {steps[step].fields.map((field) => (
                 <div
                   key={field.id}
-                  className="w-full flex flex-col items-start gap-2 mb-4"
+                  className="w-full flex flex-col items-start gap-2 mb-4 relative"
                 >
+                  {field.type === "password" && (
+                    <span
+                      className="material-symbols-outlined absolute top-10 right-2 cursor-pointer"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                    >
+                      {showPassword ? "visibility_off" : "visibility"}
+                    </span>
+                  )}
                   <label htmlFor={field.id} className="text-left md:text-lg">
                     {field.label}
                   </label>
                   <input
                     id={field.id}
-                    type={field.type}
+                    type={
+                      field.type === "password" && showPassword
+                        ? "text"
+                        : field.type
+                    }
                     value={field.value}
                     onChange={(e) => field.onChange(e.target.value)}
                     className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
@@ -419,24 +425,30 @@ export default function SignUp() {
 
             <div className="w-full flex flex-col items-start gap-2 mb-4">
               <label htmlFor="loginId" className="text-left md:text-lg">
-                ID
+                Email
               </label>
               <input
                 id="loginId"
-                type="text"
+                type="email"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
                 className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
               />
             </div>
 
-            <div className="w-full flex flex-col items-start gap-2 mb-4">
+            <div className="w-full relative flex flex-col items-start gap-2 mb-4">
+              <span
+                className="material-symbols-outlined absolute top-10 right-2 cursor-pointer"
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
+                {showPassword ? "visibility_off" : "visibility"}
+              </span>
               <label htmlFor="loginPassword" className="text-left md:text-lg">
                 Password
               </label>
               <input
                 id="loginPassword"
-                type="password"
+                type={`${showPassword ? "text" : "password"}`}
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"

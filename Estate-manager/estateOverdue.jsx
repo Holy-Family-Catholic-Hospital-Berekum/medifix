@@ -10,7 +10,7 @@ export default function Overdue() {
       secColor={"bg-blue-500"}
       titleBgColor={"bg-yellow-500"}
       reportCardHoverColor={"hover:bg-blue-600"}
-      reportDate1="dateSent" //change to date due later
+      reportDate1="dateDue"
       titleBorderColor={"border-yellow-300"}
       navBarColor="bg-yellow-300"
       slideInBgColor="bg-yellow-300"

@@ -13,7 +13,7 @@ export default function AdminHome() {
       titleBgColor={"bg-red-300"}
       reportCardHoverColor={"hover:bg-green-700"}
       reportDate1="dateSent"
-      reportDate2="dateAssigned" //change later to date Estate manager reviewed
+      reportDate2="dateCostAdded"
       titleBorderColor={"border-red-300"}
       navBarColor="bg-green-300"
       slideInBgColor="bg-green-300"

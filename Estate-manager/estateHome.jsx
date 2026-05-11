@@ -12,8 +12,8 @@ export default function EstateHome() {
       secColor={"bg-blue-500"}
       titleBgColor={"bg-yellow-500"}
       reportCardHoverColor={"hover:bg-blue-600"}
-      reportDate1="dateSent"
-      reportDate2="dateAssigned" //change later to date admin confirmed
+      reportDate1="dateApproved"
+      reportDate2="dateConfirmed"
       titleBorderColor={"border-yellow-300"}
       navBarColor="bg-yellow-300"
       slideInBgColor="bg-yellow-300"
