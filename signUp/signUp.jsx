@@ -1,18 +1,22 @@
 import { useState } from "react";
 import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
   collection,
   query,
   where,
   getDocs,
-  addDoc,
-  serverTimestamp,
-  doc,
-  setDoc,
+  limit,
 } from "firebase/firestore";
 import { db, auth } from "../src/firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInAnonymously,
+  deleteUser,
 } from "firebase/auth";
 import { useNavigate } from "react-router";
 
@@ -23,12 +27,13 @@ export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [location, setLocation] = useState(""); // ✅ fixed typo
+  const [location, setLocation] = useState("");
   const [profession, setProfession] = useState("");
   const [id, setId] = useState("");
   const [loginId, setLoginId] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [closing, setClosing] = useState(false); // ✅ for smooth mode transition
+  const [closing, setClosing] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -75,7 +80,7 @@ export default function SignUp() {
           type: "text",
           value: location,
           onChange: setLocation,
-        }, // ✅ fixed typo
+        },
       ],
     },
     {
@@ -99,178 +104,206 @@ export default function SignUp() {
     },
   ];
 
-  const canProceed = steps[step].fields.every(
-    (field) => field.value.trim() !== "",
-  );
+  const canProceed = steps[step].fields.every((f) => f.value.trim() !== "");
   const isLastStep = step === steps.length - 1;
   const isFirstStep = step === 0;
 
   const handleNext = () => {
     if (!isLastStep && canProceed) setStep((c) => c + 1);
   };
-
   const handlePrev = () => {
     if (!isFirstStep) setStep((c) => c - 1);
   };
 
-  // ✅ handleSubmit was missing — now defined
-  const handleSubmit = async () => {
-    if (!canProceed) return;
-
-    try {
-      const registrationQuery = query(
-        collection(db, "registrationIDs"),
-        where("ID", "==", id),
-      );
-      const registrationSnapshot = await getDocs(registrationQuery);
-
-      if (registrationSnapshot.empty) {
-        alert(
-          "Invalid registration ID. Please request a valid ID from the Estate Manager.",
-        );
-        return;
-      }
-
-      const registrationData = registrationSnapshot.docs[0].data();
-      const type = registrationData.type?.toLowerCase();
-
-      if (type !== "staff" && type !== "worker") {
-        alert(
-          "Registration ID type is invalid. Please contact the Estate Manager.",
-        );
-        return;
-      }
-
-      const existingUserQuery = query(
-        collection(db, "users"),
-        where("ID", "==", id),
-      );
-      const existingUserSnapshot = await getDocs(existingUserQuery);
-
-      if (!existingUserSnapshot.empty) {
-        alert(
-          "This registration ID has already been used to create an account.",
-        );
-        return;
-      }
-
-      // Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
-      const uid = userCredential.user.uid;
-
-      // Create user document in Firestore with uid as document ID
-      await setDoc(doc(db, "users", uid), {
-        name,
-        location,
-        profession,
-        ID: id,
-        phoneNumber,
-        email,
-        role: type,
-        createdAt: serverTimestamp(),
-      });
-
-      alert("Account created successfully!");
-      setName("");
-      setEmail("");
-      setPassword("");
-      setPhoneNumber("");
-      setLocation("");
-      setProfession("");
-      setId("");
-      setStep(0);
-      setTimeout(() => setMode("login"), 200);
-    } catch (error) {
-      console.error("Sign up failed:", error);
-      if (error.code === "auth/email-already-in-use") {
-        alert("Email already in use. Please use a different email.");
-      } else if (error.code === "auth/weak-password") {
-        alert("Password is too weak. Please choose a stronger password.");
-      } else {
-        alert("Unable to create account. Please try again later.");
-      }
-    }
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setPassword("");
+    setPhoneNumber("");
+    setLocation("");
+    setProfession("");
+    setId("");
+    setStep(0);
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-
-    if (!loginId.trim() || !loginPassword.trim()) {
-      alert("Please fill in both ID and password.");
-      return;
-    }
-
-    try {
-      // Query user by ID to get email
-      const userQuery = query(
-        collection(db, "users"),
-        where("ID", "==", loginId.trim()),
-      );
-      const userSnapshot = await getDocs(userQuery);
-
-      if (userSnapshot.empty) {
-        alert("Invalid ID or password. Please try again.");
-        return;
-      }
-
-      const userData = userSnapshot.docs[0].data();
-      const userEmail = userData.email;
-
-      // Sign in with Firebase Auth using email and password
-      await signInWithEmailAndPassword(auth, userEmail, loginPassword);
-
-      // Store user data in localStorage with timestamp for session management
-      const userInfo = {
-        data: userData,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem("user", JSON.stringify(userInfo));
-
-      alert(`Login successful! Welcome ${userData.name || "user"}.`);
-      setLoginPassword("");
-      setLoginId("");
-
-      if (userData.role === "staff") {
-        setTimeout(() => navigate("/Home"), 300);
-      } else if (userData.role === "worker") {
-        setTimeout(() => navigate("/workerHome"), 300);
-      } else if (userData.role === "admin") {
-        setTimeout(() => navigate("/adminHome"), 300);
-      } else if (userData.role === "estate") {
-        setTimeout(() => navigate("/estateHome"), 300);
-      } else {
-        setTimeout(() => navigate("/"), 300);
-      }
-    } catch (error) {
-      console.error("Login failed:", error);
-      if (
-        error.code === "auth/wrong-password" ||
-        error.code === "auth/user-not-found"
-      ) {
-        alert("Invalid ID or password. Please try again.");
-      } else {
-        alert("Unable to log in. Please try again later.");
-      }
-    }
-  };
-
-  // ✅ Smooth mode switch — fade out then switch
   const switchMode = (newMode) => {
     setClosing(true);
     setTimeout(() => {
       setMode(newMode);
       setClosing(false);
-      setStep(0); // reset steps when switching
+      setStep(0);
     }, 300);
+  };
+
+  const handleSubmit = async () => {
+    if (!canProceed || loading) return;
+    setLoading(true);
+
+    let createdUser = null;
+    let regDocRef = null;
+
+    try {
+      // ✅ Step 1 — validate registration ID
+      regDocRef = doc(db, "registrationIDs", id.trim());
+      const regSnap = await getDoc(regDocRef);
+
+      if (!regSnap.exists()) {
+        alert(
+          "Invalid registration ID. Please request one from the Estate Manager.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      const regData = regSnap.data();
+      const type = regData.type?.toLowerCase();
+
+      if (regData.used === true) {
+        alert("This registration ID has already been used.");
+        setLoading(false);
+        return;
+      }
+
+      if (!["staff", "worker"].includes(type)) {
+        alert("Invalid registration ID type. Contact the Estate Manager.");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Step 2 — create Firebase Auth user FIRST
+      // only mark ID as used after this succeeds
+      // so weak password / email errors don't consume the ID
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+      createdUser = userCredential.user;
+      const uid = createdUser.uid;
+
+      try {
+        // ✅ Step 3 — write Firestore user doc
+        await setDoc(doc(db, "users", uid), {
+          name: name.trim(),
+          email: email.trim(),
+          location: location.trim(),
+          profession: profession.trim(),
+          ID: id.trim(),
+          phoneNumber: phoneNumber.trim(),
+          role: type,
+          createdAt: serverTimestamp(),
+        });
+
+        // ✅ Step 4 — only mark ID as used AFTER everything else succeeds
+        // auth user is now signed in so the update rule passes
+        await updateDoc(regDocRef, { used: true });
+
+        alert("Account created successfully!");
+        resetForm();
+        switchMode("login");
+      } catch (innerError) {
+        console.error("Firestore write failed:", innerError);
+
+        // ✅ Clean up auth user since Firestore write failed
+        // ID was never marked used so no rollback needed
+        if (createdUser) {
+          try {
+            await deleteUser(createdUser);
+          } catch (e) {
+            console.error("Auth cleanup failed:", e);
+          }
+        }
+
+        alert("Unable to create account. Please try again later.");
+      }
+    } catch (outerError) {
+      console.error("Sign up failed:", outerError);
+
+      // ✅ auth errors land here — ID was never touched so no rollback needed
+      if (outerError.code === "auth/email-already-in-use") {
+        alert("Email already in use. Please use a different email.");
+      } else if (outerError.code === "auth/weak-password") {
+        alert("Password too weak. Use at least 6 characters.");
+      } else {
+        alert("Unable to create account. Please try again later.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!loginId.trim() || !loginPassword.trim()) {
+      alert("Please fill in both ID and password.");
+      return;
+    }
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      // ✅ Sign in anonymously so the users list rule passes
+      await signInAnonymously(auth);
+
+      const userQuery = query(
+        collection(db, "users"),
+        where("ID", "==", loginId.trim()),
+        limit(1),
+      );
+      const userSnapshot = await getDocs(userQuery);
+
+      if (userSnapshot.empty) {
+        await auth.signOut();
+        alert("Invalid ID or password. Please try again.");
+        return;
+      }
+
+      const userData = userSnapshot.docs[0].data();
+
+      // ✅ Sign in with real credentials — replaces the anonymous session
+      await signInWithEmailAndPassword(auth, userData.email, loginPassword);
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          data: userData,
+          timestamp: Date.now(),
+        }),
+      );
+
+      setLoginId("");
+      setLoginPassword("");
+
+      const routes = {
+        staff: "/Home",
+        worker: "/workerHome",
+        admin: "/adminHome",
+        estate: "/estateHome",
+      };
+
+      setTimeout(() => navigate(routes[userData.role] || "/"), 300);
+    } catch (error) {
+      console.error("Login failed:", error);
+      try {
+        await auth.signOut();
+      } catch (_) {}
+
+      if (
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/user-not-found" ||
+        error.code === "auth/invalid-credential"
+      ) {
+        alert("Invalid ID or password. Please try again.");
+      } else {
+        alert("Unable to log in. Please try again later.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="bg-yellow-400 overflow-y-auto min-h-screen w-full flex justify-center items-center px-4 py-8">
-      {/* ✅ Single wrapper with fade — no conditional rendering killing the animation */}
       <div
         className="transition-opacity duration-300 w-full flex justify-center"
         style={{ opacity: closing ? 0 : 1 }}
@@ -278,7 +311,7 @@ export default function SignUp() {
         {/* SIGNUP FORM */}
         {mode === "signup" && (
           <form className="flex flex-col items-center gap-5 rounded-xl py-10 bg-yellow-500 w-full max-w-96 px-6 md:max-w-[550px] lg:max-w-[680px] shadow-lg">
-            <div className="mb-6 text-center">
+            <div className="mb-2 text-center">
               <h2 className="text-xl font-semibold text-black">
                 {steps[step].title}
               </h2>
@@ -287,43 +320,38 @@ export default function SignUp() {
               </p>
             </div>
 
-            <div className="w-full overflow-hidden">
-              <div
-                className="flex w-[300%] transition-transform duration-500 ease-in-out"
-                style={{ transform: `translateX(-${step * 100}%)` }}
-              >
-                {steps.map((section) => (
-                  <div
-                    key={section.title}
-                    className="w-full shrink-0 px-1 md:px-4"
-                  >
-                    {section.fields.map((field) => (
-                      <div
-                        key={field.id}
-                        className="w-full flex flex-col items-start gap-2 mb-4"
-                      >
-                        <label
-                          htmlFor={field.id}
-                          className="text-left md:text-lg"
-                        >
-                          {field.label}
-                        </label>
-                        <input
-                          id={field.id}
-                          type={field.type}
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          className="bg-green-700 md:text-lg w-full border border-yellow-100 rounded p-2"
-                          required
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+            <div className="flex gap-2 mb-2">
+              {steps.map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 w-10 rounded-full transition-all duration-300 ${
+                    i <= step ? "bg-red-700" : "bg-yellow-300"
+                  }`}
+                />
+              ))}
             </div>
 
-            <div className="flex w-full items-center justify-between gap-3 flex-wrap">
+            <div className="w-full">
+              {steps[step].fields.map((field) => (
+                <div
+                  key={field.id}
+                  className="w-full flex flex-col items-start gap-2 mb-4"
+                >
+                  <label htmlFor={field.id} className="text-left md:text-lg">
+                    {field.label}
+                  </label>
+                  <input
+                    id={field.id}
+                    type={field.type}
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex w-full items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={handlePrev}
@@ -353,15 +381,15 @@ export default function SignUp() {
               ) : (
                 <button
                   type="button"
-                  onClick={handleSubmit} // ✅ now defined
-                  disabled={!canProceed}
-                  className={`rounded px-5 py-2 transition w-full ${
-                    canProceed
+                  onClick={handleSubmit}
+                  disabled={!canProceed || loading}
+                  className={`rounded px-5 py-2 transition flex-1 ${
+                    canProceed && !loading
                       ? "bg-red-700 cursor-pointer text-yellow-300 hover:bg-red-800"
                       : "bg-red-300 text-yellow-200 cursor-not-allowed"
                   }`}
                 >
-                  Submit
+                  {loading ? "Creating account..." : "Submit"}
                 </button>
               )}
             </div>
@@ -371,7 +399,7 @@ export default function SignUp() {
               <button
                 className="bg-yellow-300 px-4 cursor-pointer hover:bg-yellow-400 transition rounded-full text-red-700"
                 type="button"
-                onClick={() => switchMode("login")} // ✅ smooth switch
+                onClick={() => switchMode("login")}
               >
                 Login
               </button>
@@ -398,8 +426,7 @@ export default function SignUp() {
                 type="text"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
-                className="bg-green-700 md:text-lg w-full border border-yellow-100 rounded p-2"
-                required
+                className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
               />
             </div>
 
@@ -412,16 +439,20 @@ export default function SignUp() {
                 type="password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="bg-green-700 md:text-lg w-full border border-yellow-100 rounded p-2"
-                required
+                className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
               />
             </div>
 
             <button
               type="submit"
-              className="bg-red-700 w-full rounded py-2 transition text-yellow-300 hover:bg-red-800 cursor-pointer"
+              disabled={loading}
+              className={`w-full rounded py-2 transition text-yellow-300 ${
+                loading
+                  ? "bg-red-300 cursor-not-allowed"
+                  : "bg-red-700 hover:bg-red-800 cursor-pointer"
+              }`}
             >
-              Login
+              {loading ? "Logging in..." : "Login"}
             </button>
 
             <div className="mt-4 flex gap-2 items-center justify-center flex-wrap text-sm text-gray-900">
@@ -429,7 +460,7 @@ export default function SignUp() {
               <button
                 className="bg-yellow-300 px-4 cursor-pointer hover:bg-yellow-400 transition rounded-full text-red-700"
                 type="button"
-                onClick={() => switchMode("signup")} // ✅ smooth switch
+                onClick={() => switchMode("signup")}
               >
                 Sign Up
               </button>

@@ -97,8 +97,11 @@ service cloud.firestore {
 
     // Registration IDs collection
     match /registrationIDs/{id} {
-      // Read: estate managers and admins
-      allow read: if isAuthenticated() && (isAdmin() || isEstateManager());
+      // Allow unauthenticated signup validation by exact ID query or direct doc get.
+      allow get: if true;
+      allow list: if request.query.where.size() == 1 &&
+        request.query.where[0].fieldPath == 'ID' &&
+        request.query.where[0].op == '==';
       
       // Write: estate managers and admins can manage registration IDs
       allow write: if isAuthenticated() && (isAdmin() || isEstateManager()) &&
