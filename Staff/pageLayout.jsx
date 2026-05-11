@@ -2,7 +2,6 @@ import NavBars from "./navBars";
 import StaffSlideInRight from "./staffSlideInRight";
 import Footer from "../components/footer";
 
-
 export default function PageLayout({ sidePopup, content, page }) {
   return (
     <>

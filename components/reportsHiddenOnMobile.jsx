@@ -5,6 +5,7 @@ export default function ReportsHiddenOnMobile({
   onClose,
   reportsHiddenOnMobile,
   reportsHiddenOnMobileTitle,
+  secondReports,
 }) {
   const [closing, setClosing] = useState(false);
 
@@ -29,9 +30,13 @@ export default function ReportsHiddenOnMobile({
         <h1 className="text-2xl md:text-4xl text-gray-800 font-bold">
           {reportsHiddenOnMobileTitle}
         </h1>
-        <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
-          {reportsHiddenOnMobile}
-        </div>
+        {secondReports.length > 0 ? (
+          <div className="flex gap-4 md:gap-10 justify-center flex-wrap py-10 md:py-20 px-4">
+            {reportsHiddenOnMobile}
+          </div>
+        ) : (
+          <p className="mt-10">Nothing to display here...yet</p>
+        )}
       </div>
     </div>
   );

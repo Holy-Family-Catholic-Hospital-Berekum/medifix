@@ -164,7 +164,7 @@ export default function SignUp() {
         return;
       }
 
-      if (!["staff", "worker"].includes(type)) {
+      if (!["staff", "worker", "estate", "admin"].includes(type)) {
         alert("Invalid registration ID type. Contact the Estate Manager.");
         setLoading(false);
         return;

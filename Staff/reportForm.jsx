@@ -148,6 +148,8 @@ export default function ReportForm({ formPopup, onClose }) {
         // Additional fields
         feedback: "",
         instructions: "",
+        notes: [],
+        cost: null,
         alerts: [],
 
         // Metadata

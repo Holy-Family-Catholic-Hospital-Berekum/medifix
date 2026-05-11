@@ -1,7 +1,6 @@
 import NavBar from "./navBar";
 import { useState, useEffect } from "react";
 import SlideInRight from "../components/slideInRight";
-import AlertsContainer from "./AlertsContainer";
 import { NavLink } from "react-router";
 import { nanoid } from "nanoid";
 import ReportDetailsContainer from "./reportDetails";
@@ -15,6 +14,8 @@ import {
   getDocs,
   updateDoc,
   arrayUnion,
+  doc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 
@@ -49,6 +50,27 @@ export default function Home({
   const [currentReport, setCurrentReport] = useState([]);
   const [reports, setReports] = useState([]);
 
+  const user = JSON.parse(localStorage.getItem("user"))?.data;
+
+  const generateRegistrationID = async () => {
+    const type = prompt("Enter type: staff or worker");
+    if (!type || !["staff", "worker"].includes(type.toLowerCase())) {
+      alert("Invalid type. Please enter 'staff' or 'worker'.");
+      return;
+    }
+    try {
+      const id = nanoid();
+      await setDoc(doc(db, "registrationIDs", id), {
+        type: type.toLowerCase(),
+        used: false,
+      });
+      alert(`Registration ID generated: ${id}`);
+    } catch (error) {
+      console.error("Failed to generate ID:", error);
+      alert("Failed to generate registration ID. Please try again.");
+    }
+  };
+
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
       isActive ? `${primaryColor}` : "text-[#111827] hover:text-blue-200"
@@ -56,7 +78,7 @@ export default function Home({
 
   const handleClose = () => {
     // give slide-down time to finish before hiding
-    setTimeout(() => setFormPopup(false), 300);
+    setTimeout(() => SetShowReportsHiddenOnMobile(false), 300);
   };
 
   useEffect(() => {
@@ -84,6 +106,28 @@ export default function Home({
     setCurrentReport(reportToDisplay);
   };
 
+  // Get all alerts for the current user
+  const getAllAlerts = () => {
+    const allAlerts = [];
+    reports.forEach((report) => {
+      if (!report.alerts || !Array.isArray(report.alerts)) return;
+
+      report.alerts.forEach((alert) => {
+        if (alert.sentTo === user?.role || alert.sentTo === user?.ID) {
+          allAlerts.push({
+            ...alert,
+            reportId: report.id,
+            reportCategory: report.category,
+          });
+        }
+      });
+    });
+
+    return allAlerts.sort((a, b) => new Date(b.date) - new Date(a.date));
+  };
+
+  const alerts = getAllAlerts();
+
   const firstReports = reports.filter(
     (report) => report.status === `${firstReportsStatus}`,
   );
@@ -93,11 +137,11 @@ export default function Home({
 
   const firstReportsCard = firstReports.map((report, i) => (
     <div
-      className={`${secColor} select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition ${reportCardHoverColor} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}
+      className={`${report.status !== "completed" && report.priorityLevel === "urgent" ? "bg-red-500" : report.status !== "completed" && report.priorityLevel === "routine" ? secColor : "bg-green-500"} select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition ${report.priorityLevel === "routine" ? reportCardHoverColor : "hover:bg-red-600"} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
-      <h1>{report.category.toUpperCase()}</h1>
+      <h1>{report.priorityLevel.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
         <span className="text-blue-200 bg-yellow-800 px-1 rounded">
           {report[reportDate1]?.toDate().toLocaleDateString()}
@@ -111,11 +155,11 @@ export default function Home({
 
   const secondReportsCard = secondReports.map((report, i) => (
     <div
-      className={`${secColor} z-60 border select-none border-yellow-800 md:flex flex-col gap-2 items-center justify-center cursor-pointer transition ${reportCardHoverColor} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4 ${showReportsHiddenOnMobile ? "flex" : "hidden"} `}
+      className={`${report.status !== "completed" && report.priorityLevel === "routine" ? secColor : "bg-red-500"} z-60 border select-none border-yellow-800 md:flex flex-col gap-2 items-center justify-center cursor-pointer transition ${report.priorityLevel === "routine" ? reportCardHoverColor : "hover:bg-red-600"} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4 ${showReportsHiddenOnMobile ? "flex" : "hidden"} `}
       key={i}
       onClick={() => displayReportDetails(report.id)}
     >
-      <h1>{report.category.toUpperCase()}</h1>
+      <h1>{report.priorityLevel.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
         <span className="text-blue-200 bg-yellow-800 px-1 rounded">
           {report[reportDate2]?.toDate().toLocaleDateString()}
@@ -135,12 +179,14 @@ export default function Home({
         setDisplayDetails={setDisplayDetails}
         reportDetailsBgColor={reportDetailsBgColor}
       />
+
       {showReportsHiddenOnMobile && (
         <ReportsHiddenOnMobile
           showReportsHiddenOnMobile={showReportsHiddenOnMobile}
           onClose={handleClose}
           reportsHiddenOnMobile={secondReportsCard}
           reportsHiddenOnMobileTitle={reportsHiddenOnMobileTitle}
+          secondReports={secondReports}
         />
       )}
       <NavBar
@@ -194,19 +240,27 @@ export default function Home({
           </NavLink>
         </div>
         <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden  overflow-y-auto py-24 flex flex-col items-center z-0">
+          {(user?.role === "admin" || user?.role === "estate") && (
+            <button
+              onClick={generateRegistrationID}
+              className="bg-red-400 hover:bg-red-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded my-4"
+            >
+              Generate Registration ID
+            </button>
+          )}
+
           <h1
             className={`text-xl border-y ${titleBorderColor} md:text-2xl ${primaryColor} font-bold w-full text-center py-2 ${secColor}`}
           >
             {title1}
           </h1>
-          {firstReports ? (
+
+          {firstReports.length > 0 ? (
             <div className="flex lg:max-w-[80%]  md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
               {firstReportsCard}
             </div>
           ) : (
-            <p className="hidden md:block my-20">
-              Nothing to display here...yet
-            </p>
+            <p className=" my-20">Nothing to display here...yet</p>
           )}
           {!specificReportsPage && (
             <h1

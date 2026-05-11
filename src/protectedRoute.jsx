@@ -43,7 +43,11 @@ const ProtectedRoute = ({ children }) => {
 
   // Show loading while checking auth
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center w-full h-screen font-bold text-red-400">
+        Loading...
+      </div>
+    );
   }
 
   // If user exists, render the actual page
