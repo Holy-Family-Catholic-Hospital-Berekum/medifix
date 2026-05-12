@@ -22,7 +22,153 @@ import {
   canUserDownloadPDF,
   createAlert,
 } from "../src/utils";
-import { type } from "firebase/firestore/pipelines";
+
+const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
+
+function MaterialsTable({ materials, onChange, readOnly = false }) {
+  const addRow = () => onChange([...materials, { ...EMPTY_MATERIAL }]);
+
+  const removeRow = (idx) => onChange(materials.filter((_, i) => i !== idx));
+
+  const updateCell = (idx, field, value) => {
+    const updated = materials.map((row, i) =>
+      i === idx ? { ...row, [field]: value } : row,
+    );
+    onChange(updated);
+  };
+
+  if (readOnly) {
+    if (!materials || materials.length === 0) return null;
+    return (
+      <div className="overflow-x-auto rounded border border-gray-300">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-100 text-gray-700">
+              <th className="border border-gray-300 px-3 py-2 text-left w-10">
+                S/N
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left">
+                Description of Material/Item
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left w-24">
+                Qty Required
+              </th>
+              <th className="border border-gray-300 px-3 py-2 text-left w-36">
+                Specification / Size
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {materials.map((row, idx) => (
+              <tr
+                key={idx}
+                className={idx % 2 === 1 ? "bg-gray-50" : "bg-white"}
+              >
+                <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">
+                  {idx + 1}
+                </td>
+                <td className="border border-gray-300 px-3 py-2 text-red-500 font-medium">
+                  {row.description}
+                </td>
+                <td className="border border-gray-300 px-3 py-2 text-red-500 text-center">
+                  {row.quantity}
+                </td>
+                <td className="border border-gray-300 px-3 py-2 text-red-500">
+                  {row.specification}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="overflow-x-auto rounded border border-gray-300">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-100 text-gray-700">
+              <th className="border border-gray-300 px-2 py-2 text-left w-10">
+                S/N
+              </th>
+              <th className="border border-gray-300 px-2 py-2 text-left">
+                Description of Material/Item
+              </th>
+              <th className="border border-gray-300 px-2 py-2 text-left w-24">
+                Qty Required
+              </th>
+              <th className="border border-gray-300 px-2 py-2 text-left w-36">
+                Specification / Size
+              </th>
+              <th className="border border-gray-300 px-2 py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {materials.map((row, idx) => (
+              <tr key={idx}>
+                <td className="border border-gray-300 px-2 py-1 text-center text-gray-400 text-xs">
+                  {idx + 1}
+                </td>
+                <td className="border border-gray-300 px-1 py-1">
+                  <input
+                    type="text"
+                    placeholder="e.g. Silicone"
+                    value={row.description}
+                    onChange={(e) =>
+                      updateCell(idx, "description", e.target.value)
+                    }
+                    className="w-full px-2 py-1 text-sm outline-none bg-transparent"
+                  />
+                </td>
+                <td className="border border-gray-300 px-1 py-1">
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={row.quantity}
+                    onChange={(e) =>
+                      updateCell(idx, "quantity", e.target.value)
+                    }
+                    className="w-full px-2 py-1 text-sm outline-none bg-transparent text-center"
+                  />
+                </td>
+                <td className="border border-gray-300 px-1 py-1">
+                  <input
+                    type="text"
+                    placeholder='e.g. 4"'
+                    value={row.specification}
+                    onChange={(e) =>
+                      updateCell(idx, "specification", e.target.value)
+                    }
+                    className="w-full px-2 py-1 text-sm outline-none bg-transparent"
+                  />
+                </td>
+                <td className="border border-gray-300 px-1 py-1 text-center">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    className="text-red-400 hover:text-red-600 font-bold text-base leading-none"
+                    title="Remove row"
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button
+        type="button"
+        onClick={addRow}
+        className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+      >
+        <span className="text-lg leading-none">+</span> Add item
+      </button>
+    </div>
+  );
+}
 
 export default function ReportDetailsContainer({
   displayDetails,
@@ -34,10 +180,9 @@ export default function ReportDetailsContainer({
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [workers, setWorkers] = useState([]);
+  const [materials, setMaterials] = useState([{ ...EMPTY_MATERIAL }]);
   const [formData, setFormData] = useState({
     note: "",
-    cost: "",
-    costDescription: "",
     instructions: "",
     feedback: "",
     selectedWorker: "",
@@ -82,6 +227,17 @@ export default function ReportDetailsContainer({
     }
   }, [displayDetails]);
 
+  useEffect(() => {
+    if (!displayDetails || !currentReport || currentReport.length === 0) return;
+    const report = currentReport[0];
+    if (!report.feedback) return;
+    if (!report.feedbackViewedBy?.includes(user?.ID)) {
+      updateDoc(doc(db, "reports", report.id), {
+        feedbackViewedBy: arrayUnion(user?.ID),
+      });
+    }
+  }, [displayDetails, currentReport]);
+
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
   const report = currentReport[0];
@@ -112,10 +268,6 @@ export default function ReportDetailsContainer({
   const handleDeny = async () => {
     if (!canUserApprove(user, report)) return;
     const reason = formData.note || "Report denied";
-    if (!reason || reason === "") {
-      alert("Please provide a reason for denial");
-      return;
-    }
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
@@ -135,26 +287,26 @@ export default function ReportDetailsContainer({
     }
   };
 
-  const handleAddCost = async () => {
+  const handleAddMaterials = async () => {
     if (!canUserAddCost(user, report)) return;
-    if (!formData.cost || !formData.costDescription) {
-      alert("Please fill in both cost and description");
+    const validMaterials = materials.filter((m) => m.description.trim());
+    if (validMaterials.length === 0) {
+      alert("Please add at least one material item");
       return;
     }
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
-        cost: parseFloat(formData.cost),
-        costDescription: formData.costDescription,
+        materials: validMaterials,
         status: "pending",
         dateCostAdded: serverTimestamp(),
       });
-      alert("Cost information submitted for admin confirmation!");
-      setFormData({ ...formData, cost: "", costDescription: "" });
+      alert("Materials submitted for admin confirmation!");
+      setMaterials([{ ...EMPTY_MATERIAL }]);
       setDisplayDetails(false);
     } catch (error) {
-      console.error("Error adding cost:", error);
-      alert("Failed to add cost information");
+      console.error("Error adding materials:", error);
+      alert("Failed to submit materials");
     } finally {
       setLoading(false);
     }
@@ -164,7 +316,7 @@ export default function ReportDetailsContainer({
     if (!canUserConfirmCost(user, report)) return;
     setLoading(true);
     try {
-      const noteContent = formData.note || "Cost confirmed by admin";
+      const noteContent = formData.note || "Materials confirmed by admin";
       await updateDoc(doc(db, "reports", report.id), {
         status: "confirmed",
         dateConfirmed: serverTimestamp(),
@@ -172,12 +324,12 @@ export default function ReportDetailsContainer({
           createAlert(noteContent, "admin", "estate", report.status),
         ),
       });
-      alert("Cost confirmed!");
+      alert("Materials confirmed!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
     } catch (error) {
-      console.error("Error confirming cost:", error);
-      alert("Failed to confirm cost");
+      console.error("Error confirming materials:", error);
+      alert("Failed to confirm materials");
     } finally {
       setLoading(false);
     }
@@ -185,25 +337,22 @@ export default function ReportDetailsContainer({
 
   const handleDenyCost = async () => {
     if (!canUserConfirmCost(user, report)) return;
-    const reason = formData.note || "Cost denied by admin";
-    if (!reason || reason === "") {
-      alert("Please provide a reason for denial");
-      return;
-    }
+    const reason = formData.note || "Materials denied by admin";
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
-        status: "pending",
+        status: "costDenied",
+        dateCostDenied: serverTimestamp(),
         alerts: arrayUnion(
           createAlert(reason, "admin", "estate", report.status),
         ),
       });
-      alert("Cost denied!");
+      alert("Materials denied!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
     } catch (error) {
-      console.error("Error denying cost:", error);
-      alert("Failed to deny cost");
+      console.error("Error denying materials:", error);
+      alert("Failed to deny materials");
     } finally {
       setLoading(false);
     }
@@ -217,7 +366,7 @@ export default function ReportDetailsContainer({
     }
     setLoading(true);
     try {
-      await updateDoc(doc(db, "reports", report.id), {
+      const updatePayload = {
         assignedTo: formData.selectedWorker,
         status: "assigned",
         dateAssigned: serverTimestamp(),
@@ -229,9 +378,15 @@ export default function ReportDetailsContainer({
             report.status,
           ),
         ),
-      });
+      };
+
+      if (formData.instructions.trim()) {
+        updatePayload.instructions = formData.instructions.trim();
+      }
+
+      await updateDoc(doc(db, "reports", report.id), updatePayload);
       alert("Work assigned to worker!");
-      setFormData({ ...formData, selectedWorker: "" });
+      setFormData({ ...formData, selectedWorker: "", instructions: "" });
       setDisplayDetails(false);
     } catch (error) {
       console.error("Error assigning worker:", error);
@@ -242,24 +397,24 @@ export default function ReportDetailsContainer({
   };
 
   const handleAddInstructions = async () => {
-    if (!formData.instructions) {
+    if (!formData.instructions.trim()) {
       alert("Please enter instructions");
       return;
     }
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
-        instructions: formData.instructions,
+        instructions: formData.instructions.trim(),
         alerts: arrayUnion(
           createAlert(
-            `Instructions: ${formData.instructions}`,
+            `Instructions: ${formData.instructions.trim()}`,
             "estate",
             report.assignedTo,
             report.status,
           ),
         ),
       });
-      alert("Instructions added!");
+      alert("Instructions saved!");
       setFormData({ ...formData, instructions: "" });
     } catch (error) {
       console.error("Error adding instructions:", error);
@@ -313,26 +468,64 @@ export default function ReportDetailsContainer({
     }
   };
 
-  // Each alert's `type` holds the status the report was in WHEN the alert was created.
-  // We match alerts sent to the current user and whose `type` reflects the current status.
+  const getRelevantAlert = () => {
+    if (!report.alerts?.length) return null;
 
-  const statusAlertMap = {
-    approved: { sentTo: "estate", type: "incoming" },
-    confirmed: { sentTo: "estate", type: "approved" },
-    pending: { sentTo: "estate", type: "confirmed" }, // cost denied
-    assigned: { sentTo: report.assignedTo, type: "confirmed" },
-    denied: { sentTo: user?.ID, type: "incoming" },
+    switch (report.status) {
+      case "approved":
+        return (
+          report.alerts.find(
+            (a) =>
+              a.sentBy === "admin" &&
+              a.sentTo === "estate" &&
+              a.type === "incoming",
+          ) || null
+        );
+
+      case "confirmed":
+        return (
+          [...report.alerts]
+            .filter(
+              (a) =>
+                a.sentBy === "admin" &&
+                a.sentTo === "estate" &&
+                a.type === "pending",
+            )
+            .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null
+        );
+
+      case "costDenied":
+        return (
+          [...report.alerts]
+            .filter(
+              (a) =>
+                a.sentBy === "admin" &&
+                a.sentTo === "estate" &&
+                a.type === "pending",
+            )
+            .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null
+        );
+
+      case "assigned":
+        return (
+          report.alerts.find(
+            (a) => a.sentTo === report.assignedTo && a.type === "confirmed",
+          ) || null
+        );
+
+      case "denied":
+        return (
+          report.alerts.find(
+            (a) => a.sentTo === user?.ID && a.type === "incoming",
+          ) || null
+        );
+
+      default:
+        return null;
+    }
   };
 
-  const currentAlertConfig = statusAlertMap[report.status];
-
-  const relevantAlert = currentAlertConfig
-    ? report.alerts?.find(
-        (a) =>
-          a.sentTo === currentAlertConfig.sentTo &&
-          a.type === currentAlertConfig.type,
-      )
-    : null;
+  const relevantAlert = getRelevantAlert();
 
   const reportDetails = (
     <div className="flex flex-col px-10 gap-10 pb-20">
@@ -420,7 +613,7 @@ export default function ReportDetailsContainer({
       {report.dateCostAdded && (
         <div className="flex items-center gap-2">
           <h2 className="text-lg md:text-xl whitespace-nowrap">
-            Date Cost Added:
+            Date Materials Added:
           </h2>
           <p className="text-red-400 md:text-lg">
             {formatDate(report.dateCostAdded)}
@@ -431,7 +624,7 @@ export default function ReportDetailsContainer({
       {report.dateCostDenied && (
         <div className="flex items-center gap-2">
           <h2 className="text-lg md:text-xl whitespace-nowrap">
-            Date Cost Denied:
+            Date Materials Denied:
           </h2>
           <p className="text-red-400 md:text-lg">
             {formatDate(report.dateCostDenied)}
@@ -439,39 +632,32 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {report.dateReportDenied && (
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
-            Date Report Denied:
-          </h2>
-          <p className="text-red-400 md:text-lg">
-            {formatDate(report.dateReportDenied)}
-          </p>
-        </div>
-      )}
+      {/* Materials table — shown to admin & estate when materials exist */}
+      {Array.isArray(report.materials) &&
+        report.materials.length > 0 &&
+        ["admin", "estate"].includes(user.role) && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-lg md:text-xl whitespace-nowrap">
+              Materials Required:
+            </h2>
+            <MaterialsTable
+              materials={report.materials}
+              onChange={() => {}}
+              readOnly
+            />
+          </div>
+        )}
 
       {relevantAlert && (
         <div className="flex items-center gap-2">
           <h2 className="text-lg md:text-xl whitespace-nowrap">
-            {report.status === "denied" ? "Denial Reason:" : "Note:"}
+            {report.status === "denied"
+              ? "Denial Reason:"
+              : report.status === "costDenied"
+                ? "Materials Denial Reason:"
+                : "Note:"}
           </h2>
           <p className="text-red-400 md:text-lg">{relevantAlert.content}</p>
-        </div>
-      )}
-
-      {report.cost && (
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl">Cost:</h2>
-          <p className="text-red-400 md:text-lg">₵{report.cost}</p>
-        </div>
-      )}
-
-      {report.costDescription && (
-        <div className="flex gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
-            Cost Description:
-          </h2>
-          <p className="text-red-400 md:text-lg">{report.costDescription}</p>
         </div>
       )}
 
@@ -491,7 +677,7 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* ADMIN ACTIONS */}
+      {/* ADMIN ACTIONS - Approve/Deny */}
       {canUserApprove(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">
@@ -523,42 +709,58 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* ESTATE ACTIONS - ADD COST */}
+      {/* ESTATE ACTIONS - Add Materials */}
       {canUserAddCost(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
-          <h3 className="font-bold text-gray-800">Estate Actions - Add Cost</h3>
-          <input
-            type="number"
-            placeholder="Cost amount"
-            value={formData.cost}
-            onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-            className="w-full p-2 border border-gray-400 rounded"
-          />
-          <textarea
-            placeholder="Cost description"
-            value={formData.costDescription}
-            onChange={(e) =>
-              setFormData({ ...formData, costDescription: e.target.value })
-            }
-            className="w-full p-2 border border-gray-400 rounded"
-            rows="3"
-          />
+        <div className="bg-white rounded-lg p-5 space-y-4">
+          <h3 className="font-bold text-gray-800">
+            {report.status === "costDenied"
+              ? "Estate Actions - Resubmit Materials"
+              : "Estate Actions - Add Materials"}
+          </h3>
+
+          {report.status === "costDenied" && (
+            <p className="text-sm text-red-500">
+              Your previous submission was denied. Please review and resubmit.
+            </p>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Materials / Items Required
+            </label>
+            <MaterialsTable materials={materials} onChange={setMaterials} />
+          </div>
+
           <button
-            onClick={handleAddCost}
+            onClick={handleAddMaterials}
             disabled={loading}
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full"
           >
-            {loading ? "Processing..." : "Submit Cost for Confirmation"}
+            {loading ? "Processing..." : "Submit for Admin Confirmation"}
           </button>
         </div>
       )}
 
-      {/* ADMIN ACTIONS - CONFIRM COST */}
+      {/* ADMIN ACTIONS - Confirm/Deny Materials */}
       {canUserConfirmCost(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
+        <div className="bg-white rounded-lg p-5 space-y-4">
           <h3 className="font-bold text-gray-800">
-            Admin Actions - Confirm Cost
+            Admin Actions - Review & Confirm Materials
           </h3>
+
+          {Array.isArray(report.materials) && report.materials.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-2">
+                Materials Requested:
+              </p>
+              <MaterialsTable
+                materials={report.materials}
+                onChange={() => {}}
+                readOnly
+              />
+            </div>
+          )}
+
           <textarea
             placeholder="Add optional note for estate..."
             value={formData.note}
@@ -572,26 +774,26 @@ export default function ReportDetailsContainer({
               disabled={loading}
               className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
             >
-              {loading ? "Processing..." : "Confirm Cost"}
+              {loading ? "Processing..." : "Confirm Materials"}
             </button>
             <button
               onClick={handleDenyCost}
               disabled={loading}
               className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-1"
             >
-              {loading ? "Processing..." : "Deny Cost"}
+              {loading ? "Processing..." : "Deny Materials"}
             </button>
           </div>
         </div>
       )}
 
-      {/* ESTATE ACTIONS - ASSIGN WORKER & INSTRUCTIONS */}
+      {/* ESTATE ACTIONS - Assign Worker */}
       {canUserAssignWorker(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">
             Estate Actions - Assign Worker
           </h3>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700">
             Select a registered worker
           </label>
           <select
@@ -613,21 +815,40 @@ export default function ReportDetailsContainer({
               No registered workers found. Please add workers first.
             </p>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Instructions{" "}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              placeholder="Add work instructions for the worker..."
+              value={formData.instructions}
+              onChange={(e) =>
+                setFormData({ ...formData, instructions: e.target.value })
+              }
+              className="w-full p-2 border border-gray-400 rounded"
+              rows="4"
+            />
+          </div>
+
           <button
             onClick={handleAssignWorker}
-            disabled={loading}
-            className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded w-full"
+            disabled={loading || !formData.selectedWorker}
+            className={`font-bold py-2 px-4 rounded w-full text-white transition ${
+              loading || !formData.selectedWorker
+                ? "bg-purple-300 cursor-not-allowed"
+                : "bg-purple-500 hover:bg-purple-700 cursor-pointer"
+            }`}
           >
             {loading ? "Processing..." : "Assign Worker"}
           </button>
 
           {report.assignedTo && (
-            <div className="mt-4 pt-4 border-t">
-              <h4 className="font-bold text-gray-800 mb-2">
-                Add Work Instructions
-              </h4>
+            <div className="mt-4 pt-4 border-t space-y-2">
+              <h4 className="font-bold text-gray-800">Update Instructions</h4>
               <textarea
-                placeholder="Enter detailed work instructions for the worker..."
+                placeholder="Replace or add new instructions for the worker..."
                 value={formData.instructions}
                 onChange={(e) =>
                   setFormData({ ...formData, instructions: e.target.value })
@@ -638,7 +859,7 @@ export default function ReportDetailsContainer({
               <button
                 onClick={handleAddInstructions}
                 disabled={loading}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full mt-2"
+                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full"
               >
                 {loading ? "Processing..." : "Save Instructions"}
               </button>
@@ -647,7 +868,7 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* WORKER ACTIONS - COMPLETE WORK */}
+      {/* WORKER ACTIONS - Complete Work */}
       {canUserComplete(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">Worker Actions</h3>
@@ -661,7 +882,7 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* STAFF ACTIONS - SEND FEEDBACK */}
+      {/* STAFF ACTIONS - Send Feedback */}
       {canUserSendFeedback(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">
@@ -686,14 +907,14 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* ESTATE ACTIONS - DOWNLOAD PDF */}
+      {/* ESTATE ACTIONS - Download PDF */}
       {canUserDownloadPDF(user, report) && (
         <div className="bg-white rounded-lg p-5">
           <button
             onClick={() => generatePDFReport(report)}
             className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded w-full"
           >
-            Download Report as Evidence (PDF)
+            Download Report (PDF)
           </button>
         </div>
       )}

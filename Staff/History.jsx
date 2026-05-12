@@ -11,6 +11,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../src/firebase";
 import PageLayout from "./pageLayout";
 import StaffReportDetails from "./staffReportDetails";
+import { formatDate } from "../src/utils";
 
 export default function History() {
   const [sidePopup, setSidePopup] = useState(false);
@@ -87,7 +88,7 @@ export default function History() {
                   <h1>{report.category.toUpperCase()}</h1>
                   <div className="flex justify-between gap-4">
                     <span className="text-blue-200 bg-yellow-800 px-1 rounded">
-                      {report.dateCompleted}
+                      {formatDate(report.dateCompleted)}
                     </span>
                     <span className="text-red-400 bg-gray-800 px-1 rounded">
                       {report.status}

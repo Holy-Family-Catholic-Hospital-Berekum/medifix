@@ -150,7 +150,7 @@ export default function SignUp() {
 
       if (!regSnap.exists()) {
         alert(
-          "Invalid registration ID. Please request one from the Estate Manager.",
+          "Invalid registration ID. Please request one from the Admin or Estate Manager.",
         );
         setLoading(false);
         return;

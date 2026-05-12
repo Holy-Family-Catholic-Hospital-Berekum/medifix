@@ -133,7 +133,7 @@ export default function ReportForm({ formPopup, onClose }) {
         dateConfirmed: null,
         dateAssigned: null,
         dateCompleted: null,
-        
+
         dateDue: calculateDueDate(formData.priorityLevel),
 
         // Report content
@@ -151,9 +151,9 @@ export default function ReportForm({ formPopup, onClose }) {
 
         // Additional fields
         feedback: "",
+        feedbackViewedBy: [],
         instructions: "",
         notes: [],
-        cost: null,
         alerts: [],
 
         // Metadata
