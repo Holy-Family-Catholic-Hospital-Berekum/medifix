@@ -77,13 +77,17 @@ export default function StaffHome() {
   ));
 
   const systemWorkflows = [
-    "Staff submit maintenance reports",
-    "Reports are recorded with a status of pending ",
-    "Estate Manager reviews incoming reports",
-    "Estate Manager assigns tasks to technician",
+    "You submit a maintenance report",
+    "Report goes to administrator for approval",
+    "Estate Manager receives report only upon admin approval",
+    "Estate Manager makes a materials confirmation request to admin",
+    "Admin confirms",
+    "Estate Manager sends a materials request for procurement",
+    "The work is assigned to appropriate technician",
     "Technician executes the task and updates progress",
-    "Staff review completed work and provide feedback",
-    "Task data is logged for performance evaluation",
+    "You review completed work and provide feedback",
+    "Admin, Estate manager and the assigned technician reviews feedback",
+    "Further actions are taken if necessary",
   ];
 
   const systemWorkflowDiv = systemWorkflows.map((workflow) => (
@@ -122,7 +126,9 @@ export default function StaffHome() {
       </span>
 
       <div className="w-full mb-5 md:mb-10 text-center">
-        <h1 className="text-2xl md:text-4xl text-[#2563EB]">Services</h1>
+        <h1 className="text-2xl md:text-4xl md:mt-10 mt-4 text-[#2563EB]">
+          Our Services
+        </h1>
       </div>
       <div className="flex justify-center px-10 gap-5  flex-wrap mx-auto">
         {serviceCard}

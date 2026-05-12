@@ -17,7 +17,7 @@ export default function NavBars() {
 
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
-      isActive ? "text-red-300" : "text-[#111827] hover:text-red-300"
+      isActive ? "text-red-300 whitespace-nowrap" : "text-[#111827] hover:text-red-300 whitespace-nowrap"
     }`;
 
   const handleLogout = async () => {

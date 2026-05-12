@@ -74,11 +74,11 @@ export default function History() {
         <p>Loading reports...</p>
       ) : userData ? (
         <div>
-          <h2 className="text-xl font-semibold mb-10">
+          <h2 className="text-xl font-semibold mb-10 text-center">
             Completed Works ({reports.length})
           </h2>
           {reports.length > 0 ? (
-            <div className="grid gap-4">
+            <div className="grid gap-4 md:flex flex-wrap">
               {reports.map((report, i) => (
                 <div
                   className={`bg-green-500 select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-600 rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}

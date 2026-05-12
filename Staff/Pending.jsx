@@ -66,6 +66,12 @@ export default function Pending() {
     <div className="py-24 px-4">
       <h1 className="text-2xl font-bold mb-6 text-center">Pending Reports</h1>
 
+      <h2>
+        ADD CONTACT OF THE WORKER ASSIGNED TO WHEN REPORT STATUS CHANGES TO
+        ASSIGNED SO REPRTER CAN CALL IS NECESSARY. PENDING REPORTS SHOULD
+        DISPLAY IN ORDER OF TIME, LATEST FIRST
+      </h2>
+
       {loading ? (
         <p className="text-center">Loading...</p>
       ) : reports.length > 0 ? (

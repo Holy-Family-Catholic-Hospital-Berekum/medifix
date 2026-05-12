@@ -10,6 +10,16 @@ export default function Footer({ page }) {
         </div>
       </div>
       <small>&copy; {new Date().getFullYear()} All rights reserved.</small>
+      <small className="text-yellow-500 mt-4">
+        Developed by:{" "}
+        <a
+          href="https://azumah-ernest.vercel.app/"
+          className="text-white cursor-pointer border-b border-yellow-500 hover:text-yellow-500 transition"
+          target="blank"
+        >
+          Eng. Azumah Ernest
+        </a>
+      </small>
     </footer>
   );
 }
