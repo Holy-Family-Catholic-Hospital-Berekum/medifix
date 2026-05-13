@@ -1,50 +1,98 @@
 import PageLayout from "./pageLayout";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  getDocs,
+  limit,
+} from "firebase/firestore";
 import { db } from "../src/firebase";
 import { formatDate } from "../src/utils";
 
 export default function Pending() {
   const [sidePopup, setSidePopup] = useState(false);
   const [reports, setReports] = useState([]);
+  const [workerMap, setWorkerMap] = useState({}); // { [workerID]: workerData }
   const [loading, setLoading] = useState(true);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   useEffect(() => {
-    const fetchReports = async () => {
-      if (!user?.ID) return;
+    if (!user?.ID) return;
 
-      try {
-        const reportsQuery = query(
-          collection(db, "reports"),
-          where("reporterId", "==", user.ID),
-          where("status", "in", [
-            "incoming",
-            "approved",
-            "pending",
-            "confirmed",
-            "assigned",
-            "denied",
-          ]),
-        );
-        const snapshot = await getDocs(reportsQuery);
-        const reportsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+    const reportsQuery = query(
+      collection(db, "reports"),
+      where("reporterId", "==", user.ID),
+      where("status", "in", [
+        "incoming",
+        "approved",
+        "pending",
+        "confirmed",
+        "assigned",
+        "denied",
+      ]),
+    );
+
+    const unsubscribe = onSnapshot(
+      reportsQuery,
+      async (snapshot) => {
+        const reportsData = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const aTime = a.dateSent?.toDate?.() ?? new Date(0);
+            const bTime = b.dateSent?.toDate?.() ?? new Date(0);
+            return bTime - aTime;
+          });
         setReports(reportsData);
-      } catch (error) {
-        console.error("Error fetching reports:", error);
-      } finally {
         setLoading(false);
-      }
-    };
 
-    fetchReports();
+        // Fetch assigned workers individually by their custom ID field.
+        // Staff can't list all users, but can query with a where clause
+        // (the list rule allows it because the query is scoped).
+        const assignedIDs = [
+          ...new Set(
+            reportsData
+              .filter((r) => r.status === "assigned" && r.assignedTo)
+              .map((r) => r.assignedTo),
+          ),
+        ];
+
+        for (const workerID of assignedIDs) {
+          // Skip if already in map
+          setWorkerMap((prev) => {
+            if (prev[workerID]) return prev;
+            // Fetch asynchronously
+            getDocs(
+              query(
+                collection(db, "users"),
+                where("ID", "==", workerID),
+                limit(1),
+              ),
+            )
+              .then((snap) => {
+                if (!snap.empty) {
+                  const data = snap.docs[0].data();
+                  setWorkerMap((p) => ({ ...p, [workerID]: data }));
+                }
+              })
+              .catch((err) =>
+                console.error("Failed to fetch worker:", workerID, err),
+              );
+            return prev;
+          });
+        }
+      },
+      (error) => {
+        console.error("Error fetching reports:", error);
+        setLoading(false);
+      },
+    );
+
+    return () => unsubscribe();
   }, [user?.ID]);
 
-  // Find the denial note from alerts — sent to the reporter's ID when status was "incoming"
   const getDenialNote = (report) => {
     if (report.status !== "denied") return null;
     return (
@@ -66,18 +114,17 @@ export default function Pending() {
     <div className="py-24 px-4">
       <h1 className="text-2xl font-bold mb-6 text-center">Pending Reports</h1>
 
-      <h2>
-        ADD CONTACT OF THE WORKER ASSIGNED TO WHEN REPORT STATUS CHANGES TO
-        ASSIGNED SO REPRTER CAN CALL IS NECESSARY. PENDING REPORTS SHOULD
-        DISPLAY IN ORDER OF TIME, LATEST FIRST
-      </h2>
-
       {loading ? (
         <p className="text-center">Loading...</p>
       ) : reports.length > 0 ? (
         <div className="space-y-4">
           {reports.map((report) => {
             const denialNote = getDenialNote(report);
+            const assignedWorker =
+              report.status === "assigned" && report.assignedTo
+                ? workerMap[report.assignedTo] || null
+                : null;
+
             return (
               <div
                 key={report.id}
@@ -96,7 +143,38 @@ export default function Pending() {
                   <p>Submitted: {formatDate(report.dateSent)}</p>
                 </div>
 
-                {/* Denial note — only shown to the staff who reported it */}
+                {/* Worker contact — shown when report is assigned */}
+                {report.status === "assigned" && (
+                  <div className="mt-3 pt-3 border-t border-gray-600">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Assigned Worker:
+                    </p>
+                    {assignedWorker ? (
+                      <>
+                        <p className="text-sm text-gray-900 mt-1">
+                          {assignedWorker.name}
+                        </p>
+                        {assignedWorker.phoneNumber && (
+                          <a
+                            href={`tel:${assignedWorker.phoneNumber}`}
+                            className="inline-flex items-center gap-1 mt-1 text-sm font-medium text-blue-800 underline"
+                          >
+                            <span className="material-symbols-outlined text-base">
+                              call
+                            </span>
+                            {assignedWorker.phoneNumber}
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500 mt-1 italic">
+                        Loading worker details...
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Denial note */}
                 {denialNote && (
                   <div className="mt-3 pt-3 border-t border-gray-500">
                     <p className="text-sm font-semibold text-gray-900">
@@ -120,7 +198,7 @@ export default function Pending() {
   return (
     <>
       <span
-        className={`material-symbols-outlined md:hidden z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400`}
+        className="material-symbols-outlined md:hidden z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400"
         onClick={() => setSidePopup((prev) => !prev)}
       >
         {sidePopup ? "chevron_right" : "chevron_left"}

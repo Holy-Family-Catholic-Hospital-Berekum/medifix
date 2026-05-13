@@ -266,7 +266,7 @@ export default function ReportForm({ formPopup, onClose }) {
         <button
           type="submit"
           disabled={loading}
-          className="bg-red-400 w-full max-w-[200px] rounded py-2 text-lg hover:shadow shadow-white cursor-pointer mt-10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-yellow-400 w-full max-w-[300px] md:max-w-[600px] w-full rounded py-2 text-lg hover:shadow hover:bg-yellow-500 shadow-white cursor-pointer mt-10 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "Submitting..." : "Submit Report"}
         </button>

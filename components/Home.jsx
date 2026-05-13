@@ -1,3 +1,4 @@
+import { markOverdueReports } from "../src/utils";
 import NavBar from "./navBar";
 import { useState, useEffect } from "react";
 import SlideInRight from "../components/slideInRight";
@@ -57,6 +58,10 @@ export default function Home({
   const [currentReportId, setCurrentReportId] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
+
+  useEffect(() => {
+    markOverdueReports();
+  }, []);
 
   const generateRegistrationID = async () => {
     const allowedTypes = {
@@ -146,17 +151,29 @@ export default function Home({
 
   const alerts = getAllAlerts();
 
-  const firstReports = reports.filter((report) =>
-    Array.isArray(firstReportsStatus)
-      ? firstReportsStatus.includes(report.status)
-      : report.status === firstReportsStatus,
-  );
+  const firstReports = reports
+    .filter((report) =>
+      Array.isArray(firstReportsStatus)
+        ? firstReportsStatus.includes(report.status)
+        : report.status === firstReportsStatus,
+    )
+    .sort((a, b) => {
+      const aTime = a.dateSent?.toDate?.() ?? new Date(0);
+      const bTime = b.dateSent?.toDate?.() ?? new Date(0);
+      return bTime - aTime;
+    });
 
-  const secondReports = reports.filter((report) =>
-    Array.isArray(secondReportsStatus)
-      ? secondReportsStatus.includes(report.status)
-      : report.status === secondReportsStatus,
-  );
+  const secondReports = reports
+    .filter((report) =>
+      Array.isArray(secondReportsStatus)
+        ? secondReportsStatus.includes(report.status)
+        : report.status === secondReportsStatus,
+    )
+    .sort((a, b) => {
+      const aTime = a.dateSent?.toDate?.() ?? new Date(0);
+      const bTime = b.dateSent?.toDate?.() ?? new Date(0);
+      return bTime - aTime;
+    });
 
   const displayReportDetails = (id) => {
     setCurrentReportId(id);
@@ -175,10 +192,10 @@ export default function Home({
     (r) => r.status === "completed" && hasFeedback(r),
   ).length;
 
-  const firstReportsCard = firstReports.map((report, i) => (
+  const firstReportsCard = firstReports.map((report) => (
     <div
       className={`relative ${report.status !== "completed" && report.priorityLevel === "urgent" ? "bg-red-500" : report.status !== "completed" && report.priorityLevel === "routine" ? secColor : "bg-green-500"} select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition ${report.priorityLevel === "routine" ? reportCardHoverColor : "hover:bg-red-600"} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}
-      key={i}
+      key={report.id}
       onClick={() => displayReportDetails(report.id)}
     >
       {hasFeedback(report) && (
@@ -198,10 +215,10 @@ export default function Home({
     </div>
   ));
 
-  const secondReportsCard = secondReports.map((report, i) => (
+  const secondReportsCard = secondReports.map((report) => (
     <div
       className={`${report.status !== "completed" && report.priorityLevel === "routine" ? secColor : "bg-red-500"} z-60 border select-none border-yellow-800 md:flex flex-col gap-2 items-center justify-center cursor-pointer transition ${report.priorityLevel === "routine" ? reportCardHoverColor : "hover:bg-red-600"} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4 ${showReportsHiddenOnMobile ? "flex" : "hidden"} `}
-      key={i}
+      key={report.id}
       onClick={() => displayReportDetails(report.id)}
     >
       <h1>{report.priorityLevel.toUpperCase()}</h1>

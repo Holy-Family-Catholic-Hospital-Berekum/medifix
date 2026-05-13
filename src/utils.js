@@ -1,9 +1,72 @@
 import { jsPDF } from "jspdf";
 
+// Add this function to your src/utils.js file
+// It checks all non-terminal reports and marks them overdue if dateDue has passed.
+// Call it once on app load from Home.jsx after reports are fetched.
+
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+  doc,
+} from "firebase/firestore";
+import { db } from "./firebase";
+
+export async function markOverdueReports() {
+  try {
+    const now = new Date();
+
+    // Fetch all active reports whose due date has passed
+    // We query for each non-terminal status separately since
+    // Firestore 'not-in' has a limit of 10 values
+    const activeStatuses = [
+      "incoming",
+      "approved",
+      "pending",
+      "confirmed",
+      "assigned",
+      "costDenied",
+    ];
+
+    const snapshot = await getDocs(
+      query(collection(db, "reports"), where("status", "in", activeStatuses)),
+    );
+
+    if (snapshot.empty) return;
+
+    const overdue = snapshot.docs.filter((docSnap) => {
+      const data = docSnap.data();
+      if (!data.dateDue) return false;
+      // dateDue may be a Firestore Timestamp or a plain JS Date
+      const due = data.dateDue?.toDate
+        ? data.dateDue.toDate()
+        : new Date(data.dateDue);
+      return due < now;
+    });
+
+    if (overdue.length === 0) return;
+
+    // Batch update all overdue reports
+    const batch = writeBatch(db);
+    overdue.forEach((docSnap) => {
+      batch.update(doc(db, "reports", docSnap.id), { status: "overdue" });
+    });
+    await batch.commit();
+
+    console.log(`Marked ${overdue.length} report(s) as overdue.`);
+  } catch (err) {
+    console.error("markOverdueReports failed:", err);
+  }
+}
+
 // Utility functions for the maintenance app
 
 /**
  * Format a Firestore timestamp to a readable date string
+ *
+ *
  */
 export const formatDate = (timestamp) => {
   if (!timestamp) return "N/A";

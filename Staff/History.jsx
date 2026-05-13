@@ -41,9 +41,14 @@ export default function History() {
             );
 
             const reportsSnap = await getDocs(reportsQuery);
-            setReports(
-              reportsSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-            );
+            const reportsData = reportsSnap.docs
+              .map((d) => ({ id: d.id, ...d.data() }))
+              .sort((a, b) => {
+                const aTime = a.dateCompleted?.toDate?.() ?? new Date(0);
+                const bTime = b.dateCompleted?.toDate?.() ?? new Date(0);
+                return bTime - aTime;
+              });
+            setReports(reportsData);
           }
         } catch (error) {
           console.error("Error fetching history data:", error);
@@ -68,7 +73,7 @@ export default function History() {
 
   const HistoryContent = (
     <div
-      className={`py-24 px-6 flex justify-center  ${reports.length < 5 ? "mb-[500px] md:mb-[500px]" : ""}`}
+      className={`py-24 px-6 flex justify-center ${reports.length < 5 ? "mb-[500px] md:mb-[500px]" : ""}`}
     >
       {loading ? (
         <p>Loading reports...</p>
@@ -81,7 +86,7 @@ export default function History() {
             <div className="grid gap-4 md:flex flex-wrap">
               {reports.map((report, i) => (
                 <div
-                  className={`bg-green-500 select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-600 rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}
+                  className="bg-green-500 select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-600 rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4"
                   key={i}
                   onClick={() => displayReportDetails(report.id)}
                 >
@@ -110,7 +115,7 @@ export default function History() {
   return (
     <>
       <span
-        className={`material-symbols-outlined md:hidden z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 right-0 bg-red-400 text-white`}
+        className="material-symbols-outlined md:hidden z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 right-0 bg-red-400 text-white"
         onClick={() => setSidePopup((prev) => !prev)}
       >
         {sidePopup ? "chevron_right" : "chevron_left"}

@@ -22,10 +22,13 @@ export default function StaffOverdue() {
           where("status", "==", "overdue"),
         );
         const snapshot = await getDocs(reportsQuery);
-        const reportsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const reportsData = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .sort((a, b) => {
+            const aTime = a.dateSent?.toDate?.() ?? new Date(0);
+            const bTime = b.dateSent?.toDate?.() ?? new Date(0);
+            return bTime - aTime;
+          });
         setReports(reportsData);
       } catch (error) {
         console.error("Error fetching reports:", error);
@@ -77,7 +80,7 @@ export default function StaffOverdue() {
   return (
     <>
       <span
-        className={`material-symbols-outlined md:hidden z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400`}
+        className="material-symbols-outlined md:hidden z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400"
         onClick={() => setSidePopup((prev) => !prev)}
       >
         {sidePopup ? "chevron_right" : "chevron_left"}

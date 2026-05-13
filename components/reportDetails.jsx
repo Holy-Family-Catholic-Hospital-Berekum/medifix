@@ -234,7 +234,7 @@ export default function ReportDetailsContainer({
     if (!report.feedbackViewedBy?.includes(user?.ID)) {
       updateDoc(doc(db, "reports", report.id), {
         feedbackViewedBy: arrayUnion(user?.ID),
-      });
+      }).catch((err) => console.error("feedbackViewedBy update failed:", err));
     }
   }, [displayDetails, currentReport]);
 
@@ -661,7 +661,7 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {report.instructions && (
+      {report.instructions && user?.role !== "staff" && (
         <div className="flex gap-2">
           <h2 className="text-lg md:text-xl whitespace-nowrap">
             Instructions:
