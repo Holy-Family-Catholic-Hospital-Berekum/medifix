@@ -56,6 +56,8 @@ export default function ReportForm({ formPopup, onClose }) {
     if (priorityLevel === "urgent") {
       // 12 hours from now
       return new Date(now.getTime() + 12 * 60 * 60 * 1000);
+    } else if (priorityLevel === "emergency") {
+      return new Date(now.getTime() + 60 * 60 * 1000);
     } else {
       // 2 days from now
       return new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
@@ -226,8 +228,9 @@ export default function ReportForm({ formPopup, onClose }) {
             className="px-2 w-full border border-red-400 rounded py-2 cursor-pointer"
             required
           >
-            <option value="routine">Routine (Due in 2 days)</option>
+            <option value="routine">Routine (Due in 1 to 2 days)</option>
             <option value="urgent">Urgent (Due in 12 hours)</option>
+            <option value="emergency">Emergency (Emmediate responds)</option>
           </select>
         </div>
 

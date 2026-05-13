@@ -562,7 +562,12 @@ export default function ReportDetailsContainer({
         <h2 className="text-lg md:text-xl whitespace-nowrap">
           Sender Contact:
         </h2>
-        <p className="text-red-400 md:text-lg">{report.reporterContact}</p>
+        <a
+          href={`tel:${report.reporterContact}`}
+          className="text-red-700 md:text-lg border-b"
+        >
+          {report.reporterContact}
+        </a>
       </div>
 
       <div className="flex items-center gap-2">
@@ -575,6 +580,17 @@ export default function ReportDetailsContainer({
           <h2 className="text-lg md:text-xl">Date Approved:</h2>
           <p className="text-red-400 md:text-lg">
             {formatDate(report.dateApproved)}
+          </p>
+        </div>
+      )}
+
+      {report.dateCostAdded && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">
+            Date Materials Added:
+          </h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateCostAdded)}
           </p>
         </div>
       )}
@@ -606,17 +622,6 @@ export default function ReportDetailsContainer({
           </h2>
           <p className="text-red-400 md:text-lg">
             {formatDate(report.dateCompleted)}
-          </p>
-        </div>
-      )}
-
-      {report.dateCostAdded && (
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
-            Date Materials Added:
-          </h2>
-          <p className="text-red-400 md:text-lg">
-            {formatDate(report.dateCostAdded)}
           </p>
         </div>
       )}

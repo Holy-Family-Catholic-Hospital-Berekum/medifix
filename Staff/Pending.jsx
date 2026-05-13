@@ -16,8 +16,26 @@ export default function Pending() {
   const [reports, setReports] = useState([]);
   const [workerMap, setWorkerMap] = useState({}); // { [workerID]: workerData }
   const [loading, setLoading] = useState(true);
-
+  const [estateManagers, setEstateManagers] = useState([]);
   const user = JSON.parse(localStorage.getItem("user"))?.data;
+
+  useEffect(() => {
+    const fetchEstateManagers = async () => {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, "users"),
+            where("role", "==", "estate"),
+            limit(10),
+          ),
+        );
+        setEstateManagers(snap.docs.map((d) => d.data()));
+      } catch (err) {
+        console.error("Failed to fetch estate managers:", err);
+      }
+    };
+    fetchEstateManagers();
+  }, []);
 
   useEffect(() => {
     if (!user?.ID) return;
@@ -143,7 +161,7 @@ export default function Pending() {
                   <p>Submitted: {formatDate(report.dateSent)}</p>
                 </div>
 
-                {/* Worker contact — shown when report is assigned */}
+                {/* Estate contact — shown when report is emergency */}
                 {report.status === "assigned" && (
                   <div className="mt-3 pt-3 border-t border-gray-600">
                     <p className="text-sm font-semibold text-gray-900">
@@ -173,6 +191,39 @@ export default function Pending() {
                     )}
                   </div>
                 )}
+
+                {/* Estate manager contacts — emergency reports only */}
+                {report.priorityLevel === "emergency" &&
+                  estateManagers.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-600">
+                      <p className="text-sm font-semibold text-gray-900 mb-2">
+                        Call Estate Manager:
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {estateManagers.map((em, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between gap-2"
+                          >
+                            <span className="text-sm text-gray-900 font-medium">
+                              {em.name}
+                            </span>
+                            {em.phoneNumber && (
+                              <a
+                                href={`tel:${em.phoneNumber}`}
+                                className="inline-flex items-center gap-1 text-sm font-medium text-blue-800 underline"
+                              >
+                                <span className="material-symbols-outlined text-base">
+                                  call
+                                </span>
+                                {em.phoneNumber}
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                 {/* Denial note */}
                 {denialNote && (

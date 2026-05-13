@@ -159,7 +159,7 @@ export const generatePDFReport = (report) => {
   addSectionGap(10);
 
   // ── Description ─────────────────────────────────────────────────────────────
-  addLine("Report Description", 11, true);
+  addLine("Problem Description", 11, true);
   addSectionGap(2);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);

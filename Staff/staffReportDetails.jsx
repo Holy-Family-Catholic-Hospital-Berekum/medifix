@@ -110,12 +110,21 @@ export default function StaffReportDetails({
         </div>
       )}
 
-      {report.instructions && (
-        <div className="flex gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
-            Instructions:
-          </h2>
-          <p className="text-red-400 md:text-lg">{report.instructions}</p>
+      {report.dateAssigned && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl">Date Assigned:</h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateAssigned)}
+          </p>
+        </div>
+      )}
+
+      {report.dateCompleted && (
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl">Date Completed:</h2>
+          <p className="text-red-400 md:text-lg">
+            {formatDate(report.dateCompleted)}
+          </p>
         </div>
       )}
 

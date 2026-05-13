@@ -101,21 +101,6 @@ export default function StaffHome() {
     </div>
   ));
 
-  const Guidelines = [
-    {
-      text1: "Reports that has it's priority set to",
-      text2: "will be attended to within a period of",
-      priority: "Urgent",
-      time: "12 hrs",
-    },
-    {
-      text1: "Reports that has it's priority set to",
-      text2: "will be attended to within a period of",
-      priority: "Routine",
-      time: "1 to 2 days",
-    },
-  ];
-
   const pageContent = (
     <main className="pt-20 md:pt-24 pb-20">
       <span
@@ -146,11 +131,22 @@ export default function StaffHome() {
           />
         </div>
       </div>
+
       <h1 className="text-center text-2xl md:4xl mt-10">Report Timelines</h1>
-      <div className="flex justify-center gap-2 md:gap-10 md:gap-10 mb-10 mt-4 md:mt-10">
+      <div className="flex justify-center flex-wrap gap-2 md:gap-10 md:gap-10 mb-10 mt-4 md:mt-10">
         <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
           <h1 className="text-[#2563EB]  rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
-            Urgent Reports
+            Emergency
+          </h1>
+          <p className="text-white">
+            Reports with priority set to EMERGENCY will be attend to {""}
+            {<span className="text-black font-bold">as soon as possible</span>}
+          </p>
+        </div>
+
+        <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
+          <h1 className="text-[#2563EB]  rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
+            Urgent
           </h1>
           <p className="text-white">
             Reports with priority set to URGENT will be attend to within a
@@ -160,7 +156,7 @@ export default function StaffHome() {
 
         <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
           <h1 className="text-[#2563EB] bg-red-300 rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
-            Routine Reports
+            Routine
           </h1>
           <p className="text-white">
             Reports with priority set to ROUTINE will be attend to within a
@@ -168,6 +164,17 @@ export default function StaffHome() {
             {<span className="text-black font-bold">1 to 2 days</span>}
           </p>
         </div>
+      </div>
+
+      <div className="bg-red-700 py-2">
+        <h1 className="text-white text-center mb-4 font-bold">
+          IMPORTANT NOTICE
+        </h1>
+        <p className="px-4 text-yellow-500 lg:px-60">
+          The urgency of a report will depend on the intensity of the issue at
+          hand. Merely setting a report priority as emergency or urgent doesn't
+          make it an emergency or urgent report.
+        </p>
       </div>
 
       <div className="w-full">
