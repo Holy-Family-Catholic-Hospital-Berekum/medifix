@@ -14,16 +14,15 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-export async function markOverdueReports() {
+export async function markOverdueReports(user) {
+  // Only admin and estate can query all reports to check for overdue
+  if (!user || !["admin", "estate"].includes(user.role)) return;
+
   try {
     const now = new Date();
 
-    // Fetch all active reports whose due date has passed
-    // We query for each non-terminal status separately since
-    // Firestore 'not-in' has a limit of 10 values
     const activeStatuses = [
       "incoming",
-      "approved",
       "pending",
       "confirmed",
       "assigned",
@@ -39,7 +38,6 @@ export async function markOverdueReports() {
     const overdue = snapshot.docs.filter((docSnap) => {
       const data = docSnap.data();
       if (!data.dateDue) return false;
-      // dateDue may be a Firestore Timestamp or a plain JS Date
       const due = data.dateDue?.toDate
         ? data.dateDue.toDate()
         : new Date(data.dateDue);
@@ -48,10 +46,12 @@ export async function markOverdueReports() {
 
     if (overdue.length === 0) return;
 
-    // Batch update all overdue reports
     const batch = writeBatch(db);
     overdue.forEach((docSnap) => {
-      batch.update(doc(db, "reports", docSnap.id), { status: "overdue" });
+      batch.update(doc(db, "reports", docSnap.id), {
+        status: "overdue",
+        preOverdueStatus: docSnap.data().status,
+      });
     });
     await batch.commit();
 
@@ -352,33 +352,44 @@ export const getStatusColor = (status) => {
 };
 
 export const canUserApprove = (user, report) => {
-  return user?.role === "admin" && report?.status === "incoming";
-};
-
-export const canUserConfirmCost = (user, report) => {
-  return user?.role === "admin" && report?.status === "pending";
+  return (
+    user?.role === "admin" &&
+    (report?.status === "incoming" || report?.status === "overdue")
+  );
 };
 
 export const canUserAddCost = (user, report) => {
+  const effectiveStatus =
+    report?.status === "overdue" ? report?.preOverdueStatus : report?.status;
   return (
     user?.role === "estate" &&
-    (report?.status === "approved" || report?.status === "costDenied")
+    (effectiveStatus === "approved" || effectiveStatus === "costDenied")
   );
 };
 
 export const canUserAssignWorker = (user, report) => {
+  const effectiveStatus =
+    report?.status === "overdue" ? report?.preOverdueStatus : report?.status;
   return (
     user?.role === "estate" &&
-    ["confirmed", "assigned"].includes(report?.status)
+    ["confirmed", "assigned"].includes(effectiveStatus)
   );
 };
 
 export const canUserComplete = (user, report) => {
+  const effectiveStatus =
+    report?.status === "overdue" ? report?.preOverdueStatus : report?.status;
   return (
     user?.role === "worker" &&
-    report?.status === "assigned" &&
+    effectiveStatus === "assigned" &&
     report?.assignedTo === user?.ID
   );
+};
+
+export const canUserConfirmCost = (user, report) => {
+  const effectiveStatus =
+    report?.status === "overdue" ? report?.preOverdueStatus : report?.status;
+  return user?.role === "admin" && effectiveStatus === "pending";
 };
 
 export const canUserSendFeedback = (user, report) => {

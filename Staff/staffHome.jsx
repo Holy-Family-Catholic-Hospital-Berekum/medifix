@@ -140,7 +140,11 @@ export default function StaffHome() {
           </h1>
           <p className="text-white">
             Reports with priority set to EMERGENCY will be attend to {""}
-            {<span className="text-black font-bold">as soon as possible</span>}
+            {
+              <span className="text-red-700 font-bold">
+                as soon as possible
+              </span>
+            }
           </p>
         </div>
 
@@ -150,7 +154,7 @@ export default function StaffHome() {
           </h1>
           <p className="text-white">
             Reports with priority set to URGENT will be attend to within a
-            period of {<span className="text-black font-bold">12 hrs</span>}
+            period of {<span className="text-red-700 font-bold">12 hrs</span>}
           </p>
         </div>
 
@@ -161,12 +165,12 @@ export default function StaffHome() {
           <p className="text-white">
             Reports with priority set to ROUTINE will be attend to within a
             period of{" "}
-            {<span className="text-black font-bold">1 to 2 days</span>}
+            {<span className="text-red-700 font-bold">1 to 2 days</span>}
           </p>
         </div>
       </div>
 
-      <div className="bg-red-700 py-2">
+      <div className="bg-red-700 py-2 md:py-10">
         <h1 className="text-white text-center mb-4 font-bold">
           IMPORTANT NOTICE
         </h1>

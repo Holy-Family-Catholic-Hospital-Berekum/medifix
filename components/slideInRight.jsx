@@ -8,6 +8,7 @@ export default function SlideInRight({
   completedRedirect,
   assignedRedirect,
   completedWithFeedback,
+  newlyOverdue,
 }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -56,6 +57,11 @@ export default function SlideInRight({
         </NavLink>
         <NavLink to={`${overdueRedirect}`} className={navClass}>
           Overdue
+          {newlyOverdue > 0 && (
+            <span className="ml-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+              {newlyOverdue}
+            </span>
+          )}
         </NavLink>
       </div>
     </>

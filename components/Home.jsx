@@ -21,6 +21,80 @@ import {
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 
+function useCountdown(dateDue) {
+  const getTimeLeft = () => {
+    const due =
+      dateDue?.toDate?.() instanceof Date
+        ? dateDue.toDate()
+        : dateDue instanceof Date
+          ? dateDue
+          : null;
+
+    if (!due) return null;
+
+    const diff = due - Date.now();
+    if (diff <= 0) return { overdue: true };
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+    return { days, hours, mins, secs, overdue: false };
+  };
+
+  const [timeLeft, setTimeLeft] = useState(getTimeLeft);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
+    return () => clearInterval(interval);
+  }, [dateDue]);
+
+  return timeLeft;
+}
+
+function Countdown({ dateDue, status }) {
+  const t = useCountdown(dateDue);
+
+  if (status === "completed") return null;
+
+  if (!t) return null;
+
+  if (t.overdue)
+    return (
+      <span className="text-xs font-bold text-red-300 bg-black/30 px-1.5 py-0.5 rounded">
+        OVERDUE
+      </span>
+    );
+
+  return (
+    <span className="text-xs text-white bg-black/30 px-1.5 py-0.5 rounded">
+      {t.days > 0 && `${t.days}d `}
+      {t.hours}h {t.mins}m {t.secs}s left
+    </span>
+  );
+}
+
+function timeAgo(date) {
+  if (!date) return null;
+  const d =
+    date?.toDate?.() instanceof Date
+      ? date.toDate()
+      : date instanceof Date
+        ? date
+        : null;
+  if (!d) return null;
+
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  return `${mins}m ago`;
+}
+
 export default function Home({
   bgColor,
   primaryColor,
@@ -60,7 +134,7 @@ export default function Home({
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   useEffect(() => {
-    markOverdueReports();
+    markOverdueReports(user);
   }, []);
 
   const generateRegistrationID = async () => {
@@ -192,9 +266,23 @@ export default function Home({
     (r) => r.status === "completed" && hasFeedback(r),
   ).length;
 
+  const newlyOverdue = reports.filter(
+    (r) => r.status === "overdue" && !r.overdueViewedBy?.includes(user?.ID),
+  ).length;
+
+  const cardColors = (status, priority) => {
+    if (status !== "completed" && priority === "emergency") {
+      return "bg-red-600 hover:bg-red-700";
+    } else if (status !== "completed" && priority === "urgent") {
+      return "bg-red-500 hover:bg-red-700";
+    } else {
+      return "bg-green-500 hover:bg-green-600";
+    }
+  };
+
   const firstReportsCard = firstReports.map((report) => (
     <div
-      className={`relative ${report.status !== "completed" && report.priorityLevel === "urgent" ? "bg-red-500" : report.status !== "completed" && report.priorityLevel === "routine" ? secColor : "bg-green-500"} select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition ${report.priorityLevel === "routine" ? reportCardHoverColor : "hover:bg-red-600"} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}
+      className={`relative ${cardColors(report.status, report.priorityLevel)} select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}
       key={report.id}
       onClick={() => displayReportDetails(report.id)}
     >
@@ -212,12 +300,18 @@ export default function Home({
           {report.status}
         </span>
       </div>
+      <Countdown dateDue={report.dateDue} status={report.status} />
+      {report.status === "overdue" && report.dateDue && (
+        <span className="text-xs text-red-200 bg-black/30 px-1.5 py-0.5 rounded">
+          due {timeAgo(report.dateDue)}
+        </span>
+      )}
     </div>
   ));
 
   const secondReportsCard = secondReports.map((report) => (
     <div
-      className={`${report.status !== "completed" && report.priorityLevel === "routine" ? secColor : "bg-red-500"} z-60 border select-none border-yellow-800 md:flex flex-col gap-2 items-center justify-center cursor-pointer transition ${report.priorityLevel === "routine" ? reportCardHoverColor : "hover:bg-red-600"} rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4 ${showReportsHiddenOnMobile ? "flex" : "hidden"} `}
+      className={`${cardColors(report.status, report.priorityLevel)} z-60 border select-none border-yellow-800 md:flex flex-col gap-2 items-center justify-center cursor-pointer transition  rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4 ${showReportsHiddenOnMobile ? "flex" : "hidden"} `}
       key={report.id}
       onClick={() => displayReportDetails(report.id)}
     >
@@ -230,6 +324,8 @@ export default function Home({
           {report.status}
         </span>
       </div>
+
+      <Countdown dateDue={report.dateDue} status={report.status} />
     </div>
   ));
 
@@ -362,6 +458,7 @@ export default function Home({
         completedRedirect={completedRedirect}
         overdueRedirect={overdueRedirect}
         completedWithFeedback={completedWithFeedback}
+        newlyOverdue={newlyOverdue}
       />
       <div className="md:hidden">
         <span
@@ -404,6 +501,11 @@ export default function Home({
           </NavLink>
           <NavLink to={`${overdueRedirect}`} className={navClass}>
             Overdue
+            {newlyOverdue > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {newlyOverdue}
+              </span>
+            )}
           </NavLink>
         </div>
         <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden  overflow-y-auto py-24 flex flex-col items-center z-0">
