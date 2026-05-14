@@ -16,7 +16,6 @@ export default function WorkerCompleted() {
       slideInBgColor="bg-yellow-500"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-      overdueRedirect={"/workerOverdue"}
       completedRedirect={"/workerCompleted"}
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/workerHome"

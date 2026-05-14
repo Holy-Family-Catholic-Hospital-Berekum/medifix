@@ -1,9 +1,13 @@
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router";
+import { useNavigate, NavLink } from "react-router";
+import { signOut } from "firebase/auth";
+import { auth } from "../src/firebase";
 
 export default function StaffSlideInRight({ sidePopup }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (sidePopup) {
@@ -27,6 +31,16 @@ export default function StaffSlideInRight({ sidePopup }) {
       isActive ? "text-green-800" : "text-[#111827] hover:text-blue-200"
     }`;
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.removeItem("user");
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   return (
     <>
       <div
@@ -39,9 +53,16 @@ export default function StaffSlideInRight({ sidePopup }) {
             Pending
           </NavLink>
         }
-        <NavLink to="/staffOverdue" end className={navClass}>
-          Overdue
+        <NavLink to="/History" className={navClass}>
+          Completed
         </NavLink>
+
+        <small
+          className="text-red-700   cursor-pointer hover:text-red-800 transition"
+          onClick={handleLogout}
+        >
+          Logout
+        </small>
       </div>
     </>
   );

@@ -8,29 +8,28 @@ import ReportDetailsContainer from "./reportDetails";
 import ReportsHiddenOnMobile from "./reportsHiddenOnMobile";
 import {
   collection,
-  addDoc,
   serverTimestamp,
   query,
   where,
-  getDocs,
-  updateDoc,
-  arrayUnion,
+  onSnapshot,
   doc,
   setDoc,
-  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 
 function useCountdown(dateDue) {
   const getTimeLeft = () => {
-    const due =
-      dateDue?.toDate?.() instanceof Date
-        ? dateDue.toDate()
-        : dateDue instanceof Date
-          ? dateDue
-          : null;
+    // Firestore Timestamp has toDate(), plain Date is instanceof Date
+    let due = null;
+    if (dateDue?.toDate) {
+      due = dateDue.toDate();
+    } else if (dateDue instanceof Date) {
+      due = dateDue;
+    } else if (dateDue) {
+      due = new Date(dateDue);
+    }
 
-    if (!due) return null;
+    if (!due || isNaN(due.getTime())) return null;
 
     const diff = due - Date.now();
     if (diff <= 0) return { overdue: true };
@@ -46,6 +45,7 @@ function useCountdown(dateDue) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft);
 
   useEffect(() => {
+    setTimeLeft(getTimeLeft());
     const interval = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
     return () => clearInterval(interval);
   }, [dateDue]);
@@ -53,19 +53,22 @@ function useCountdown(dateDue) {
   return timeLeft;
 }
 
-function Countdown({ dateDue, status }) {
+function Countdown({ dateDue, status, overdueFlag }) {
   const t = useCountdown(dateDue);
 
   if (status === "completed") return null;
-
   if (!t) return null;
 
-  if (t.overdue)
+  // If locally computed as overdue but Firestore flag not set yet,
+  // show a fallback "Overdue" label so nothing disappears
+  if (t.overdue) {
+    if (overdueFlag) return null; // card already shows the ⚠ OVERDUE block
     return (
-      <span className="text-xs font-bold text-red-300 bg-black/30 px-1.5 py-0.5 rounded">
-        OVERDUE
+      <span className="text-xs font-bold text-red-300 bg-black/40 px-2 py-0.5 rounded">
+        ⚠ OVERDUE
       </span>
     );
+  }
 
   return (
     <span className="text-xs text-white bg-black/30 px-1.5 py-0.5 rounded">
@@ -77,13 +80,15 @@ function Countdown({ dateDue, status }) {
 
 function timeAgo(date) {
   if (!date) return null;
-  const d =
-    date?.toDate?.() instanceof Date
-      ? date.toDate()
-      : date instanceof Date
-        ? date
-        : null;
-  if (!d) return null;
+  let d = null;
+  if (date?.toDate) {
+    d = date.toDate();
+  } else if (date instanceof Date) {
+    d = date;
+  } else {
+    d = new Date(date);
+  }
+  if (!d || isNaN(d.getTime())) return null;
 
   const diff = Date.now() - d.getTime();
   const mins = Math.floor(diff / (1000 * 60));
@@ -100,7 +105,6 @@ export default function Home({
   primaryColor,
   secColor,
   completedRedirect,
-  overdueRedirect,
   assignedRedirect,
   title1,
   title2,
@@ -124,7 +128,6 @@ export default function Home({
     useState(false);
   const [displayDetails, setDisplayDetails] = useState(false);
   const [reports, setReports] = useState([]);
-
   const [showGenModal, setShowGenModal] = useState(false);
   const [genType, setGenType] = useState("");
   const [genLoading, setGenLoading] = useState(false);
@@ -144,7 +147,7 @@ export default function Home({
     };
     const permitted = allowedTypes[user?.role];
     if (!permitted) return;
-    setGenType(permitted[0]); // default to first allowed type
+    setGenType(permitted[0]);
     setGeneratedID("");
     setShowGenModal(true);
   };
@@ -173,7 +176,6 @@ export default function Home({
     }`;
 
   const handleClose = () => {
-    // give slide-down time to finish before hiding
     setTimeout(() => SetShowReportsHiddenOnMobile(false), 300);
   };
 
@@ -185,9 +187,6 @@ export default function Home({
         collection(db, "reports"),
         where("assignedTo", "==", user.ID),
       );
-    } else if (user?.role === "staff") {
-      // Staff already see all reports via list rule — no change needed
-      reportsQuery = query(collection(db, "reports"));
     } else {
       reportsQuery = query(collection(db, "reports"));
     }
@@ -203,12 +202,10 @@ export default function Home({
     return () => unsubscribe();
   }, []);
 
-  // Get all alerts for the current user
   const getAllAlerts = () => {
     const allAlerts = [];
     reports.forEach((report) => {
       if (!report.alerts || !Array.isArray(report.alerts)) return;
-
       report.alerts.forEach((alert) => {
         if (alert.sentTo === user?.role || alert.sentTo === user?.ID) {
           allAlerts.push({
@@ -219,7 +216,6 @@ export default function Home({
         }
       });
     });
-
     return allAlerts.sort((a, b) => new Date(b.date) - new Date(a.date));
   };
 
@@ -254,7 +250,6 @@ export default function Home({
     setDisplayDetails(true);
   };
 
-  // Derive currentReport live from the reports state
   const currentReport = reports.filter(
     (report) => report.id === currentReportId,
   );
@@ -266,20 +261,16 @@ export default function Home({
     (r) => r.status === "completed" && hasFeedback(r),
   ).length;
 
-  const newlyOverdue = reports.filter(
-    (r) => r.status === "overdue" && !r.overdueViewedBy?.includes(user?.ID),
-  ).length;
-
+  // cardColors — remove overdue status check, it's now just a flag
   const cardColors = (status, priority) => {
-    if (status !== "completed" && priority === "emergency") {
+    if (status !== "completed" && priority === "emergency")
       return "bg-red-600 hover:bg-red-700";
-    } else if (status !== "completed" && priority === "urgent") {
+    if (status !== "completed" && priority === "urgent")
       return "bg-red-500 hover:bg-red-700";
-    } else {
-      return "bg-green-500 hover:bg-green-600";
-    }
+    return "bg-green-500 hover:bg-green-600";
   };
 
+  // firstReportsCard — update overdue label and card call:
   const firstReportsCard = firstReports.map((report) => (
     <div
       className={`relative ${cardColors(report.status, report.priorityLevel)} select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4`}
@@ -293,39 +284,69 @@ export default function Home({
       )}
       <h1>{report.priorityLevel.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
-        <span className="text-blue-200 bg-yellow-800 px-1 rounded">
-          {report[reportDate1]?.toDate().toLocaleDateString()}
+        <span className="text-blue-200 bg-yellow-800 px-1 rounded text-xs">
+          {report[reportDate1]?.toDate?.().toLocaleDateString()}
         </span>
-        <span className="text-red-400 bg-gray-800 px-1 rounded">
+        <span className="text-red-400 bg-gray-800 px-1 rounded text-xs">
           {report.status}
         </span>
       </div>
-      <Countdown dateDue={report.dateDue} status={report.status} />
-      {report.status === "overdue" && report.dateDue && (
-        <span className="text-xs text-red-200 bg-black/30 px-1.5 py-0.5 rounded">
-          due {timeAgo(report.dateDue)}
-        </span>
+      {report.overdue && (
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs font-bold text-red-300 bg-black/40 px-2 py-0.5 rounded">
+            ⚠ OVERDUE
+          </span>
+          {report.dateDue && (
+            <span className="text-xs text-red-200 bg-black/30 px-1.5 py-0.5 rounded">
+              due {timeAgo(report.dateDue)}
+            </span>
+          )}
+        </div>
+      )}
+      {!report.overdue && (
+        <Countdown
+          dateDue={report.dateDue}
+          status={report.status}
+          overdueFlag={report.overdue}
+        />
       )}
     </div>
   ));
 
   const secondReportsCard = secondReports.map((report) => (
     <div
-      className={`${cardColors(report.status, report.priorityLevel)} z-60 border select-none border-yellow-800 md:flex flex-col gap-2 items-center justify-center cursor-pointer transition  rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4 ${showReportsHiddenOnMobile ? "flex" : "hidden"} `}
+      className={`${cardColors(report.status, report.priorityLevel)} z-60 border select-none border-yellow-800 md:flex flex-col gap-2 items-center justify-center cursor-pointer transition rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4 ${showReportsHiddenOnMobile ? "flex" : "hidden"}`}
       key={report.id}
       onClick={() => displayReportDetails(report.id)}
     >
       <h1>{report.priorityLevel.toUpperCase()}</h1>
       <div className="flex justify-between gap-4">
-        <span className="text-blue-200 bg-yellow-800 px-1 rounded">
-          {report[reportDate2]?.toDate().toLocaleDateString()}
+        <span className="text-blue-200 bg-yellow-800 px-1 rounded text-xs">
+          {report[reportDate2]?.toDate?.().toLocaleDateString()}
         </span>
-        <span className="text-red-400 bg-gray-800 px-1 rounded">
+        <span className="text-red-400 bg-gray-800 px-1 rounded text-xs">
           {report.status}
         </span>
       </div>
-
-      <Countdown dateDue={report.dateDue} status={report.status} />
+      {report.overdue && (
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs font-bold text-red-300 bg-black/40 px-2 py-0.5 rounded">
+            ⚠ OVERDUE
+          </span>
+          {report.dateDue && (
+            <span className="text-xs text-red-200 bg-black/30 px-1.5 py-0.5 rounded">
+              due {timeAgo(report.dateDue)}
+            </span>
+          )}
+        </div>
+      )}
+      {!report.overdue && (
+        <Countdown
+          dateDue={report.dateDue}
+          status={report.status}
+          overdueFlag={report.overdue}
+        />
+      )}
     </div>
   ));
 
@@ -344,7 +365,6 @@ export default function Home({
             <h2 className="text-lg font-bold text-gray-800">
               Generate Registration ID
             </h2>
-
             {!generatedID ? (
               <>
                 <div className="flex flex-col gap-2">
@@ -371,7 +391,6 @@ export default function Home({
                     ))}
                   </div>
                 </div>
-
                 <div className="flex gap-3 mt-2">
                   <button
                     type="button"
@@ -446,6 +465,7 @@ export default function Home({
           secondReports={secondReports}
         />
       )}
+
       <NavBar
         navBarColor={navBarColor}
         logoBGColor={logoBGColor}
@@ -456,10 +476,9 @@ export default function Home({
         slideInBgColor={slideInBgColor}
         assignedRedirect={assignedRedirect}
         completedRedirect={completedRedirect}
-        overdueRedirect={overdueRedirect}
         completedWithFeedback={completedWithFeedback}
-        newlyOverdue={newlyOverdue}
       />
+
       <div className="md:hidden">
         <span
           className="material-symbols-outlined select-none z-60 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400"
@@ -484,7 +503,7 @@ export default function Home({
 
       <main className={`flex ${bgColor}`}>
         <div
-          className={`w-full fixed inset-y-0 z-10 max-w-[20%] h-screen ${secColor}  md:flex flex-col pt-24 px-10 gap-10 hidden`}
+          className={`w-full fixed inset-y-0 z-10 max-w-[20%] h-screen ${secColor} md:flex flex-col pt-24 px-10 gap-10 hidden`}
         >
           {assignedRedirect && (
             <NavLink to={`${assignedRedirect}`} className={navClass}>
@@ -499,16 +518,9 @@ export default function Home({
               </span>
             )}
           </NavLink>
-          <NavLink to={`${overdueRedirect}`} className={navClass}>
-            Overdue
-            {newlyOverdue > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {newlyOverdue}
-              </span>
-            )}
-          </NavLink>
         </div>
-        <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden  overflow-y-auto py-24 flex flex-col items-center z-0">
+
+        <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-auto py-24 flex flex-col items-center z-0">
           {(user?.role === "admin" || user?.role === "estate") && (
             <button
               onClick={generateRegistrationID}
@@ -517,24 +529,21 @@ export default function Home({
               Generate Registration ID
             </button>
           )}
+
           <h1
             className={`text-xl border-y ${titleBorderColor} md:text-2xl ${primaryColor} font-bold w-full text-center py-2 ${secColor}`}
           >
             {title1}
           </h1>
 
-          {firstReports.some(hasFeedback) && (
-            <div className="w-full max-w-[80%] mt-5 text-center ...">
-              💬 Some completed works have feedback tap a card to review.
-            </div>
-          )}
           {firstReports.length > 0 ? (
-            <div className="flex lg:max-w-[80%]  md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
+            <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
               {firstReportsCard}
             </div>
           ) : (
-            <p className=" my-20">Nothing to display here...yet</p>
+            <p className="my-20">Nothing to display here...yet</p>
           )}
+
           {!specificReportsPage && (
             <h1
               className={`text-xl hidden md:block md:text-2xl border-y ${titleBorderColor} ${primaryColor} font-bold w-full text-center py-2 ${secColor}`}
@@ -542,8 +551,9 @@ export default function Home({
               {title2}
             </h1>
           )}
+
           {secondReports.length > 0 && !specificReportsPage ? (
-            <div className="flex lg:max-w-[80%]  md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
+            <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
               {secondReportsCard}
             </div>
           ) : !specificReportsPage && secondReports.length <= 0 ? (

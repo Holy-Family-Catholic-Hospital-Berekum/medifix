@@ -19,7 +19,6 @@ export default function AdminHome() {
       slideInBgColor="bg-green-300"
       reportDetailsBgColor="bg-green-300"
       reportsHiddenOnMobileTitle="Pending Confirmation"
-      overdueRedirect={"/adminOverdue"}
       completedRedirect={"/adminCompleted"}
       assignedRedirect={"/adminAssigned"}
       logoBGColor="md:bg-green-500"

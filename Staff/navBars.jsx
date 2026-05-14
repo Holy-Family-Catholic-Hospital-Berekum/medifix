@@ -2,8 +2,7 @@ import { useState } from "react";
 import ReportForm from "./reportForm";
 import AlertsContainer from "../components/AlertsContainer";
 import { useNavigate, NavLink } from "react-router";
-import { signOut } from "firebase/auth";
-import { auth } from "../src/firebase";
+
 export default function NavBars() {
   const [formPopup, setFormPopup] = useState(false);
   const navigate = useNavigate();
@@ -21,16 +20,6 @@ export default function NavBars() {
         ? "text-red-300 whitespace-nowrap"
         : "text-[#111827] hover:text-red-300 whitespace-nowrap"
     }`;
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      localStorage.removeItem("user");
-      navigate("/");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
 
   return (
     <>
@@ -55,20 +44,11 @@ export default function NavBars() {
           <h1 className="font-bold ">PHIX-HFCH</h1>
         </div>
 
-        <NavLink to="/History" className={navClass}>
-          History
-        </NavLink>
         <NavLink to="/Home" end className={navClass}>
           Home
         </NavLink>
 
         <div className="flex items-center justify-center gap-4 md:gap-10">
-          <button
-            className="text-[#111827]   cursor-pointer hover:text-red-300 transition"
-            onClick={handleLogout}
-          >
-            Logout
-          </button>
           <button
             className="bg-yellow-500 text-white hidden md:block  text-lg bg-[#2563EB] px-4 py-1 rounded-full cursor-pointer hover:shadow hover:bg-red-400 shadow-white transition"
             onClick={() => (formPopup ? handleClose() : setFormPopup(true))}

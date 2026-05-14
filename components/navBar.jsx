@@ -36,12 +36,12 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
         Home
       </NavLink>
 
-      <button
+      <small
         onClick={handleLogout}
         className="text-[#111827] hover:text-red-400 cursor-pointer transition"
       >
         Logout
-      </button>
+      </small>
     </nav>
   );
 }

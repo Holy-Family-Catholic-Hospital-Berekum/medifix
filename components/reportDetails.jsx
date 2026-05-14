@@ -238,17 +238,6 @@ export default function ReportDetailsContainer({
     }
   }, [displayDetails, currentReport]);
 
-  useEffect(() => {
-    if (!displayDetails || !currentReport || currentReport.length === 0) return;
-    const report = currentReport[0];
-    if (report.status !== "overdue") return;
-    if (!report.overdueViewedBy?.includes(user?.ID)) {
-      updateDoc(doc(db, "reports", report.id), {
-        overdueViewedBy: arrayUnion(user?.ID),
-      }).catch((err) => console.error("overdueViewedBy update failed:", err));
-    }
-  }, [displayDetails, currentReport]);
-
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
   const report = currentReport[0];
@@ -263,7 +252,7 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "approved",
         dateApproved: serverTimestamp(),
-        dateDue: null, // ← add this
+
         alerts: arrayUnion(
           createAlert(noteContent, "admin", "estate", report.status),
         ),
@@ -314,7 +303,6 @@ export default function ReportDetailsContainer({
         materials: validMaterials,
         status: "pending",
         dateCostAdded: serverTimestamp(),
-        preOverdueStatus: null,
       });
       alert("Materials submitted for admin confirmation!");
       setMaterials([{ ...EMPTY_MATERIAL }]);
@@ -335,7 +323,6 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "confirmed",
         dateConfirmed: serverTimestamp(),
-        preOverdueStatus: null,
         alerts: arrayUnion(
           createAlert(noteContent, "admin", "estate", report.status),
         ),
@@ -386,7 +373,6 @@ export default function ReportDetailsContainer({
         assignedTo: formData.selectedWorker,
         status: "assigned",
         dateAssigned: serverTimestamp(),
-        preOverdueStatus: null,
         alerts: arrayUnion(
           createAlert(
             `Worker assigned: ${formData.selectedWorker}`,
@@ -448,7 +434,6 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "completed",
         dateCompleted: serverTimestamp(),
-        preOverdueStatus: null,
       });
       alert("Work marked as completed!");
       setDisplayDetails(false);

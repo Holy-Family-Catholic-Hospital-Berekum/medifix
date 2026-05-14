@@ -16,7 +16,7 @@ export default function StaffHome() {
 
   const services = [
     {
-      name: "Electricity",
+      name: "Electrical",
       provisions: ["Repairs", "Suplies"],
       image: electricity,
     },
@@ -49,7 +49,7 @@ export default function StaffHome() {
 
   const serviceCard = services.map((service) => (
     <div
-      className="flex flex-col items-center justify-center cursor-pointer rounded-xl border p-4 max-w-[130px] md:max-w-[300px]  w-full border-red-300 shadow"
+      className="flex flex-col items-center justify-center cursor-default select-none rounded-xl border p-4 max-w-[130px] md:max-w-[300px]  w-full border-red-300 shadow"
       key={service.name}
     >
       <h1 className="text-xl mb-2 text-[[#111827]">{service.name}</h1>

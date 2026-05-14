@@ -9,18 +9,14 @@ import AdminHome from "../Admin/adminHome";
 
 import EstateAssigned from "../Estate-manager/estateAssigned";
 import EstateCompleted from "../Estate-manager/estateCompleted";
-import EstateOverdue from "../Estate-manager/estateOverdue";
 
 import AdminAssigned from "../Admin/adminAssigned";
 import AdminCompleted from "../Admin/adminCompleted";
-import AdminOverdue from "../Admin/adminOverdue";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
-import WorkerOverdue from "../Worker/workerOverdue";
 
 import Pending from "../Staff/Pending";
-import StaffOverdue from "../Staff/staffOverdue";
 
 import SignUp from "../signUp/signUp";
 
@@ -80,14 +76,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/adminOverdue"
-        element={
-          <ProtectedRoute>
-            <AdminOverdue />
-          </ProtectedRoute>
-        }
-      />
 
       <Route
         path="/estateAssigned"
@@ -105,28 +93,12 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/estateOverdue"
-        element={
-          <ProtectedRoute>
-            <EstateOverdue />
-          </ProtectedRoute>
-        }
-      />
 
       <Route
         path="/workerCompleted"
         element={
           <ProtectedRoute>
             <WorkerCompleted />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/workerOverdue"
-        element={
-          <ProtectedRoute>
-            <WorkerOverdue />
           </ProtectedRoute>
         }
       />
@@ -139,14 +111,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/staffOverdue"
-        element={
-          <ProtectedRoute>
-            <StaffOverdue />
-          </ProtectedRoute>
-        }
-      />
+
       <Route
         path="/History"
         element={

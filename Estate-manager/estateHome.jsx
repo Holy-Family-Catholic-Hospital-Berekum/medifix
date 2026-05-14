@@ -20,7 +20,6 @@ export default function EstateHome() {
       reportDetailsBgColor="bg-green-300"
       reportsHiddenOnMobileTitle="Confirmed Reports"
       specificReportsPage={false}
-      overdueRedirect="/estateOverdue"
       completedRedirect="/estateCompleted"
       assignedRedirect="/estateAssigned"
       logoBGColor="md:bg-blue-500"
