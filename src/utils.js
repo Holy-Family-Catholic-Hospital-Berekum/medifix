@@ -11,6 +11,7 @@ import {
   getDocs,
   writeBatch,
   doc,
+  limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -95,7 +96,13 @@ export const createAlert = (content, sentBy, sentTo, type) => {
 /**
  * Generate a PDF report with a materials table and signatures
  */
-export const generatePDFReport = (report) => {
+export const generatePDFReport = (
+  report,
+  workerName,
+  workerPhone,
+  estateManagerName,
+  estateManagerPhone,
+) => {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = 595.28;
   const margin = 40;
@@ -243,11 +250,17 @@ export const generatePDFReport = (report) => {
     addLine(`Total Estimated Cost: ₵${report.cost}`);
   }
 
-  // ── Admin confirmation note ──────────────────────────────────────────────────
-  const confirmationAlert = report.alerts?.find(
-    (a) =>
-      a.sentBy === "admin" && a.sentTo === "estate" && a.type === "pending",
-  );
+  const confirmationAlert =
+    [...(report.alerts || [])]
+      .filter(
+        (a) =>
+          a.sentBy === "admin" &&
+          a.sentTo === "estate" &&
+          a.type === "pending" &&
+          a.subtype === "confirmed",
+      )
+      .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
+
   if (confirmationAlert?.content) {
     addSectionGap(4);
     addLine("Admin Confirmation Note", 11, true);
@@ -257,17 +270,11 @@ export const generatePDFReport = (report) => {
     );
   }
 
-  // ── Instructions / Feedback ──────────────────────────────────────────────────
-  if (report.instructions) {
+  if (workerName) {
     addSectionGap(6);
-    addLine("Work Instructions", 11, true);
-    addLine(report.instructions);
-  }
-
-  if (report.assignedTo) {
-    addSectionGap(6);
-    addLine("Assigned Worker", 11, true);
-    addLine(`Worker ID: ${report.assignedTo}`);
+    addLine("Assigned Technician", 11, true);
+    addLine(workerName);
+    if (workerPhone) addLine(`Contact: ${workerPhone}`);
   }
 
   if (report.feedback) {
@@ -305,12 +312,15 @@ export const generatePDFReport = (report) => {
   doc.setFontSize(10);
   doc.text("Requested by Maintenance Manager:", margin, sigY);
   doc.setFont("helvetica", "normal");
-  doc.text(report.reporter || "", margin, sigY + 14);
-  doc.line(margin, sigY + 30, margin + 200, sigY + 30);
+  doc.text(estateManagerName || "", margin, sigY + 14);
+  if (estateManagerPhone) {
+    doc.text(`Contact: ${estateManagerPhone}`, margin, sigY + 26);
+  }
+  doc.line(margin, sigY + 40, margin + 200, sigY + 40);
   doc.setFontSize(8);
-  doc.text("Signature & Date", margin, sigY + 42);
+  doc.text("Signature & Date", margin, sigY + 52);
 
-  y = sigY + 60;
+  y = sigY + 70;
   addSectionGap(14);
 
   // Procurement section

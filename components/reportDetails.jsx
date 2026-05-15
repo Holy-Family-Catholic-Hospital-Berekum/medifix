@@ -323,9 +323,10 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "confirmed",
         dateConfirmed: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(noteContent, "admin", "estate", report.status),
-        ),
+        alerts: arrayUnion({
+          ...createAlert(noteContent, "admin", "estate", report.status),
+          subtype: "confirmed",
+        }),
       });
       alert("Materials confirmed!");
       setFormData({ ...formData, note: "" });
@@ -346,9 +347,10 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "costDenied",
         dateCostDenied: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(reason, "admin", "estate", report.status),
-        ),
+        alerts: arrayUnion({
+          ...createAlert(reason, "admin", "estate", report.status),
+          subtype: "denied",
+        }),
       });
       alert("Materials denied!");
       setFormData({ ...formData, note: "" });
@@ -677,7 +679,7 @@ export default function ReportDetailsContainer({
             {report.status === "denied"
               ? "Denial Reason:"
               : report.status === "costDenied"
-                ? "Materials Denial Reason:"
+                ? "Denial Note:"
                 : "Note:"}
           </h2>
           <p className="text-red-400 md:text-lg">{relevantAlert.content}</p>
@@ -934,7 +936,20 @@ export default function ReportDetailsContainer({
       {canUserDownloadPDF(user, report) && (
         <div className="bg-white rounded-lg p-5">
           <button
-            onClick={() => generatePDFReport(report)}
+            onClick={() => {
+              const workerName =
+                assignedWorker?.name || report.assignedTo || "";
+              const workerPhone = assignedWorker?.phoneNumber || "";
+              const estateManagerName = user?.name || "";
+              const estateManagerPhone = user?.phoneNumber || "";
+              generatePDFReport(
+                report,
+                workerName,
+                workerPhone,
+                estateManagerName,
+                estateManagerPhone,
+              );
+            }}
             className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded w-full"
           >
             Download Report (PDF)

@@ -93,7 +93,7 @@ function ReportCard({
       {report.status === "assigned" && (
         <div className="mt-3 pt-3 border-t border-gray-600">
           <p className="text-sm font-semibold text-gray-900">
-            Assigned Worker:
+            Assigned Technician:
           </p>
           {assignedWorker ? (
             <>
