@@ -390,7 +390,13 @@ export default function ReportDetailsContainer({
       }
 
       await updateDoc(doc(db, "reports", report.id), updatePayload);
-      alert("Work assigned to worker!");
+
+      // If assigning directly from approved (no materials), also hide the add materials section
+      const msg =
+        report.status === "approved"
+          ? "Work assigned directly (no materials required)!"
+          : "Work assigned to worker!";
+      alert(msg);
       setFormData({ ...formData, selectedWorker: "", instructions: "" });
       setDisplayDetails(false);
     } catch (error) {
@@ -735,6 +741,7 @@ export default function ReportDetailsContainer({
       )}
 
       {/* ESTATE ACTIONS - Add Materials */}
+
       {canUserAddCost(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-4">
           <h3 className="font-bold text-gray-800">
@@ -742,6 +749,13 @@ export default function ReportDetailsContainer({
               ? "Estate Actions - Resubmit Materials"
               : "Estate Actions - Add Materials"}
           </h3>
+          {report.status === "approved" && (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
+              If no materials are needed, skip this and use the{" "}
+              <span className="font-semibold">Assign Worker</span> section below
+              to assign work directly.
+            </p>
+          )}
 
           {report.status === "costDenied" && (
             <p className="text-sm text-red-500">

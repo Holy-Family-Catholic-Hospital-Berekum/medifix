@@ -379,7 +379,7 @@ export const canUserAddCost = (user, report) => {
 export const canUserAssignWorker = (user, report) => {
   return (
     user?.role === "estate" &&
-    ["confirmed", "assigned"].includes(report?.status)
+    ["approved", "confirmed", "assigned"].includes(report?.status)
   );
 };
 
@@ -401,8 +401,12 @@ export const canUserSendFeedback = (user, report) => {
 };
 
 export const canUserDownloadPDF = (user, report) => {
+  // No PDF for reports that skipped the materials flow (no materials array)
+  const hasMaterials =
+    Array.isArray(report?.materials) && report.materials.length > 0;
   return (
     user?.role === "estate" &&
+    hasMaterials &&
     (report?.status === "confirmed" ||
       report?.status === "assigned" ||
       report?.status === "completed")
