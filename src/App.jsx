@@ -12,7 +12,7 @@ import EstateCompleted from "../Estate-manager/estateCompleted";
 
 import AdminAssigned from "../Admin/adminAssigned";
 import AdminCompleted from "../Admin/adminCompleted";
-import AdminDashboard from "../Admin/adminDashboard";
+import AdminDashboard from "../Admin/Dashboard";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
