@@ -128,10 +128,7 @@ export default function Home({
     useState(false);
   const [displayDetails, setDisplayDetails] = useState(false);
   const [reports, setReports] = useState([]);
-  const [showGenModal, setShowGenModal] = useState(false);
-  const [genType, setGenType] = useState("");
-  const [genLoading, setGenLoading] = useState(false);
-  const [generatedID, setGeneratedID] = useState("");
+
   const [currentReportId, setCurrentReportId] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
@@ -139,36 +136,6 @@ export default function Home({
   useEffect(() => {
     markOverdueReports(user);
   }, []);
-
-  const generateRegistrationID = async () => {
-    const allowedTypes = {
-      admin: ["estate", "staff", "worker"],
-      estate: ["staff", "worker"],
-    };
-    const permitted = allowedTypes[user?.role];
-    if (!permitted) return;
-    setGenType(permitted[0]);
-    setGeneratedID("");
-    setShowGenModal(true);
-  };
-
-  const handleGenerate = async () => {
-    if (!genType || genLoading) return;
-    setGenLoading(true);
-    try {
-      const id = nanoid();
-      await setDoc(doc(db, "registrationIDs", id), {
-        type: genType,
-        used: false,
-      });
-      setGeneratedID(id);
-    } catch (error) {
-      console.error("Failed to generate ID:", error);
-      alert("Failed to generate registration ID. Please try again.");
-    } finally {
-      setGenLoading(false);
-    }
-  };
 
   const navClass = ({ isActive }) =>
     `cursor-pointer transition ${
@@ -359,103 +326,6 @@ export default function Home({
         reportDetailsBgColor={reportDetailsBgColor}
       />
 
-      {showGenModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 flex flex-col gap-4">
-            <h2 className="text-lg font-bold text-gray-800">
-              Generate Registration ID
-            </h2>
-            {!generatedID ? (
-              <>
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm text-gray-600 font-medium">
-                    Select account type
-                  </label>
-                  <div className="flex gap-2 flex-wrap">
-                    {(user?.role === "admin"
-                      ? ["estate", "staff", "worker"]
-                      : ["staff", "worker"]
-                    ).map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setGenType(type)}
-                        className={`px-4 py-2 rounded-full capitalize text-sm font-medium border transition cursor-pointer ${
-                          genType === type
-                            ? "bg-red-400 text-white border-red-400"
-                            : "bg-white text-gray-700 border-gray-300 hover:border-red-300"
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowGenModal(false)}
-                    className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={genLoading}
-                    className={`flex-1 py-2 rounded-lg text-white font-medium transition cursor-pointer ${
-                      genLoading
-                        ? "bg-red-300 cursor-not-allowed"
-                        : "bg-red-400 hover:bg-red-500"
-                    }`}
-                  >
-                    {genLoading ? "Generating..." : "Generate"}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600">
-                  Share this ID with the new{" "}
-                  <span className="font-semibold capitalize">{genType}</span>:
-                </p>
-                <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
-                  <span className="flex-1 text-sm font-mono text-gray-800 break-all">
-                    {generatedID}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(generatedID)}
-                    className="material-symbols-outlined text-gray-500 hover:text-gray-800 transition cursor-pointer text-lg"
-                  >
-                    content_copy
-                  </button>
-                </div>
-                <div className="flex gap-3 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGeneratedID("");
-                      setGenType(user?.role === "admin" ? "estate" : "staff");
-                    }}
-                    className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
-                  >
-                    Generate Another
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowGenModal(false)}
-                    className="flex-1 py-2 rounded-lg bg-red-400 hover:bg-red-500 text-white font-medium transition cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {showReportsHiddenOnMobile && (
         <ReportsHiddenOnMobile
           showReportsHiddenOnMobile={showReportsHiddenOnMobile}
@@ -521,14 +391,7 @@ export default function Home({
         </div>
 
         <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-auto py-24 flex flex-col items-center z-0">
-          {(user?.role === "admin" || user?.role === "estate") && (
-            <button
-              onClick={generateRegistrationID}
-              className="bg-red-400 hover:bg-red-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded my-4"
-            >
-              Generate Registration ID
-            </button>
-          )}
+          
 
           <h1
             className={`text-xl border-y ${titleBorderColor} md:text-2xl ${primaryColor} font-bold w-full text-center py-2 ${secColor}`}

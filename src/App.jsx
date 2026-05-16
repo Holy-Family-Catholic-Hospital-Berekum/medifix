@@ -22,6 +22,7 @@ import Pending from "../Staff/Pending";
 import SignUp from "../signUp/signUp";
 
 import ProtectedRoute from "./protectedRoute";
+import Manager from "../ItManager/manager";
 
 export default function App() {
   return (
@@ -36,6 +37,16 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/manager"
+        element={
+          <ProtectedRoute>
+            <Manager homeRedirect="/estateHome" />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/estateHome"
         element={

@@ -26,7 +26,7 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
 
   return (
     <nav
-      className={`flex justify-between items-center gap-10 ${navBarColor} shadow pl-4 md:pl-0 py-6 pr-4 w-full z-100 fixed top-0 bottom-auto`}
+      className={`flex justify-between items-center gap-10 ${navBarColor} shadow pl-4 md:pl-0 py-6  pr-4 w-full z-100 fixed top-0 bottom-auto`}
     >
       <h1
         className={`font-bold ${logoBGColor} md:h-full md:w-full md:max-w-[20%] md:absolute md:flex items-center justify-center`}
@@ -34,9 +34,11 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
         PHIX-HFCH
       </h1>
 
-      <NavLink to={`${homeRedirect}`} end className={navClass}>
-        Home
-      </NavLink>
+      {user?.role !== "manager" && (
+        <NavLink to={`${homeRedirect}`} end className={navClass}>
+          Home
+        </NavLink>
+      )}
       {(user?.role === "admin" || user?.role === "estate") && (
         <NavLink
           to="/adminDashboard"
@@ -50,7 +52,7 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
 
       <small
         onClick={handleLogout}
-        className="text-[#111827] hover:text-red-400 cursor-pointer transition"
+        className={`text-[#111827] ${user?.role === "manager" ? "hover:text-yellow-500" : "hover:text-red-400"} cursor-pointer transition ${user.role === "manager" && "absolute right-4"} `}
       >
         Logout
       </small>

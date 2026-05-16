@@ -157,7 +157,7 @@ export default function SignUp() {
         return;
       }
 
-      if (!["staff", "worker", "estate", "admin"].includes(type)) {
+      if (!["staff", "worker", "estate", "admin", "manager"].includes(type)) {
         alert("Invalid registration ID type. Contact the Estate Manager.");
         return;
       }
@@ -268,6 +268,7 @@ export default function SignUp() {
         worker: "/workerHome",
         admin: "/adminHome",
         estate: "/estateHome",
+        manager: "/manager",
       };
 
       setTimeout(() => navigate(routes[userData.role] || "/"), 300);
