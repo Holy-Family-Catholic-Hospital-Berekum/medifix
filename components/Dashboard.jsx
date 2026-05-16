@@ -988,7 +988,7 @@ export default function Dashboard({ navBarColor, logoBGColor, homeRedirect }) {
                 margin: "0 0 4px",
               }}
             >
-              {role} portal
+              {role} dashboard
             </p>
             <h1
               style={{
