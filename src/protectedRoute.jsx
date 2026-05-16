@@ -48,7 +48,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-red-400 animate-spin" />
         </div>
         <p className="text-red-400 font-semibold text-sm tracking-wide animate-pulse">
-          Loading...
+          Loading... 
         </p>
       </div>
     );

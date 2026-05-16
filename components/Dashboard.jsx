@@ -11,6 +11,7 @@ import {
 import { db } from "../src/firebase";
 import NavBar from "./navBar";
 
+
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
   incoming: {
@@ -872,6 +873,8 @@ export default function Dashboard({ navBarColor, logoBGColor, homeRedirect }) {
     : ["all", "manager", "estate", "staff", "worker"];
 
   // ── NOW it is safe to do early returns (all hooks are done) ──────────────
+
+ 
 
   // Access guard — rendered AFTER all hooks.
   if (!hasAccess) return <AccessDenied role={role} />;

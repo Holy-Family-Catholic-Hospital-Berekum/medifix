@@ -24,9 +24,24 @@ import SignUp from "../signUp/signUp";
 import ProtectedRoute from "./protectedRoute";
 import Manager from "../ItManager/manager";
 
-const user = JSON.parse(localStorage.getItem("user"))?.data;
-
 export default function App() {
+  // Read inside the component so it's always fresh on each render
+  const user = JSON.parse(localStorage.getItem("user"))?.data;
+
+  const dashboardNavBarColor = () => {
+    if (user?.role === "admin") return "bg-green-300";
+    if (user?.role === "estate") return "bg-yellow-300";
+    if (user?.role === "manager") return "bg-blue-300";
+    return "bg-gray-300";
+  };
+
+  const dashboardHomeRedirect = () => {
+    if (user?.role === "admin") return "/adminHome";
+    if (user?.role === "estate") return "/estateHome";
+    if (user?.role === "manager") return "/manager";
+    return "/";
+  };
+
   return (
     <Routes>
       <Route path="/" element={<SignUp />} />
@@ -44,7 +59,7 @@ export default function App() {
         path="/manager"
         element={
           <ProtectedRoute allowedRoles={["manager"]}>
-            <Manager homeRedirect="/estateHome" />
+            <Manager />
           </ProtectedRoute>
         }
       />
@@ -57,6 +72,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/Home"
         element={
@@ -65,6 +81,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/workerHome"
         element={
@@ -82,6 +99,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/adminCompleted"
         element={
@@ -96,8 +114,8 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["admin", "estate", "manager"]}>
             <Dashboard
-              navBarColor={`${user?.role === "admin" ? "bg-green-300" : "bg-yellow-300"}`}
-              homeRedirect={`${user?.role === "admin" ? "/adminHome" : user?.role === "estate" ? "/estateHome" : "/"}`}
+              navBarColor={dashboardNavBarColor()}
+              homeRedirect={dashboardHomeRedirect()}
             />
           </ProtectedRoute>
         }
@@ -111,6 +129,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/estateCompleted"
         element={
