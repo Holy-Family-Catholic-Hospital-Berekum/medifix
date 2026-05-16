@@ -9,7 +9,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
-import NavBar from "../components/navBar";
+import NavBar from "./navBar";
 
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -614,11 +614,7 @@ function AccessDenied({ role }) {
 // IMPORTANT: ALL hooks must be called unconditionally before any early return.
 // Moving the access guard after hooks fixes the React rules-of-hooks violation
 // that caused managers to see "Access Denied" despite having the correct role.
-export default function AdminDashboard({
-  navBarColor,
-  logoBGColor,
-  homeRedirect,
-}) {
+export default function Dashboard({ navBarColor, logoBGColor, homeRedirect }) {
   // ── state — ALL hooks first, no early returns before this block ──────────
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);

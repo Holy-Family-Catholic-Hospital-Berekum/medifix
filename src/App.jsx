@@ -12,7 +12,7 @@ import EstateCompleted from "../Estate-manager/estateCompleted";
 
 import AdminAssigned from "../Admin/adminAssigned";
 import AdminCompleted from "../Admin/adminCompleted";
-import AdminDashboard from "../Admin/Dashboard";
+import Dashboard from "../components/Dashboard";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
@@ -94,8 +94,8 @@ export default function App() {
       <Route
         path="/Dashboard"
         element={
-          <ProtectedRoute>
-            <AdminDashboard
+          <ProtectedRoute allowedRoles={["admin", "estate", "manager"]}>
+            <Dashboard
               navBarColor={`${user?.role === "admin" ? "bg-green-300" : "bg-yellow-300"}`}
               homeRedirect={`${user?.role === "admin" ? "/adminHome" : user?.role === "estate" ? "/estateHome" : "/"}`}
             />
