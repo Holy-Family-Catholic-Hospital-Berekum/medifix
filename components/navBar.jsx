@@ -22,9 +22,11 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
         : "text-[#111827] hover:text-red-400 md:flex justify-center md:w-full"
     }`;
 
+  const user = JSON.parse(localStorage.getItem("user"))?.data;
+
   return (
     <nav
-      className={`flex justify-between items-center gap-2 ${navBarColor} shadow pl-4 md:pl-0 py-6 pr-4 w-full z-100 fixed top-0 bottom-auto`}
+      className={`flex justify-between items-center gap-10 ${navBarColor} shadow pl-4 md:pl-0 py-6 pr-4 w-full z-100 fixed top-0 bottom-auto`}
     >
       <h1
         className={`font-bold ${logoBGColor} md:h-full md:w-full md:max-w-[20%] md:absolute md:flex items-center justify-center`}
@@ -35,6 +37,16 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
       <NavLink to={`${homeRedirect}`} end className={navClass}>
         Home
       </NavLink>
+      {(user?.role === "admin" || user?.role === "estate") && (
+        <NavLink
+          to="/adminDashboard"
+          className={({ isActive }) =>
+            `${isActive ? "text-red-400" : "hover:text-red-400"} md:flex hidden`
+          }
+        >
+          Dashboard
+        </NavLink>
+      )}
 
       <small
         onClick={handleLogout}

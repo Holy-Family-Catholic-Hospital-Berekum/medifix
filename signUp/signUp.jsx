@@ -5,17 +5,11 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
-  collection,
-  query,
-  where,
-  getDocs,
-  limit,
 } from "firebase/firestore";
 import { db, auth } from "../src/firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInAnonymously,
   deleteUser,
 } from "firebase/auth";
 import { useNavigate } from "react-router";
@@ -136,23 +130,22 @@ export default function SignUp() {
     }, 300);
   };
 
+  // ── sign up ──────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!canProceed || loading) return;
     setLoading(true);
 
     let createdUser = null;
-    let regDocRef = null;
 
     try {
-      // ✅ Step 1 — validate registration ID
-      regDocRef = doc(db, "registrationIDs", id.trim());
+      // 1. Validate registration ID
+      const regDocRef = doc(db, "registrationIDs", id.trim());
       const regSnap = await getDoc(regDocRef);
 
       if (!regSnap.exists()) {
         alert(
           "Invalid registration ID. Please request one from the Admin or Estate Manager.",
         );
-        setLoading(false);
         return;
       }
 
@@ -161,19 +154,15 @@ export default function SignUp() {
 
       if (regData.used === true) {
         alert("This registration ID has already been used.");
-        setLoading(false);
         return;
       }
 
       if (!["staff", "worker", "estate", "admin"].includes(type)) {
         alert("Invalid registration ID type. Contact the Estate Manager.");
-        setLoading(false);
         return;
       }
 
-      // ✅ Step 2 — create Firebase Auth user FIRST
-      // only mark ID as used after this succeeds
-      // so weak password / email errors don't consume the ID
+      // 2. Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
@@ -183,7 +172,7 @@ export default function SignUp() {
       const uid = createdUser.uid;
 
       try {
-        // ✅ Step 3 — write Firestore user doc
+        // 3. Write Firestore user doc
         await setDoc(doc(db, "users", uid), {
           name: name.trim(),
           email: email.trim(),
@@ -192,11 +181,11 @@ export default function SignUp() {
           ID: id.trim(),
           phoneNumber: phoneNumber.trim(),
           role: type,
+          deactivated: false, // explicitly set so the field always exists
           createdAt: serverTimestamp(),
         });
 
-        // ✅ Step 4 — only mark ID as used AFTER everything else succeeds
-        // auth user is now signed in so the update rule passes
+        // 4. Mark registration ID as used
         await updateDoc(regDocRef, { used: true });
 
         alert("Account created successfully!");
@@ -204,9 +193,6 @@ export default function SignUp() {
         switchMode("login");
       } catch (innerError) {
         console.error("Firestore write failed:", innerError);
-
-        // ✅ Clean up auth user since Firestore write failed
-        // ID was never marked used so no rollback needed
         if (createdUser) {
           try {
             await deleteUser(createdUser);
@@ -214,13 +200,10 @@ export default function SignUp() {
             console.error("Auth cleanup failed:", e);
           }
         }
-
         alert("Unable to create account. Please try again later.");
       }
     } catch (outerError) {
       console.error("Sign up failed:", outerError);
-
-      // ✅ auth errors land here — ID was never touched so no rollback needed
       if (outerError.code === "auth/email-already-in-use") {
         alert("Email already in use. Please use a different email.");
       } else if (outerError.code === "auth/weak-password") {
@@ -233,6 +216,7 @@ export default function SignUp() {
     }
   };
 
+  // ── login ────────────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginId.trim() || !loginPassword.trim()) {
@@ -248,7 +232,6 @@ export default function SignUp() {
         loginId.trim(),
         loginPassword,
       );
-
       const uid = userCredential.user.uid;
       const userSnap = await getDoc(doc(db, "users", uid));
 
@@ -260,12 +243,21 @@ export default function SignUp() {
 
       const userData = userSnap.data();
 
+      // ── DEACTIVATION CHECK ──────────────────────────────────────────────────
+      // Block login before storing anything in localStorage.
+      // Firebase Auth itself doesn't enforce this, so we do it here.
+      if (userData.deactivated === true) {
+        await auth.signOut();
+        alert(
+          "Your account has been deactivated. Please contact your administrator.",
+        );
+        return;
+      }
+      // ───────────────────────────────────────────────────────────────────────
+
       localStorage.setItem(
         "user",
-        JSON.stringify({
-          data: userData,
-          timestamp: Date.now(),
-        }),
+        JSON.stringify({ data: userData, timestamp: Date.now() }),
       );
 
       setLoginId("");
@@ -281,7 +273,6 @@ export default function SignUp() {
       setTimeout(() => navigate(routes[userData.role] || "/"), 300);
     } catch (error) {
       console.error("Login failed:", error);
-
       if (
         error.code === "auth/wrong-password" ||
         error.code === "auth/user-not-found" ||
@@ -296,13 +287,14 @@ export default function SignUp() {
     }
   };
 
+  // ── render ───────────────────────────────────────────────────────────────────
   return (
     <div className="bg-yellow-400 overflow-y-auto min-h-screen w-full flex justify-center items-center px-4 py-8">
       <div
         className="transition-opacity duration-300 w-full flex justify-center"
         style={{ opacity: closing ? 0 : 1 }}
       >
-        {/* SIGNUP FORM */}
+        {/* ── SIGNUP ── */}
         {mode === "signup" && (
           <form className="flex flex-col items-center gap-5 rounded-xl py-10 bg-yellow-500 w-full max-w-96 px-6 md:max-w-[550px] lg:max-w-[680px] shadow-lg">
             <div className="mb-2 text-center">
@@ -318,9 +310,7 @@ export default function SignUp() {
               {steps.map((_, i) => (
                 <div
                   key={i}
-                  className={`h-1.5 w-10 rounded-full transition-all duration-300 ${
-                    i <= step ? "bg-red-700" : "bg-yellow-300"
-                  }`}
+                  className={`h-1.5 w-10 rounded-full transition-all duration-300 ${i <= step ? "bg-red-700" : "bg-yellow-300"}`}
                 />
               ))}
             </div>
@@ -362,11 +352,7 @@ export default function SignUp() {
                 type="button"
                 onClick={handlePrev}
                 disabled={isFirstStep}
-                className={`rounded px-5 py-2 transition ${
-                  isFirstStep
-                    ? "bg-yellow-300 text-gray-400 cursor-not-allowed"
-                    : "bg-yellow-300 text-red-700 cursor-pointer hover:bg-yellow-400"
-                }`}
+                className={`rounded px-5 py-2 transition ${isFirstStep ? "bg-yellow-300 text-gray-400 cursor-not-allowed" : "bg-yellow-300 text-red-700 cursor-pointer hover:bg-yellow-400"}`}
               >
                 Previous
               </button>
@@ -376,11 +362,7 @@ export default function SignUp() {
                   type="button"
                   onClick={handleNext}
                   disabled={!canProceed}
-                  className={`rounded px-5 py-2 transition ${
-                    canProceed
-                      ? "bg-red-700 text-yellow-300 cursor-pointer hover:bg-red-800"
-                      : "bg-red-300 text-yellow-200 cursor-not-allowed"
-                  }`}
+                  className={`rounded px-5 py-2 transition ${canProceed ? "bg-red-700 text-yellow-300 cursor-pointer hover:bg-red-800" : "bg-red-300 text-yellow-200 cursor-not-allowed"}`}
                 >
                   Next
                 </button>
@@ -389,11 +371,7 @@ export default function SignUp() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={!canProceed || loading}
-                  className={`rounded px-5 py-2 transition flex-1 ${
-                    canProceed && !loading
-                      ? "bg-red-700 cursor-pointer text-yellow-300 hover:bg-red-800"
-                      : "bg-red-300 text-yellow-200 cursor-not-allowed"
-                  }`}
+                  className={`rounded px-5 py-2 transition flex-1 ${canProceed && !loading ? "bg-red-700 cursor-pointer text-yellow-300 hover:bg-red-800" : "bg-red-300 text-yellow-200 cursor-not-allowed"}`}
                 >
                   {loading ? "Creating account..." : "Submit"}
                 </button>
@@ -413,7 +391,7 @@ export default function SignUp() {
           </form>
         )}
 
-        {/* LOGIN FORM */}
+        {/* ── LOGIN ── */}
         {mode === "login" && (
           <form
             className="flex flex-col items-center gap-5 rounded-xl py-10 bg-yellow-500 w-full max-w-96 px-6 md:max-w-[550px] lg:max-w-[680px] shadow-lg"
@@ -448,7 +426,7 @@ export default function SignUp() {
               </label>
               <input
                 id="loginPassword"
-                type={`${showPassword ? "text" : "password"}`}
+                type={showPassword ? "text" : "password"}
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
@@ -458,11 +436,7 @@ export default function SignUp() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full rounded py-2 transition text-yellow-300 ${
-                loading
-                  ? "bg-red-300 cursor-not-allowed"
-                  : "bg-red-700 hover:bg-red-800 cursor-pointer"
-              }`}
+              className={`w-full rounded py-2 transition text-yellow-300 ${loading ? "bg-red-300 cursor-not-allowed" : "bg-red-700 hover:bg-red-800 cursor-pointer"}`}
             >
               {loading ? "Logging in..." : "Login"}
             </button>

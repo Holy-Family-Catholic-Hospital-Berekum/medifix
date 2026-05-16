@@ -12,6 +12,7 @@ import EstateCompleted from "../Estate-manager/estateCompleted";
 
 import AdminAssigned from "../Admin/adminAssigned";
 import AdminCompleted from "../Admin/adminCompleted";
+import AdminDashboard from "../Admin/adminDashboard";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
@@ -74,6 +75,16 @@ export default function App() {
           <ProtectedRoute>
             <AdminCompleted />
           </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/adminDashboard"
+        element={
+          <AdminDashboard
+            navBarColor="bg-green-300"
+            homeRedirect="/adminHome"
+          />
         }
       />
 
