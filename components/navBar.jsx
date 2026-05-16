@@ -41,7 +41,7 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
       )}
       {(user?.role === "admin" || user?.role === "estate") && (
         <NavLink
-          to="/adminDashboard"
+          to="/Dashboard"
           className={({ isActive }) =>
             `${isActive ? "text-red-400" : "hover:text-red-400"} md:flex hidden`
           }

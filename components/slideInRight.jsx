@@ -55,7 +55,7 @@ export default function SlideInRight({
       </NavLink>
       {["admin", "estate"].includes(user?.role) && (
         <NavLink
-          to="/adminDashboard"
+          to="/Dashboard"
           className={({ isActive }) =>
             `${isActive ? "text-red-400" : "hover:text-red-400"} flex md:hidden`
           }

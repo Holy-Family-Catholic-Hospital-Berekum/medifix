@@ -24,6 +24,8 @@ import SignUp from "../signUp/signUp";
 import ProtectedRoute from "./protectedRoute";
 import Manager from "../ItManager/manager";
 
+const user = JSON.parse(localStorage.getItem("user"))?.data;
+
 export default function App() {
   return (
     <Routes>
@@ -32,7 +34,7 @@ export default function App() {
       <Route
         path="/adminHome"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["admin"]}>
             <AdminHome />
           </ProtectedRoute>
         }
@@ -41,7 +43,7 @@ export default function App() {
       <Route
         path="/manager"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["manager"]}>
             <Manager homeRedirect="/estateHome" />
           </ProtectedRoute>
         }
@@ -50,7 +52,7 @@ export default function App() {
       <Route
         path="/estateHome"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["estate"]}>
             <EstateHome />
           </ProtectedRoute>
         }
@@ -58,7 +60,7 @@ export default function App() {
       <Route
         path="/Home"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["staff"]}>
             <StaffHome />
           </ProtectedRoute>
         }
@@ -66,7 +68,7 @@ export default function App() {
       <Route
         path="/workerHome"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["worker"]}>
             <WorkerHome />
           </ProtectedRoute>
         }
@@ -75,7 +77,7 @@ export default function App() {
       <Route
         path="/adminAssigned"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["admin"]}>
             <AdminAssigned />
           </ProtectedRoute>
         }
@@ -83,26 +85,28 @@ export default function App() {
       <Route
         path="/adminCompleted"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["admin"]}>
             <AdminCompleted />
           </ProtectedRoute>
         }
       />
 
       <Route
-        path="/adminDashboard"
+        path="/Dashboard"
         element={
-          <AdminDashboard
-            navBarColor="bg-green-300"
-            homeRedirect="/adminHome"
-          />
+          <ProtectedRoute>
+            <AdminDashboard
+              navBarColor={`${user?.role === "admin" ? "bg-green-300" : "bg-yellow-300"}`}
+              homeRedirect={`${user?.role === "admin" ? "/adminHome" : user?.role === "estate" ? "/estateHome" : "/"}`}
+            />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/estateAssigned"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["estate"]}>
             <EstateAssigned />
           </ProtectedRoute>
         }
@@ -110,7 +114,7 @@ export default function App() {
       <Route
         path="/estateCompleted"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["estate"]}>
             <EstateCompleted />
           </ProtectedRoute>
         }
@@ -119,7 +123,7 @@ export default function App() {
       <Route
         path="/workerCompleted"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["worker"]}>
             <WorkerCompleted />
           </ProtectedRoute>
         }
@@ -128,7 +132,7 @@ export default function App() {
       <Route
         path="/Pending"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["staff"]}>
             <Pending />
           </ProtectedRoute>
         }
@@ -137,7 +141,7 @@ export default function App() {
       <Route
         path="/History"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["staff"]}>
             <History />
           </ProtectedRoute>
         }
