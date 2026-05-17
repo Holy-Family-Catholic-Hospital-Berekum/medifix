@@ -133,7 +133,7 @@ export default function StaffHome() {
       </div>
 
       <h1 className="text-center text-2xl md:4xl mt-10">Report Timelines</h1>
-      <div className="flex justify-center flex-wrap gap-2 md:gap-10 md:gap-10 mb-10 mt-4 md:mt-10">
+      <div className="flex justify-center flex-wrap gap-4 md:gap-10 md:gap-10 mb-10 mt-4 md:mt-10">
         <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
           <h1 className="text-[#2563EB]  rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
             Emergency

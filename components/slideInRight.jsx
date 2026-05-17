@@ -7,6 +7,7 @@ export default function SlideInRight({
   completedRedirect,
   assignedRedirect,
   completedWithFeedback,
+  dashboardRedirect,
 }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -55,7 +56,7 @@ export default function SlideInRight({
       </NavLink>
       {["admin", "estate"].includes(user?.role) && (
         <NavLink
-          to="/Dashboard"
+          to={`${dashboardRedirect}`}
           className={({ isActive }) =>
             `${isActive ? "text-red-400" : "hover:text-red-400"} flex md:hidden`
           }

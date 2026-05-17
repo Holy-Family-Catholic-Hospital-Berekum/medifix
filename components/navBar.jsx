@@ -2,7 +2,12 @@ import { NavLink, useNavigate } from "react-router";
 import { signOut } from "firebase/auth";
 import { auth } from "../src/firebase";
 
-export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
+export default function NavBar({
+  navBarColor,
+  logoBGColor,
+  homeRedirect,
+  dashboardRedirect,
+}) {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -41,7 +46,7 @@ export default function NavBar({ navBarColor, logoBGColor, homeRedirect }) {
       )}
       {(user?.role === "admin" || user?.role === "estate") && (
         <NavLink
-          to="/Dashboard"
+          to={`${dashboardRedirect}`} end
           className={({ isActive }) =>
             `${isActive ? "text-red-400" : "hover:text-red-400"} md:flex hidden`
           }

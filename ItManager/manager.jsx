@@ -1,5 +1,5 @@
-import AdminDashboard from "../components/Dashboard";
+import Dashboard from "../components/Dashboard";
 
 export default function Manager(navBarColor) {
-  return <AdminDashboard navBarColor="bg-red-400" />;
+  return <Dashboard navBarColor="bg-red-400" />;
 }

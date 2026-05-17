@@ -120,33 +120,37 @@ function ReportCard({
         </div>
       )}
 
-      {report.priorityLevel === "emergency" && estateManagers.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-600">
-          <p className="text-sm font-semibold text-gray-900 mb-2">
-            Call Estate Manager:
-          </p>
-          <div className="flex flex-col gap-2">
-            {estateManagers.map((em, i) => (
-              <div key={i} className="flex items-center justify-between gap-2">
-                <span className="text-sm text-gray-900 font-medium">
-                  {em.name}
-                </span>
-                {em.phoneNumber && (
-                  <a
-                    href={`tel:${em.phoneNumber}`}
-                    className="inline-flex items-center gap-1 text-sm font-medium text-blue-800 underline"
-                  >
-                    <span className="material-symbols-outlined text-base">
-                      call
-                    </span>
-                    {em.phoneNumber}
-                  </a>
-                )}
-              </div>
-            ))}
+      {(report.priorityLevel === "emergency" || report.overdue) &&
+        estateManagers.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-600">
+            <p className="text-sm font-semibold text-gray-900 mb-2">
+              Call Estate Manager:
+            </p>
+            <div className="flex flex-col gap-2">
+              {estateManagers.map((em, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-sm text-gray-900 font-medium">
+                    {em.name}
+                  </span>
+                  {em.phoneNumber && (
+                    <a
+                      href={`tel:${em.phoneNumber}`}
+                      className="inline-flex items-center gap-1 text-sm font-medium text-blue-800 underline"
+                    >
+                      <span className="material-symbols-outlined text-base">
+                        call
+                      </span>
+                      {em.phoneNumber}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {denialNote && (
         <div className="mt-3 pt-3 border-t border-gray-500">

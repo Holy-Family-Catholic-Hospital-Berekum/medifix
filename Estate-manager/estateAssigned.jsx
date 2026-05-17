@@ -20,6 +20,7 @@ export default function Assigned() {
       assignedRedirect={"/estateAssigned"}
       logoBGColor="md:bg-blue-500"
       homeRedirect="/estateHome"
+      dashboardRedirect={"/estateDashboard"}
     />
   );
 }

@@ -100,6 +100,18 @@ function timeAgo(date) {
   return `${mins}m ago`;
 }
 
+function Preloader() {
+  return (
+    <div className="flex flex-col justify-center items-center w-full py-20 gap-4">
+      <div className="relative w-12 h-12">
+        <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-red-400 animate-spin" />
+      </div>
+      <p className="text-sm text-gray-400 animate-pulse">Loading reports...</p>
+    </div>
+  );
+}
+
 export default function Home({
   bgColor,
   primaryColor,
@@ -122,6 +134,7 @@ export default function Home({
   specificReportsPage,
   logoBGColor,
   homeRedirect,
+  dashboardRedirect,
 }) {
   const [sidePopup, setSidePopup] = useState(false);
   const [showReportsHiddenOnMobile, SetShowReportsHiddenOnMobile] =
@@ -130,6 +143,7 @@ export default function Home({
   const [reports, setReports] = useState([]);
 
   const [currentReportId, setCurrentReportId] = useState(null);
+  const [reportsLoading, setReportsLoading] = useState(true);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -164,6 +178,30 @@ export default function Home({
         ...doc.data(),
       }));
       setReports(reportsData);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    let reportsQuery;
+
+    if (user?.role === "worker") {
+      reportsQuery = query(
+        collection(db, "reports"),
+        where("assignedTo", "==", user.ID),
+      );
+    } else {
+      reportsQuery = query(collection(db, "reports"));
+    }
+
+    const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
+      const reportsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setReports(reportsData);
+      setReportsLoading(false); // mark ready after first snapshot
     });
 
     return () => unsubscribe();
@@ -340,6 +378,7 @@ export default function Home({
         navBarColor={navBarColor}
         logoBGColor={logoBGColor}
         homeRedirect={homeRedirect}
+        dashboardRedirect={dashboardRedirect}
       />
       <SlideInRight
         sidePopup={sidePopup}
@@ -347,6 +386,7 @@ export default function Home({
         assignedRedirect={assignedRedirect}
         completedRedirect={completedRedirect}
         completedWithFeedback={completedWithFeedback}
+        dashboardRedirect={dashboardRedirect}
       />
 
       <div className="md:hidden">
@@ -391,15 +431,15 @@ export default function Home({
         </div>
 
         <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-auto py-24 flex flex-col items-center z-0">
-          
-
           <h1
             className={`text-xl border-y ${titleBorderColor} md:text-2xl ${primaryColor} font-bold w-full text-center py-2 ${secColor}`}
           >
             {title1}
           </h1>
 
-          {firstReports.length > 0 ? (
+          {reportsLoading ? (
+            <Preloader />
+          ) : firstReports.length > 0 ? (
             <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
               {firstReportsCard}
             </div>
@@ -415,17 +455,20 @@ export default function Home({
             </h1>
           )}
 
-          {secondReports.length > 0 && !specificReportsPage ? (
-            <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
-              {secondReportsCard}
-            </div>
-          ) : !specificReportsPage && secondReports.length <= 0 ? (
-            <p className="hidden md:block my-20">
-              Nothing to display here...yet
-            </p>
-          ) : (
-            ""
-          )}
+          {!specificReportsPage &&
+            (reportsLoading ? (
+              <div className="hidden md:flex">
+                <Preloader />
+              </div>
+            ) : secondReports.length > 0 ? (
+              <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-10 justify-center w-full flex-wrap py-10 md:py-20 px-4">
+                {secondReportsCard}
+              </div>
+            ) : (
+              <p className="hidden md:block my-20">
+                Nothing to display here...yet
+              </p>
+            ))}
         </div>
       </main>
     </>

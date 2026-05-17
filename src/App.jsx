@@ -1,47 +1,30 @@
 import { Routes, Route } from "react-router";
 
+import SignUp from "../signUp/signUp";
+import ProtectedRoute from "./protectedRoute";
+
 import History from "../Staff/History";
 import StaffHome from "../Staff/staffHome";
+import Pending from "../Staff/Pending";
 
 import EstateHome from "../Estate-manager/estateHome";
-
-import AdminHome from "../Admin/adminHome";
-
 import EstateAssigned from "../Estate-manager/estateAssigned";
 import EstateCompleted from "../Estate-manager/estateCompleted";
+import EstateDashboard from "../Estate-manager/estateDashboard";
 
+import AdminHome from "../Admin/adminHome";
 import AdminAssigned from "../Admin/adminAssigned";
 import AdminCompleted from "../Admin/adminCompleted";
-import Dashboard from "../components/Dashboard";
+import AdminDashboard from "../Admin/adminDashboard";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
 
-import Pending from "../Staff/Pending";
-
-import SignUp from "../signUp/signUp";
-
-import ProtectedRoute from "./protectedRoute";
 import Manager from "../ItManager/manager";
 
+const user = JSON.parse(localStorage.getItem("user"))?.data;
+
 export default function App() {
-  // Read inside the component so it's always fresh on each render
-  const user = JSON.parse(localStorage.getItem("user"))?.data;
-
-  const dashboardNavBarColor = () => {
-    if (user?.role === "admin") return "bg-green-300";
-    if (user?.role === "estate") return "bg-yellow-300";
-    if (user?.role === "manager") return "bg-blue-300";
-    return "bg-gray-300";
-  };
-
-  const dashboardHomeRedirect = () => {
-    if (user?.role === "admin") return "/adminHome";
-    if (user?.role === "estate") return "/estateHome";
-    if (user?.role === "manager") return "/manager";
-    return "/";
-  };
-
   return (
     <Routes>
       <Route path="/" element={<SignUp />} />
@@ -72,7 +55,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/Home"
         element={
@@ -81,7 +63,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/workerHome"
         element={
@@ -99,7 +80,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/adminCompleted"
         element={
@@ -110,13 +90,10 @@ export default function App() {
       />
 
       <Route
-        path="/Dashboard"
+        path="/adminDashboard"
         element={
-          <ProtectedRoute allowedRoles={["admin", "estate", "manager"]}>
-            <Dashboard
-              navBarColor={dashboardNavBarColor()}
-              homeRedirect={dashboardHomeRedirect()}
-            />
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminDashboard />
           </ProtectedRoute>
         }
       />
@@ -129,12 +106,19 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/estateCompleted"
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
             <EstateCompleted />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/estateDashboard"
+        element={
+          <ProtectedRoute allowedRoles={["estate"]}>
+            <EstateDashboard />
           </ProtectedRoute>
         }
       />

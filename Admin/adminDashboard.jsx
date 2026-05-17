@@ -9,7 +9,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
-import NavBar from "./navBar";
+import NavBar from "../components/navBar";
 
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -614,7 +614,7 @@ function AccessDenied({ role }) {
 // IMPORTANT: ALL hooks must be called unconditionally before any early return.
 // Moving the access guard after hooks fixes the React rules-of-hooks violation
 // that caused managers to see "Access Denied" despite having the correct role.
-export default function Dashboard({
+export default function AdminDashboard({
   navBarColor,
   homeRedirect,
   dashboardRedirect,
@@ -921,9 +921,9 @@ export default function Dashboard({
   return (
     <div style={{ background: "#f8fafc", minHeight: "100vh" }}>
       <NavBar
-        navBarColor={navBarColor}
-        homeRedirect={homeRedirect}
-        dashboardRedirect={dashboardRedirect}
+        navBarColor="bg-green-300"
+        homeRedirect="/adminHome"
+        dashboardRedirect={"/adminDashboard"}
       />
 
       {showGenID && (

@@ -16,18 +16,18 @@ export default function ReportForm({ formPopup, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Get current user from localStorage
+  const storedUser = JSON.parse(localStorage.getItem("user"));
+  const currentUser = storedUser?.data;
+
   const [formData, setFormData] = useState({
     category: "Plumbing",
     priorityLevel: "routine",
-    location: "",
+    location: currentUser.location,
     reportDescription: "",
     costDescription: "",
     ID: "",
   });
-
-  // Get current user from localStorage
-  const storedUser = JSON.parse(localStorage.getItem("user"));
-  const currentUser = storedUser?.data;
 
   // ✅ When formPopup goes false, play slide-down before hiding
   useEffect(() => {

@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "./firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "./firebase";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const [user, setUser] = useState(null);
@@ -9,22 +10,39 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const storedUser = JSON.parse(localStorage.getItem("user"));
-        if (storedUser && storedUser.data) {
-          const oneWeek = 7 * 24 * 60 * 60 * 1000;
-          if (Date.now() - storedUser.timestamp > oneWeek) {
+        try {
+          // Always fetch fresh role from Firestore — never trust localStorage
+          const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+
+          if (userSnap.exists()) {
+            const freshData = userSnap.data();
+            setUser(freshData);
+
+            // Keep localStorage in sync so other parts of the app
+            // that still read it get the fresh data
+            localStorage.setItem(
+              "user",
+              JSON.stringify({
+                data: freshData,
+                timestamp: Date.now(),
+              }),
+            );
+          } else {
+            // User doc doesn't exist in Firestore — sign out
+            await auth.signOut();
             localStorage.removeItem("user");
             setUser(null);
-          } else {
-            setUser(storedUser.data);
           }
-        } else {
-          auth.signOut();
+        } catch (err) {
+          console.error("Failed to fetch user profile:", err);
+          await auth.signOut();
+          localStorage.removeItem("user");
           setUser(null);
         }
       } else {
+        localStorage.removeItem("user");
         setUser(null);
       }
       setLoading(false);
@@ -42,13 +60,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center w-full h-screen gap-4 bg-white">
-        {/* Spinning ring */}
         <div className="relative w-16 h-16">
           <div className="absolute inset-0 rounded-full border-4 border-red-100" />
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-red-400 animate-spin" />
         </div>
         <p className="text-red-400 font-semibold text-sm tracking-wide animate-pulse">
-          Loading... 
+          Loading...
         </p>
       </div>
     );
@@ -56,7 +73,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (!user) return null;
 
-  // Role check — if allowedRoles provided and user's role isn't in it, show access denied
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">
@@ -74,9 +90,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           >
             Go Back
           </button>
-
           <button
-            className="bg-red-400 px-8 rounded text-white cursor-pointer hover:bg-red-500 transition"
+            className="bg-red-400 px-8 rounded text-white cursor-pointer hover:bg-red-500 transition py-2"
             onClick={() => navigate("/")}
           >
             Login

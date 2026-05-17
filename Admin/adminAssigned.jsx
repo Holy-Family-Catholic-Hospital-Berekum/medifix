@@ -19,6 +19,7 @@ export default function Assigned() {
       assignedRedirect={"/adminAssigned"}
       logoBGColor="md:bg-green-500"
       homeRedirect="/adminHome"
+      dashboardRedirect={"/adminDashboard"}
     />
   );
 }

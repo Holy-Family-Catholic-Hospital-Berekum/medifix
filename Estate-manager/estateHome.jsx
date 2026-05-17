@@ -24,6 +24,7 @@ export default function EstateHome() {
       assignedRedirect="/estateAssigned"
       logoBGColor="md:bg-blue-500"
       homeRedirect="/estateHome"
+      dashboardRedirect={"/estateDashboard"}
     />
   );
 }
