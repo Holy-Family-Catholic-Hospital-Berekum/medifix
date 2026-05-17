@@ -301,7 +301,7 @@ export default function Home({
           <span className="text-xs font-bold text-red-300 bg-black/40 px-2 py-0.5 rounded">
             ⚠ OVERDUE
           </span>
-          {report.dateDue && (
+          {report.dateDue && report.status !== "completed" && (
             <span className="text-xs text-red-200 bg-black/30 px-1.5 py-0.5 rounded">
               due {timeAgo(report.dateDue)}
             </span>

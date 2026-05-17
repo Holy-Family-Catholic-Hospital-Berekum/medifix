@@ -189,7 +189,7 @@ export default function ReportForm({ formPopup, onClose }) {
   if (!formPopup && !closing) return null;
 
   return (
-    <div className="z-50 fixed inset-0 flex items-end justify-center bg-black/40">
+    <div className="z-100 fixed inset-0 flex items-end justify-center bg-black/40">
       <form
         className={`bg-red-300 w-full h-full overflow-y-auto pt-24 flex flex-col items-center gap-4 rounded-t-2xl ${
           closing ? "slide-down" : "slide-up"
@@ -246,7 +246,7 @@ export default function ReportForm({ formPopup, onClose }) {
             value={formData.location}
             onChange={handleInputChange}
             className="bg-red-400 w-full p-2 rounded"
-            placeholder="Enter Your Hostel/Department/Room"
+            placeholder="Eg. Doctors flat room 20"
             required
           />
         </div>
@@ -270,7 +270,7 @@ export default function ReportForm({ formPopup, onClose }) {
         <button
           type="submit"
           disabled={loading}
-          className="bg-yellow-400 w-full max-w-[300px] md:max-w-[600px] w-full rounded py-2 text-lg hover:shadow hover:bg-yellow-500 shadow-white cursor-pointer mt-10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-yellow-400 border border-white w-full max-w-[300px] md:max-w-[600px] w-full rounded py-2 text-lg hover:shadow hover:bg-yellow-500 shadow-white cursor-pointer mt-10 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "Submitting..." : "Submit Report"}
         </button>

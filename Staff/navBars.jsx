@@ -48,9 +48,9 @@ export default function NavBars() {
           Home
         </NavLink>
 
-        <div className="flex items-center justify-center gap-4 md:gap-10">
+        <div className="flex items-center justify-center hidden md:block gap-4 md:gap-10">
           <button
-            className="bg-yellow-500 text-white hidden md:block  text-lg bg-[#2563EB] px-4 py-1 rounded-full cursor-pointer hover:shadow hover:bg-red-400 shadow-white transition"
+            className="bg-yellow-500 text-white   text-lg bg-[#2563EB] px-4 py-1 rounded-full cursor-pointer hover:shadow hover:bg-red-400 shadow-white transition"
             onClick={() => (formPopup ? handleClose() : setFormPopup(true))}
           >
             {formPopup ? "Close" : "Report"}

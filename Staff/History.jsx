@@ -73,17 +73,17 @@ export default function History() {
 
   const HistoryContent = (
     <div
-      className={`py-24 px-6 flex justify-center ${reports.length < 5 ? "mb-[500px] md:mb-[500px]" : ""}`}
+      className={`py-24  flex justify-center w-full ${reports.length < 5 ? "mb-[500px] md:mb-[500px]" : ""}`}
     >
       {loading ? (
         <p>Loading reports...</p>
       ) : userData ? (
-        <div>
-          <h2 className="text-xl font-semibold mb-10 text-center">
+        <div className="flex flex-col items-center justify-center  w-full">
+          <h2 className="text-xl font-semibold mb-10">
             Completed Works ({reports.length})
           </h2>
           {reports.length > 0 ? (
-            <div className="grid gap-4 md:flex flex-wrap">
+            <div className="flex md:gap-10 gap-4 justify-center flex-wrap w-full">
               {reports.map((report, i) => (
                 <div
                   className="bg-green-500 select-none border border-gray-800 flex flex-col gap-2 items-center justify-center cursor-pointer transition hover:bg-green-600 rounded-xl w-full max-w-[250px] md:max-w-[300px] p-2 md:p-4"
