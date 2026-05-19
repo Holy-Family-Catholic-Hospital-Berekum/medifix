@@ -290,7 +290,7 @@ export default function SignUp() {
 
   // ── render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="bg-yellow-400 overflow-y-auto min-h-screen w-full flex flex-col gap-10 justify-center items-center px-4 py-8">
+    <div className="bg-[#F48631] overflow-y-auto min-h-screen w-full flex flex-col gap-10 justify-center items-center px-4 py-8">
       <h1 className="text-xl text-red-700 md:text-2xl font-bold">PHIX</h1>
       <div
         className="transition-opacity duration-300 w-full flex justify-center"
@@ -298,7 +298,7 @@ export default function SignUp() {
       >
         {/* ── SIGNUP ── */}
         {mode === "signup" && (
-          <form className="flex flex-col items-center gap-5 rounded-xl py-10 bg-yellow-500 w-full max-w-96 px-6 md:max-w-[550px] lg:max-w-[680px] shadow-lg">
+          <form className="flex flex-col items-center gap-5 rounded-xl py-10 bg-[#40499F] w-full max-w-96 px-6 md:max-w-[550px] lg:max-w-[680px] shadow-lg">
             <div className="mb-2 text-center">
               <h2 className="text-xl font-semibold text-black">
                 {steps[step].title}
@@ -343,7 +343,7 @@ export default function SignUp() {
                     }
                     value={field.value}
                     onChange={(e) => field.onChange(e.target.value)}
-                    className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
+                    className="bg-[#F48631] text-white md:text-lg w-full border border-yellow-100 rounded p-2"
                   />
                 </div>
               ))}
@@ -396,7 +396,7 @@ export default function SignUp() {
         {/* ── LOGIN ── */}
         {mode === "login" && (
           <form
-            className="flex flex-col items-center gap-5 rounded-xl py-10 bg-yellow-500 w-full max-w-96 px-6 md:max-w-[550px] lg:max-w-[680px] shadow-lg"
+            className="flex flex-col items-center gap-5 rounded-xl py-10 bg-[#40499F] w-full max-w-96 px-6 md:max-w-[550px] lg:max-w-[680px] shadow-lg"
             onSubmit={handleLogin}
           >
             <div className="mb-6 text-center">
@@ -412,7 +412,7 @@ export default function SignUp() {
                 type="email"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
-                className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
+                className="bg-[#F48631] text-white md:text-lg w-full border border-yellow-100 rounded p-2"
               />
             </div>
 
@@ -431,7 +431,7 @@ export default function SignUp() {
                 type={showPassword ? "text" : "password"}
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="bg-green-700 text-white md:text-lg w-full border border-yellow-100 rounded p-2"
+                className="bg-[#F48631] text-white md:text-lg w-full border border-yellow-100 rounded p-2"
               />
             </div>
 
