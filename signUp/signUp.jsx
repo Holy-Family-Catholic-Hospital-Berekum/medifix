@@ -290,7 +290,7 @@ export default function SignUp() {
 
   // ── render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="bg-[#F48631] overflow-y-auto min-h-screen w-full flex flex-col gap-10 justify-center items-center px-4 py-8">
+    <div className="bg-white overflow-y-auto min-h-screen w-full flex flex-col gap-10 justify-center items-center px-4 py-8">
       <h1 className="text-xl text-red-700 md:text-2xl font-bold">PHIX</h1>
       <div
         className="transition-opacity duration-300 w-full flex justify-center"
