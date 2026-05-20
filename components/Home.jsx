@@ -400,7 +400,7 @@ export const THEMES = {
   },
 
   worker: {
-    pageBg: "bg-violet-950",
+    pageBg: "bg-violet-300",
     sidebarBg: "bg-violet-950",
     sidebarBorder: "border-violet-800/50",
     contentBg: "bg-violet-950",
