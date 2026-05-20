@@ -24,6 +24,7 @@ export default function AdminHome() {
       logoBGColor="md:bg-green-500"
       homeRedirect="/adminHome"
       dashboardRedirect={"/adminDashboard"}
+      role={"admin"}
     />
   );
 }

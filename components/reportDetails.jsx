@@ -20,6 +20,7 @@ import {
   canUserComplete,
   canUserSendFeedback,
   canUserDownloadPDF,
+  canUserSubmitCost,
   createAlert,
 } from "../src/utils";
 
@@ -175,6 +176,7 @@ export default function ReportDetailsContainer({
   setDisplayDetails,
   currentReport,
   reportDetailsBgColor,
+  theme,
 }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -187,6 +189,8 @@ export default function ReportDetailsContainer({
     feedback: "",
     selectedWorker: "",
   });
+
+  const [actualCost, setActualCost] = useState("");
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -210,6 +214,7 @@ export default function ReportDetailsContainer({
         const workersQuery = query(
           collection(db, "users"),
           where("role", "==", "worker"),
+          where("deactivated", "==", false),
         );
         const snapshot = await getDocs(workersQuery);
         const loadedWorkers = snapshot.docs.map((docSnap) => ({
@@ -435,6 +440,28 @@ export default function ReportDetailsContainer({
     }
   };
 
+  const handleSubmitCost = async () => {
+    if (!canUserSubmitCost(user, report)) return;
+    const parsed = parseFloat(actualCost);
+    if (!actualCost || isNaN(parsed) || parsed <= 0) {
+      alert("Please enter a valid cost amount");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        cost: parsed,
+      });
+      alert("Cost submitted successfully!");
+      setActualCost("");
+    } catch (error) {
+      console.error("Error submitting cost:", error);
+      alert("Failed to submit cost");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCompleteWork = async () => {
     if (!canUserComplete(user, report)) return;
     setLoading(true);
@@ -539,36 +566,64 @@ export default function ReportDetailsContainer({
   const relevantAlert = getRelevantAlert();
 
   const reportDetails = (
-    <div className="flex flex-col px-10 gap-10 pb-20">
+    <div className={`flex flex-col px-10 gap-10 pb-20`}>
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl">Sent By:</h2>
-        <p className="text-red-400 md:text-lg">{report.reporter}</p>
+        <h2 className={`text-lg md:text-xl ${theme.detailsLabelColor}`}>
+          Sent By:
+        </h2>
+        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+          {report.reporter}
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl whitespace-nowrap">
+        <h2
+          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+        >
           Priority Level:
         </h2>
-        <p className="text-red-400 md:text-lg">{report.priorityLevel}</p>
+        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+          {report.priorityLevel}
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl">Category:</h2>
-        <p className="text-red-400 md:text-lg">{report.category}</p>
+        <h2
+          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+        >
+          Category:
+        </h2>
+        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+          {report.category}
+        </p>
       </div>
 
       <div className="flex gap-2">
-        <h2 className="text-lg md:text-xl whitespace-nowrap">Description:</h2>
-        <p className="text-red-400 md:text-lg">{report.reportDescription}</p>
+        <h2
+          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+        >
+          Description:
+        </h2>
+        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+          {report.reportDescription}
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl">Date Sent:</h2>
-        <p className="text-red-400 md:text-lg">{formatDate(report.dateSent)}</p>
+        <h2
+          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+        >
+          Date Sent:
+        </h2>
+        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+          {formatDate(report.dateSent)}
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl whitespace-nowrap">
+        <h2
+          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+        >
           Sender Contact:
         </h2>
         <a
@@ -580,14 +635,24 @@ export default function ReportDetailsContainer({
       </div>
 
       <div className="flex items-center gap-2">
-        <h2 className="text-lg md:text-xl whitespace-nowrap">Location:</h2>
-        <p className="text-red-400 md:text-lg">{report.location}</p>
+        <h2
+          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+        >
+          Location:
+        </h2>
+        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+          {report.location}
+        </p>
       </div>
 
       {report.dateApproved && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl">Date Approved:</h2>
-          <p className="text-red-400 md:text-lg">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Approved:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateApproved)}
           </p>
         </div>
@@ -595,10 +660,12 @@ export default function ReportDetailsContainer({
 
       {report.dateCostAdded && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
             Date Materials Added:
           </h2>
-          <p className="text-red-400 md:text-lg">
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateCostAdded)}
           </p>
         </div>
@@ -606,8 +673,12 @@ export default function ReportDetailsContainer({
 
       {report.dateConfirmed && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl">Date Confirmed:</h2>
-          <p className="text-red-400 md:text-lg">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Confirmed:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateConfirmed)}
           </p>
         </div>
@@ -615,10 +686,12 @@ export default function ReportDetailsContainer({
 
       {report.dateAssigned && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
             Date Assigned:
           </h2>
-          <p className="text-red-400 md:text-lg">
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateAssigned)}
           </p>
         </div>
@@ -626,9 +699,15 @@ export default function ReportDetailsContainer({
 
       {report.assignedTo && ["admin", "estate"].includes(user?.role) && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">Technician:</h2>
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Technician:
+          </h2>
           <div className="flex flex-col">
-            <p className="text-red-400 md:text-lg">{assignedWorker?.name}</p>
+            <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+              {assignedWorker?.name}
+            </p>
             {assignedWorker?.phoneNumber && (
               <a
                 href={`tel:${assignedWorker.phoneNumber}`}
@@ -643,10 +722,12 @@ export default function ReportDetailsContainer({
 
       {report.dateCompleted && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
             Date Completed:
           </h2>
-          <p className="text-red-400 md:text-lg">
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateCompleted)}
           </p>
         </div>
@@ -654,10 +735,12 @@ export default function ReportDetailsContainer({
 
       {report.dateCostDenied && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
             Date Materials Denied:
           </h2>
-          <p className="text-red-400 md:text-lg">
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateCostDenied)}
           </p>
         </div>
@@ -668,7 +751,9 @@ export default function ReportDetailsContainer({
         report.materials.length > 0 &&
         ["admin", "estate"].includes(user.role) && (
           <div className="flex flex-col gap-2">
-            <h2 className="text-lg md:text-xl whitespace-nowrap">
+            <h2
+              className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+            >
               Materials Required:
             </h2>
             <MaterialsTable
@@ -679,32 +764,61 @@ export default function ReportDetailsContainer({
           </div>
         )}
 
+      {report.cost != null && ["admin", "estate"].includes(user?.role) && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Actual Cost:
+          </h2>
+          <p
+            className={`text-red-400 md:text-lg font-semibold ${theme.detailsValueColor}`}
+          >
+            ₵{report.cost.toLocaleString()}
+          </p>
+        </div>
+      )}
+
       {relevantAlert && (
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
             {report.status === "denied"
               ? "Denial Reason:"
               : report.status === "costDenied"
                 ? "Denial Note:"
                 : "Note:"}
           </h2>
-          <p className="text-red-400 md:text-lg">{relevantAlert.content}</p>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {relevantAlert.content}
+          </p>
         </div>
       )}
 
       {report.instructions && user?.role !== "staff" && (
         <div className="flex gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
             Instructions:
           </h2>
-          <p className="text-red-400 md:text-lg">{report.instructions}</p>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {report.instructions}
+          </p>
         </div>
       )}
 
       {report.feedback && (
         <div className="flex gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">Feedback:</h2>
-          <p className="text-red-400 md:text-lg">{report.feedback}</p>
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Feedback:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {report.feedback}
+          </p>
         </div>
       )}
 
@@ -973,14 +1087,51 @@ export default function ReportDetailsContainer({
     </div>
   );
 
+  {
+    /* ESTATE ACTIONS - Submit Actual Cost */
+  }
+  {
+    canUserSubmitCost(user, report) && (
+      <div className="bg-white rounded-lg p-5 space-y-3">
+        <h3 className="font-bold text-gray-800">
+          Estate Actions - Submit Actual Cost
+        </h3>
+        <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
+          Enter the actual cost of materials after procurement.
+        </p>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Actual Cost (₵)
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 450.00"
+            value={actualCost}
+            onChange={(e) => setActualCost(e.target.value)}
+            className="w-full p-2 border border-gray-400 rounded"
+            min="0"
+            step="0.01"
+          />
+        </div>
+        <button
+          onClick={handleSubmitCost}
+          disabled={loading}
+          className="bg-emerald-500 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded w-full"
+        >
+          {loading ? "Submitting..." : "Submit Cost"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`fixed top-0 md:top-[10%] py-24 md:py-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden right-0 w-full md:max-w-[700px] h-screen md:max-h-[80%] md:right-5 md:rounded-xl ${reportDetailsBgColor} z-80 md:shadow-xl overflow-y-auto ${
+      className={`fixed top-0 md:top-[10%] py-24 md:py-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden right-0 w-full md:max-w-[700px] h-screen md:max-h-[80%] md:right-5 md:rounded-xl ${reportDetailsBgColor} z-80 md:shadow-xl ${theme.detailsBg} overflow-y-auto ${
         closing ? "slide-out-right" : "slide-in-right"
       }`}
     >
       <span
-        className="fixed top-20 md:top-5 right-5 cursor-pointer text-xl font-bold"
+        className={`fixed top-20 md:top-5 right-5 ${theme.detailsCloseText} cursor-pointer text-xl font-bold`}
         onClick={() => setDisplayDetails(false)}
       >
         X

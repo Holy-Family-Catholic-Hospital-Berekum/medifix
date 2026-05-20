@@ -21,6 +21,7 @@ export default function Assigned() {
       logoBGColor="md:bg-blue-500"
       homeRedirect="/estateHome"
       dashboardRedirect={"/estateDashboard"}
+      role={"estate"}
     />
   );
 }

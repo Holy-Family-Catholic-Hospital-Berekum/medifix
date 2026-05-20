@@ -915,11 +915,30 @@ export default function EstateDashboard() {
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: "#f8fafc", minHeight: "100vh" }}>
+    <div style={{ minHeight: "100vh" }} className="bg-blue-200">
       <NavBar
-        navBarColor="bg-yellow-300"
         homeRedirect="/estateHome"
         dashboardRedirect="/estateDashboard"
+        theme={{
+          navBg: "bg-blue-950",
+          navBorder: "border-blue-800/60",
+          logoFrom: "from-blue-300",
+          logoTo: "to-yellow-300",
+          logoSub: "text-blue-500",
+          liveColor: "bg-yellow-400",
+          liveShadow: "shadow-[0_0_8px_2px_rgba(250,204,21,0.6)]",
+          liveText: "text-yellow-400",
+          linkActive: "text-yellow-300",
+          linkHover: "hover:text-yellow-200",
+          linkBar: "bg-yellow-400",
+          logoutBorder: "border-blue-800",
+          logoutText: "text-blue-400",
+          logoutHoverBorder: "hover:border-red-500/60",
+          logoutHoverText: "hover:text-red-400",
+          logoutHoverBg: "hover:bg-red-500/5",
+          accent: "shadow-[0_1px_0_0_rgba(250,204,21,0.15)]",
+          glowLine: "via-yellow-400/20",
+        }}
       />
 
       {showGenID && (

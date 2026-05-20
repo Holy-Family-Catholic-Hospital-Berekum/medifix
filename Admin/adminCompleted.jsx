@@ -20,6 +20,7 @@ export default function Completed() {
       logoBGColor="md:bg-green-500"
       homeRedirect="/adminHome"
       dashboardRedirect={"/adminDashboard"}
+      role={"admin"}
     />
   );
 }

@@ -19,6 +19,7 @@ export default function WorkerCompleted() {
       completedRedirect={"/workerCompleted"}
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/workerHome"
+      role={"worker"}
     />
   );
 }

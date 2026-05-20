@@ -22,6 +22,7 @@ export default function Completed() {
       logoBGColor="md:bg-blue-500"
       homeRedirect="/estateHome"
       dashboardRedirect={"/estateDashboard"}
+      role={"estate"}
     />
   );
 }

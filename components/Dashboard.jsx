@@ -920,12 +920,6 @@ export default function Dashboard({
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ background: "#f8fafc", minHeight: "100vh" }}>
-      <NavBar
-        navBarColor={navBarColor}
-        homeRedirect={homeRedirect}
-        dashboardRedirect={dashboardRedirect}
-      />
-
       {showGenID && (
         <GenIDModal role={role} onClose={() => setShowGenID(false)} />
       )}

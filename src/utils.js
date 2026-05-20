@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-
+import logo from "../images/hfch-logo.png";
 // Add this function to your src/utils.js file
 // It checks all non-terminal reports and marks them overdue if dateDue has passed.
 // Call it once on app load from Home.jsx after reports are fetched.
@@ -122,12 +122,49 @@ export const generatePDFReport = (
   };
 
   // ── Header ──────────────────────────────────────────────────────────────────
-  addLine("MAINTENANCE DEPARTMENT", 14, true);
-  addLine("MATERIALS / ITEMS REQUEST FORM", 11, false, [80, 80, 80]);
-  addSectionGap(6);
-  doc.setDrawColor(180, 180, 180);
+  // Logo
+  try {
+    // logo must be a base64 data URL or an imported asset URL
+    const img = new Image();
+    img.src = logo;
+    // jsPDF addImage: (imageData, format, x, y, width, height)
+    doc.addImage(logo, "PNG", margin, y, 60, 60);
+  } catch (e) {
+    console.warn("Logo could not be added to PDF:", e);
+  }
+
+  // Hospital name block — positioned to the right of the logo
+  const logoRight = margin + 70; // 60px logo + 10px gap
+  const headerTopY = y;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(180, 80, 0); // orange-brown to match hospital brand
+  doc.text("Holy Family Catholic Hospital", logoRight, headerTopY + 18);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Berekum, Bono Region, Ghana", logoRight, headerTopY + 33);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(100, 100, 100);
+  doc.text("Maintenance Department", logoRight, headerTopY + 46);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Materials / Items Request Form", logoRight, headerTopY + 60);
+
+  // Move y below the logo block
+  y = headerTopY + 72;
+
+  doc.setDrawColor(180, 80, 0); // orange divider line
+  doc.setLineWidth(1.5);
   doc.line(margin, y, pageWidth - margin, y);
-  addSectionGap(8);
+  doc.setLineWidth(1); // reset
+  doc.setDrawColor(180, 180, 180);
+  addSectionGap(20);
 
   // Work title & category on one line
   doc.setFont("helvetica", "bold");
@@ -164,6 +201,8 @@ export const generatePDFReport = (
   addSectionGap(4);
   doc.line(margin, y, pageWidth - margin, y);
   addSectionGap(10);
+
+  doc.setTextColor(0, 0, 0); // reset to black for body
 
   // ── Description ─────────────────────────────────────────────────────────────
   addLine("Problem Description", 11, true);
@@ -244,10 +283,10 @@ export const generatePDFReport = (
   }
 
   // ── Cost ────────────────────────────────────────────────────────────────────
-  if (report.cost && ["admin", "estate"].includes(report._userRole)) {
-    addLine("Cost Information", 11, true);
-    addSectionGap(2);
-    addLine(`Total Estimated Cost: ₵${report.cost}`);
+  if (report.cost != null) {
+    addSectionGap(6);
+    addLine("Cost of Materials", 11, true);
+    addLine(`₵${Number(report.cost).toLocaleString()}`);
   }
 
   const confirmationAlert =
@@ -274,7 +313,7 @@ export const generatePDFReport = (
     addSectionGap(6);
     addLine("Assigned Technician", 11, true);
     addLine(workerName);
-    if (workerPhone) addLine(`Contact: ${workerPhone}`);
+    if (workerPhone) addLine(`${workerPhone}`);
   }
 
   if (report.feedback) {
@@ -314,7 +353,7 @@ export const generatePDFReport = (
   doc.setFont("helvetica", "normal");
   doc.text(estateManagerName || "", margin, sigY + 14);
   if (estateManagerPhone) {
-    doc.text(`Contact: ${estateManagerPhone}`, margin, sigY + 26);
+    doc.text(`${estateManagerPhone}`, margin, sigY + 26);
   }
   doc.line(margin, sigY + 40, margin + 200, sigY + 40);
   doc.setFontSize(8);
@@ -380,6 +419,14 @@ export const canUserAssignWorker = (user, report) => {
   return (
     user?.role === "estate" &&
     ["approved", "confirmed", "assigned"].includes(report?.status)
+  );
+};
+
+export const canUserSubmitCost = (user, report) => {
+  return (
+    user?.role === "estate" &&
+    (report?.status === "assigned" || report?.status === "completed") &&
+    (report?.cost === null || report?.cost === undefined)
   );
 };
 

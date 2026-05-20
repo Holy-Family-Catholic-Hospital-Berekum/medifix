@@ -10,185 +10,332 @@ import ac from "../images/ac.jpg";
 import refrigerator from "../images/refrigerator.jpg";
 import Footer from "../components/footer";
 import ReportForm from "./reportForm";
+import logo from "../images/hfch-logo.png";
+const ORANGE = "#FF8825";
+
+const services = [
+  {
+    name: "Electrical",
+    provisions: ["Repairs", "Supplies"],
+    image: electricity,
+    accent: "from-amber-400 to-yellow-300",
+    icon: "⚡",
+  },
+  {
+    name: "Plumbing",
+    provisions: ["Repairs", "Supplies"],
+    image: plumbing,
+    accent: "from-blue-400 to-cyan-300",
+    icon: "🔧",
+  },
+  {
+    name: "Carpentry",
+    provisions: ["Repairs", "Supplies"],
+    image: carpentry,
+    accent: "from-orange-400 to-amber-300",
+    icon: "🪚",
+  },
+  {
+    name: "Masonry",
+    provisions: ["Repairs", "Supplies"],
+    image: masonery,
+    accent: "from-stone-400 to-zinc-300",
+    icon: "🧱",
+  },
+  {
+    name: "Refrigerator",
+    provisions: ["Repairs"],
+    image: refrigerator,
+    accent: "from-sky-400 to-blue-300",
+    icon: "❄️",
+  },
+  {
+    name: "Air Conditioner",
+    provisions: ["Repairs"],
+    image: ac,
+    accent: "from-teal-400 to-emerald-300",
+    icon: "🌬️",
+  },
+];
+
+const systemWorkflows = [
+  { step: "01", text: "You submit a maintenance report" },
+  { step: "02", text: "Report goes to administrator for approval" },
+  { step: "03", text: "Estate Manager receives report upon admin approval" },
+  { step: "04", text: "Estate Manager makes a materials confirmation request" },
+  { step: "05", text: "Admin confirms the materials request" },
+  {
+    step: "06",
+    text: "Estate Manager sends a materials request for procurement",
+  },
+  { step: "07", text: "Work is assigned to appropriate technician" },
+  { step: "08", text: "Technician executes the task and updates progress" },
+  { step: "09", text: "You review completed work and provide feedback" },
+  { step: "10", text: "Admin, Estate Manager, and technician review feedback" },
+  { step: "11", text: "Further actions are taken if necessary" },
+];
+
+const timelines = [
+  {
+    priority: "Emergency",
+    desc: "Attended to as soon as possible",
+    color: "bg-red-500",
+    border: "border-red-400",
+    text: "text-red-600",
+    badge: "bg-red-100",
+    icon: "🚨",
+  },
+  {
+    priority: "Urgent",
+    desc: "Attended to within 12 hours",
+    color: "bg-orange-500",
+    border: "border-orange-400",
+    text: "text-orange-600",
+    badge: "bg-orange-100",
+    icon: "⚡",
+  },
+  {
+    priority: "Routine",
+    desc: "Attended to within 1 to 2 days",
+    color: "bg-green-500",
+    border: "border-green-400",
+    text: "text-green-600",
+    badge: "bg-green-100",
+    icon: "📋",
+  },
+];
 
 export default function StaffHome() {
   const [sidePopup, setSidePopup] = useState(false);
 
-  const services = [
-    {
-      name: "Electrical",
-      provisions: ["Repairs", "Suplies"],
-      image: electricity,
-    },
-    {
-      name: "Plumbing",
-      provisions: ["Repairs", "Suplies"],
-      image: plumbing,
-    },
-    {
-      name: "Carpentry",
-      provisions: ["Repairs", "Suplies"],
-      image: carpentry,
-    },
-    {
-      name: "Masonery",
-      provisions: ["Repairs", "Suplies"],
-      image: masonery,
-    },
-    {
-      name: "Refrigerator",
-      provisions: ["Repairs"],
-      image: refrigerator,
-    },
-    {
-      name: "Air Conditioner",
-      provisions: ["Repairs"],
-      image: ac,
-    },
-  ];
-
-  const serviceCard = services.map((service) => (
-    <div
-      className="flex flex-col items-center justify-center cursor-default select-none rounded-xl border p-4 max-w-[130px] md:max-w-[300px]  w-full border-red-300 shadow"
-      key={service.name}
-    >
-      <h1 className="text-xl mb-2 text-[[#111827]">{service.name}</h1>
-      <div className="flex justify-center items-center gap-2">
-        <span className="material-symbols-outlined">
-          <span className="material-symbols-outlined">chevron_right</span>
-        </span>
-        <span>{service.provisions[0]}</span>
-      </div>
-      {service.provisions[1] && (
-        <div className="flex justify-center items-center gap-2 mb-2">
-          <span className="material-symbols-outlined">
-            <span className="material-symbols-outlined">chevron_right</span>
-          </span>
-          <span className="text-lg">{service.provisions[1]}</span>
-        </div>
-      )}
-
-      <img
-        src={service.image}
-        alt="service image"
-        className="hidden rounded md:flex max-h-40 w-full"
-      />
-    </div>
-  ));
-
-  const systemWorkflows = [
-    "You submit a maintenance report",
-    "Report goes to administrator for approval",
-    "Estate Manager receives report only upon admin approval",
-    "Estate Manager makes a materials confirmation request to admin",
-    "Admin confirms",
-    "Estate Manager sends a materials request for procurement",
-    "The work is assigned to appropriate technician",
-    "Technician executes the task and updates progress",
-    "You review completed work and provide feedback",
-    "Admin, Estate manager and the assigned technician reviews feedback",
-    "Further actions are taken if necessary",
-  ];
-
-  const systemWorkflowDiv = systemWorkflows.map((workflow) => (
-    <div className="flex items-center gap-4 bg-red-300" key={workflow}>
-      <img
-        src={toolsIcon}
-        alt="tools icon"
-        className="w-12 h-12 bg-[#2563EB]"
-      />
-      <h2 className="md:text-lg px-2">{workflow}</h2>
-    </div>
-  ));
-
   const pageContent = (
-    <main className="pt-20 md:pt-24 pb-20">
+    <main className="bg-white pt-20 md:pt-24 pb-20 min-h-screen">
       <span
-        className={`material-symbols-outlined md:hidden z-50 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 bg-red-400`}
+        className="material-symbols-outlined md:hidden z-50 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 text-white shadow-lg"
+        style={{ backgroundColor: ORANGE }}
         onClick={() => setSidePopup((prev) => !prev)}
       >
         {sidePopup ? "chevron_right" : "chevron_left"}
       </span>
 
-      <div className="w-full mb-5 md:mb-10 text-center">
-        <h1 className="text-2xl md:text-4xl md:mt-10 mt-4 text-[#2563EB]">
-          Our Services
-        </h1>
-      </div>
-      <div className="flex justify-center px-10 gap-5  flex-wrap mx-auto">
-        {serviceCard}
-      </div>
-      <div className="flex flex-col md:mb-20 mt-20 md:mt-40 ">
-        <h1 className="bg-[#2563EB] text-xl text-center py-4 md:2xl">
-          System Workflow
-        </h1>
-        <div className="flex flex-col relative">
-          {systemWorkflowDiv}
-          <img
-            src={worker}
-            alt="cartoon image"
-            className="absolute max-w-[500px] right-0 bottom-20 hidden lg:block"
-          />
-        </div>
-      </div>
+      {/* ── Hero banner ───────────────────────────────────────────── */}
+      <section className="relative overflow-hidden mb-16">
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `repeating-linear-gradient(45deg, ${ORANGE} 0, ${ORANGE} 1px, transparent 0, transparent 50%)`,
+            backgroundSize: "18px 18px",
+          }}
+        />
+        <div className="relative text-center py-12 px-6 ">
+          <div className="flex flex-col justify-center items-center">
+            <img src={logo} alt="logo" className="w-30 " />
+            <h1 className="md:text-4xl text-3xl  font-black text-gray-900 leading-tight mb-3">
+              Holy Family Catholic Hospital, Berekum
+            </h1>
+          </div>
 
-      <h1 className="text-center text-2xl md:4xl mt-10">Report Timelines</h1>
-      <div className="flex justify-center flex-wrap gap-4 md:gap-10 md:gap-10 mb-10 mt-4 md:mt-10">
-        <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
-          <h1 className="text-[#2563EB]  rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
-            Emergency
+          <span
+            className="inline-block text-xs font-black tracking-[.25em] uppercase px-4 py-1.5 rounded-full mb-4 text-white"
+            style={{ backgroundColor: ORANGE }}
+          >
+            Maintenance Department
+          </span>
+          <h1 className="text-2xl  font-black text-gray-900 leading-tight mb-3">
+            What can we <span style={{ color: ORANGE }}>fix</span> for you?
           </h1>
-          <p className="text-white">
-            Reports with priority set to EMERGENCY will be attend to {""}
-            {
-              <span className="text-red-700 font-bold">
-                as soon as possible
+          <p className="text-gray-500 text-lg max-w-xl mx-auto">
+            Click on the Report button at the top right corner to submit a
+            report.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Services ──────────────────────────────────────────────── */}
+      <section className="px-4 md:px-12 mb-20">
+        <div className="flex items-center gap-4 mb-8">
+          <h2 className="text-3xl font-black text-gray-900">Our Services</h2>
+          <div className="flex-1 h-0.5 bg-gray-100 rounded" />
+          <span
+            className="text-sm font-bold px-3 py-1 rounded-full text-white"
+            style={{ backgroundColor: ORANGE }}
+          >
+            {services.length} available
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {services.map((service) => (
+            <div
+              key={service.name}
+              className="group relative bg-white rounded-2xl border-2 border-gray-100 hover:border-orange-300 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-default select-none"
+            >
+              {/* colour bar */}
+              <div
+                className={`h-1.5 w-full bg-gradient-to-r ${service.accent}`}
+              />
+
+              <div className="p-4">
+                {/* icon */}
+                <div className="text-3xl mb-3">{service.icon}</div>
+
+                <h3 className="font-black text-gray-900 text-sm leading-tight mb-2">
+                  {service.name}
+                </h3>
+
+                <div className="flex flex-col gap-1">
+                  {service.provisions.map((p) => (
+                    <span
+                      key={p}
+                      className="text-xs text-gray-500 flex items-center gap-1"
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+                        style={{ backgroundColor: ORANGE }}
+                      />
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* image on hover */}
+              <div className="overflow-hidden h-0 group-hover:h-28 transition-all duration-500">
+                <img
+                  src={service.image}
+                  alt={service.name}
+                  className="w-full h-28 object-cover"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Workflow ──────────────────────────────────────────────── */}
+      <section className="px-4 md:px-12 mb-20">
+        <div
+          className="rounded-3xl overflow-hidden"
+          style={{
+            background: `linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)`,
+          }}
+        >
+          {/* header */}
+          <div className="px-8 pt-10 pb-6 flex items-center gap-4">
+            <div>
+              <h2 className="text-3xl font-black text-white">
+                System Workflow
+              </h2>
+              <p className="text-gray-400 text-sm mt-1">
+                How your report moves through the system
+              </p>
+            </div>
+            <div className="ml-auto hidden lg:block">
+              <img src={worker} alt="worker" className="w-40 opacity-80" />
+            </div>
+          </div>
+
+          {/* steps */}
+          <div className="px-8 pb-10 grid md:grid-cols-2 gap-3">
+            {systemWorkflows.map((w, i) => (
+              <div
+                key={w.step}
+                className="flex items-center gap-4 bg-white/5 hover:bg-white/10 transition rounded-xl px-4 py-3 group"
+              >
+                <span
+                  className="text-xs font-black w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white"
+                  style={{ backgroundColor: ORANGE }}
+                >
+                  {w.step}
+                </span>
+                <p className="text-sm text-gray-300 group-hover:text-white transition">
+                  {w.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Report Timelines ──────────────────────────────────────── */}
+      <section className="px-4 md:px-12 mb-16">
+        <div className="flex items-center gap-4 mb-8">
+          <h2 className="text-3xl font-black text-gray-900">
+            Report Timelines
+          </h2>
+          <div className="flex-1 h-0.5 bg-gray-100 rounded" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          {timelines.map((t) => (
+            <div
+              key={t.priority}
+              className={`relative rounded-2xl border-2 ${t.border} overflow-hidden bg-white shadow-sm hover:shadow-lg transition-all duration-300`}
+            >
+              <div className={`${t.color} px-6 py-4 flex items-center gap-3`}>
+                <span className="text-2xl">{t.icon}</span>
+                <h3 className="font-black text-white text-xl">{t.priority}</h3>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-gray-700 font-medium">{t.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Important Notice ──────────────────────────────────────── */}
+      <section className="px-4 md:px-12 mb-16">
+        <div
+          className="rounded-2xl p-6 md:p-8 flex gap-4 items-start border-l-8"
+          style={{
+            backgroundColor: "#fff8f0",
+            borderLeftColor: ORANGE,
+          }}
+        >
+          <span className="text-3xl flex-shrink-0">⚠️</span>
+          <div>
+            <h3 className="font-black text-gray-900 text-lg mb-2">
+              Important Notice
+            </h3>
+            <p className="text-gray-700 leading-relaxed">
+              The urgency of a report depends on the actual intensity of the
+              issue. Merely setting a priority as <strong>emergency</strong> or{" "}
+              <strong>urgent</strong> does not automatically make it one.
+              Reports are assessed independently.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Working Hours ─────────────────────────────────────────── */}
+      <section className="px-4 md:px-12">
+        <div className="rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm">
+          <div className="flex items-center gap-4 px-8 py-5 bg-gray-900">
+            <span className="text-2xl">🕐</span>
+            <div>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
+                Working Hours
+              </p>
+              <p className="text-white font-black text-xl">Monday – Friday</p>
+            </div>
+            <div className="ml-auto">
+              <span
+                className="text-sm font-black px-4 py-2 rounded-full text-white"
+                style={{ backgroundColor: ORANGE }}
+              >
+                8:00 AM – 4:00 PM
               </span>
-            }
-          </p>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-8 py-4">
+            <p className="text-gray-500 text-sm">
+              Reports submitted outside working hours will be processed the next
+              working day except emergency or urgent reports
+            </p>
+          </div>
         </div>
-
-        <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
-          <h1 className="text-[#2563EB]  rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
-            Urgent
-          </h1>
-          <p className="text-white">
-            Reports with priority set to URGENT will be attend to within a
-            period of {<span className="text-red-700 font-bold">12 hrs</span>}
-          </p>
-        </div>
-
-        <div className="w-full border border-[#2563EB] bg-red-300 rounded-2xl px-2 pb-2 max-w-[150px] md:max-w-[300px]">
-          <h1 className="text-[#2563EB] bg-red-300 rounded-b-2xl text-2xl md:4xl text-center mb-2 md:mb-4">
-            Routine
-          </h1>
-          <p className="text-white">
-            Reports with priority set to ROUTINE will be attend to within a
-            period of{" "}
-            {<span className="text-red-700 font-bold">1 to 2 days</span>}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-red-700 py-2 md:py-10">
-        <h1 className="text-white text-center mb-4 font-bold">
-          IMPORTANT NOTICE
-        </h1>
-        <p className="px-4 text-yellow-500 lg:px-60">
-          The urgency of a report will depend on the intensity of the issue at
-          hand. Merely setting a report priority as emergency or urgent doesn't
-          make it an emergency or urgent report.
-        </p>
-      </div>
-
-      <div className="w-full">
-        <h1 className="text-center text-2xl md:4xl mt-10 mb-2">
-          Working Hours
-        </h1>
-        <p className="text-red-400 bg-black text-center py-2">
-          Monday to Friday from {<span className="font-bold">8am to 4pm</span>}
-        </p>
-      </div>
+      </section>
     </main>
   );
 

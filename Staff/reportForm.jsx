@@ -191,13 +191,13 @@ export default function ReportForm({ formPopup, onClose }) {
   return (
     <div className="z-100 fixed inset-0 flex items-end justify-center bg-black/40">
       <form
-        className={`bg-red-300 w-full h-full overflow-y-auto pt-24 flex flex-col items-center gap-4 rounded-t-2xl ${
+        className={`bg-blue-100 w-full h-full text-blue-900 overflow-y-auto pt-24 flex flex-col items-center gap-4 rounded-t-2xl ${
           closing ? "slide-down" : "slide-up"
         }`}
         onSubmit={handleSubmit}
       >
         <div className="w-full max-w-[300px] md:max-w-[600px] pt-5 md:pt-10">
-          <label htmlFor="category" className="text-lg">
+          <label htmlFor="category" className="text-lg text-gray-900">
             Category <span className="text-red-600">*</span>
           </label>
           <select
@@ -218,8 +218,8 @@ export default function ReportForm({ formPopup, onClose }) {
         </div>
 
         <div className="w-full max-w-[300px] md:max-w-[600px]">
-          <label htmlFor="priorityLevel" className="text-lg">
-            Priority Level <span className="text-red-600">*</span>
+          <label htmlFor="priorityLevel" className="text-lg text-gray-900">
+            Priority Level <span className="text-red-600 ">*</span>
           </label>
           <select
             name="priorityLevel"
@@ -236,7 +236,7 @@ export default function ReportForm({ formPopup, onClose }) {
         </div>
 
         <div className="w-full max-w-[300px] md:max-w-[600px]">
-          <label htmlFor="location" className="text-lg">
+          <label htmlFor="location" className="text-lg text-gray-900">
             Location <span className="text-red-600">*</span>
           </label>
           <input
@@ -245,14 +245,14 @@ export default function ReportForm({ formPopup, onClose }) {
             name="location"
             value={formData.location}
             onChange={handleInputChange}
-            className="bg-red-400 w-full p-2 rounded"
+            className="bg-orange-300 w-full p-2 rounded"
             placeholder="Eg. Doctors flat room 20"
             required
           />
         </div>
 
         <div className="w-full max-w-[300px] md:max-w-[600px]">
-          <label htmlFor="reportDescription" className="text-lg">
+          <label htmlFor="reportDescription" className="text-lg text-gray-900">
             Problem Description <span className="text-red-600">*</span>
           </label>
           <textarea
@@ -260,7 +260,7 @@ export default function ReportForm({ formPopup, onClose }) {
             id="reportDescription"
             value={formData.reportDescription}
             onChange={handleInputChange}
-            className="bg-red-400 w-full p-2 rounded"
+            className="bg-orange-300 text-blue-900 w-full p-2 rounded"
             placeholder="Briefly describe the problem"
             rows="4"
             required
@@ -270,7 +270,7 @@ export default function ReportForm({ formPopup, onClose }) {
         <button
           type="submit"
           disabled={loading}
-          className="bg-yellow-400 border border-white w-full max-w-[300px] md:max-w-[600px] w-full rounded py-2 text-lg hover:shadow hover:bg-yellow-500 shadow-white cursor-pointer mt-10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-[#40499F] text-blue-100 border border-white w-full max-w-[300px] md:max-w-[600px] w-full rounded py-2 text-lg hover:shadow hover:bg-blue-900 shadow-white cursor-pointer mt-10 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "Submitting..." : "Submit Report"}
         </button>

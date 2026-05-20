@@ -919,11 +919,30 @@ export default function AdminDashboard({
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: "#f8fafc", minHeight: "100vh" }}>
+    <div style={{ minHeight: "100vh" }} className="bg-blue-100">
       <NavBar
-        navBarColor="bg-green-300"
         homeRedirect="/adminHome"
-        dashboardRedirect={"/adminDashboard"}
+        dashboardRedirect="/adminDashboard"
+        theme={{
+          navBg: "bg-sky-600",
+          navBorder: "border-sky-900/60",
+          logoFrom: "from-sky-300",
+          logoTo: "to-blue-100",
+          logoSub: "text-slate-600",
+          liveColor: "bg-emerald-400",
+          liveShadow: "shadow-[0_0_8px_2px_rgba(52,211,153,0.6)]",
+          liveText: "text-blue-100",
+          linkActive: "text-sky-300",
+          linkHover: "hover:text-sky-200",
+          linkBar: "bg-sky-400",
+          logoutBorder: "border-sky-900",
+          logoutText: "text-slate-900",
+          logoutHoverBorder: "hover:border-red-500/60",
+          logoutHoverText: "hover:text-red-400",
+          logoutHoverBg: "hover:bg-red-500/5",
+          accent: "shadow-[0_1px_0_0_rgba(125,211,252,0.15)]",
+          glowLine: "via-sky-400/20",
+        }}
       />
 
       {showGenID && (
