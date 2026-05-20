@@ -919,10 +919,12 @@ export default function Dashboard({
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: "#f8fafc", minHeight: "100vh" }}>
+    <div style={{ background: "#b7fdc9", minHeight: "100vh" }}>
       {showGenID && (
         <GenIDModal role={role} onClose={() => setShowGenID(false)} />
       )}
+
+      <NavBar />
 
       {toast && (
         <div

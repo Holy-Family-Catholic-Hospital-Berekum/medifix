@@ -10,7 +10,7 @@ export default function NavBar({
   const navigate = useNavigate();
 
   const {
-    navBg = "bg-sky-950",
+    navBg = "bg-green-800",
     navBorder = "border-sky-800",
     logoFrom = "from-sky-300",
     logoTo = "to-cyan-400",
