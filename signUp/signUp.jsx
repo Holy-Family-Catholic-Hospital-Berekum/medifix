@@ -392,7 +392,7 @@ export default function SignUp() {
       const regSnap = await getDoc(regDocRef);
       if (!regSnap.exists()) {
         alert(
-          "Invalid registration ID. Please request one from the Admin or Estate Manager.",
+          "Invalid registration ID. Please request one from the Admin or IT Manager.",
         );
         return;
       }
@@ -403,7 +403,7 @@ export default function SignUp() {
         return;
       }
       if (!["staff", "worker", "estate", "admin", "manager"].includes(type)) {
-        alert("Invalid registration ID type. Contact the Estate Manager.");
+        alert("Invalid registration ID type. Contact the IT Manager.");
         return;
       }
       const userCredential = await createUserWithEmailAndPassword(
@@ -471,7 +471,7 @@ export default function SignUp() {
       const userSnap = await getDoc(doc(db, "users", uid));
       if (!userSnap.exists()) {
         await auth.signOut();
-        alert("Account not found. Please contact your Estate Manager.");
+        alert("Account not found. Please contact your IT Manager.");
         return;
       }
       const userData = userSnap.data();
