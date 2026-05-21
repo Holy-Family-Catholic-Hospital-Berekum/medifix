@@ -970,7 +970,49 @@ export default function AdminDashboard({
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh" }} className="bg-blue-100">
-      <NavBar homeRedirect="/adminHome" dashboardRedirect="/adminDashboard" />
+      <NavBar
+        homeRedirect="/adminHome"
+        dashboardRedirect="/adminDashboard"
+        theme={{
+          navBg:
+            "bg-gradient-to-r from-emerald-500/90 via-green-500/85 to-lime-400/80 backdrop-blur-2xl",
+
+          navBorder:
+            "border border-white/20 shadow-[0_8px_32px_rgba(16,185,129,0.18)]",
+
+          logoFrom: "from-emerald-950",
+
+          logoTo: "to-lime-600",
+
+          logoSub: "text-emerald-950/60",
+
+          liveColor: "bg-lime-400",
+
+          liveShadow: "shadow-[0_0_10px_2px_rgba(163,230,53,0.7)]",
+
+          liveText: "text-emerald-950",
+
+          linkActive: "text-white",
+
+          linkHover: "hover:text-lime-100",
+
+          linkBar: "bg-lime-300",
+
+          logoutBorder: "border-white/20",
+
+          logoutText: "text-emerald-950",
+
+          logoutHoverBorder: "hover:border-red-400/50",
+
+          logoutHoverText: "hover:text-red-500",
+
+          logoutHoverBg: "hover:bg-red-500/5",
+
+          accent: "shadow-[0_1px_0_0_rgba(134,239,172,0.25)]",
+
+          glowLine: "via-emerald-300/40",
+        }}
+      />
 
       {showGenID && (
         <GenIDModal role={role} onClose={() => setShowGenID(false)} />
