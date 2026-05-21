@@ -191,7 +191,7 @@ export default function ReportForm({ formPopup, onClose }) {
   return (
     <div className="z-100 fixed inset-0 flex items-end justify-center bg-black/40">
       <form
-        className={`bg-blue-100 w-full h-full text-blue-900 overflow-y-auto pt-24 flex flex-col items-center gap-4 rounded-t-2xl ${
+        className={`bg-blue-50 w-full h-full text-[#FF8825] overflow-y-auto pt-24 flex flex-col items-center gap-4 rounded-t-2xl ${
           closing ? "slide-down" : "slide-up"
         }`}
         onSubmit={handleSubmit}
@@ -245,7 +245,7 @@ export default function ReportForm({ formPopup, onClose }) {
             name="location"
             value={formData.location}
             onChange={handleInputChange}
-            className="bg-orange-300 w-full p-2 rounded"
+            className="bg-blue-300 w-full p-2 rounded"
             placeholder="Eg. Doctors flat room 20"
             required
           />
@@ -260,7 +260,7 @@ export default function ReportForm({ formPopup, onClose }) {
             id="reportDescription"
             value={formData.reportDescription}
             onChange={handleInputChange}
-            className="bg-orange-300 text-blue-900 w-full p-2 rounded"
+            className="bg-blue-300 text-blue-900 w-full p-2 rounded"
             placeholder="Briefly describe the problem"
             rows="4"
             required
