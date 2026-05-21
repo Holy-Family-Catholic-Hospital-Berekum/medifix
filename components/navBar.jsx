@@ -26,6 +26,12 @@ export default function NavBar({
 
     liveText = "text-[#7C2D12]",
 
+    linkActive = "text-white",
+
+    linkHover = "hover:text-[#FFE7D6]",
+
+    linkBar = "bg-[#FFD166]",
+
     logoutBorder = "border-white/25",
 
     logoutText = "text-[#7C2D12]",
