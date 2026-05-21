@@ -10,24 +10,35 @@ export default function NavBar({
   const navigate = useNavigate();
 
   const {
-    navBg = "bg-[#40499F]",
-    navBorder = "border-sky-800",
-    logoFrom = "from-sky-300",
-    logoTo = "to-cyan-400",
-    logoSub = "text-sky-500",
-    liveColor = "bg-emerald-400",
-    liveShadow = "shadow-[0_0_8px_2px_rgba(52,211,153,0.6)]",
-    liveText = "text-emerald-400",
-    linkActive = "text-sky-300",
-    linkHover = "hover:text-sky-200",
-    linkBar = "bg-sky-400",
-    logoutBorder = "border-sky-700",
-    logoutText = "text-sky-400",
-    logoutHoverBorder = "hover:border-red-500/60",
-    logoutHoverText = "hover:text-red-400",
+    navBg = "bg-gradient-to-r from-[#F38130]/95 via-[#ff9b52]/90 to-[#ffb36e]/85 backdrop-blur-3xl supports-[backdrop-filter]:bg-white/10",
+
+    navBorder = "border border-white/20 shadow-[0_8px_32px_rgba(243,129,48,0.22)]",
+
+    logoFrom = "from-[#7C2D12]",
+
+    logoTo = "to-[#F38130]",
+
+    logoSub = "text-[#7C2D12]/70",
+
+    liveColor = "bg-[#FFD166]",
+
+    liveShadow = "shadow-[0_0_12px_2px_rgba(255,209,102,0.75)]",
+
+    liveText = "text-[#7C2D12]",
+
+    logoutBorder = "border-white/25",
+
+    logoutText = "text-[#7C2D12]",
+
+    logoutHoverBorder = "hover:border-red-400/50",
+
+    logoutHoverText = "hover:text-red-500",
+
     logoutHoverBg = "hover:bg-red-500/5",
-    accent = "shadow-[0_1px_0_0_rgba(125,211,252,0.2)]",
-    glowLine = "via-sky-400/20",
+
+    accent = "shadow-[0_1px_0_0_rgba(255,255,255,0.12)]",
+
+    glowLine = "via-[#FFD7B8]/60",
   } = theme;
 
   const handleLogout = async () => {
@@ -49,7 +60,7 @@ export default function NavBar({
 
   return (
     <nav
-      className={`flex justify-between items-center gap-6 ${navBg} border-b ${navBorder} ${accent} pl-4 md:pl-0 py-4 pr-6 w-full z-[100] fixed top-0 backdrop-blur-md`}
+      className={`flex justify-between items-center gap-6 ${navBg} ${navBorder} ${accent} pl-4 md:pl-0 py-4 pr-6 w-full z-[100] fixed top-0`}
     >
       {/* Subtle top glow line */}
       <div

@@ -491,8 +491,8 @@ function GenIDModal({ role, onClose }) {
                     onClick={() => setGenType(type)}
                     className={`px-4 py-2 rounded-full capitalize text-sm font-medium border transition cursor-pointer ${
                       genType === type
-                        ? "bg-red-400 text-white border-red-400"
-                        : "bg-white text-gray-700 border-gray-300 hover:border-red-300"
+                        ? "bg-[#F8934C] text-white border-[#F8934C]"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-[#F8934C]"
                     }`}
                   >
                     {type}
@@ -512,7 +512,7 @@ function GenIDModal({ role, onClose }) {
                 type="button"
                 onClick={handleGenerate}
                 disabled={genLoading}
-                className={`flex-1 py-2 rounded-lg text-white font-medium transition cursor-pointer ${genLoading ? "bg-red-300 cursor-not-allowed" : "bg-red-400 hover:bg-red-500"}`}
+                className={`flex-1 py-2 rounded-lg text-white font-medium transition cursor-pointer ${genLoading ? "bg-[#F8934C] cursor-not-allowed" : "bg-[#F8934C] hover:bg-orange-400"}`}
               >
                 {genLoading ? "Generating..." : "Generate"}
               </button>
@@ -968,7 +968,7 @@ export default function Dashboard({
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: "#b7fdc9", minHeight: "100vh" }}>
+    <div style={{ minHeight: "100vh" }}>
       {showGenID && (
         <GenIDModal role={role} onClose={() => setShowGenID(false)} />
       )}
@@ -1059,7 +1059,7 @@ export default function Dashboard({
             {(isAdmin || isManager) && (
               <button
                 onClick={() => setShowGenID(true)}
-                className="bg-[#FF8825] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
               >
                 + Generate Registration ID
               </button>

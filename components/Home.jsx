@@ -180,328 +180,584 @@ let routine;
 // ─── Default theme (can be overridden per role) ───────────────────────────────
 export const THEMES = {
   admin: {
-    // Page
-    pageBg: "bg-blue-100",
-    sidebarBg: "bg-sky-600",
-    sidebarBorder: "border-sky-900/50",
-    contentBg: "bg-slate-950",
+    // ─── Page ─────────────────────────────────────────────
+    pageBg: "bg-gradient-to-br from-emerald-50 via-lime-50 to-green-100",
 
-    // Nav
-    navBg: "bg-sky-600",
-    navBorder: "border-sky-900/60",
-    logoFrom: "from-sky-300",
-    logoTo: "to-blue-100",
-    logoSub: "text-slate-600",
-    liveColor: "bg-emerald-400",
-    liveShadow: "shadow-[0_0_8px_2px_rgba(52,211,153,0.6)]",
-    liveText: "text-blue-100",
-    linkActive: "text-sky-300",
-    linkHover: "hover:text-sky-200",
-    linkBar: "bg-sky-400",
-    logoutBorder: "border-sky-900",
-    logoutText: "text-slate-900",
-    logoutHoverBorder: "hover:border-red-500/60",
-    logoutHoverText: "hover:text-red-400",
+    sidebarBg:
+      "bg-gradient-to-br from-emerald-200/55 via-green-100/45 to-lime-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-emerald-200/35",
+
+    sidebarBorder:
+      "border border-white/30 shadow-[0_8px_32px_rgba(16,185,129,0.18)]",
+
+    contentBg: "bg-transparent",
+
+    // ─── Navbar ──────────────────────────────────────────
+    navBg:
+      "bg-gradient-to-r from-emerald-500/90 via-green-500/85 to-lime-400/80 backdrop-blur-2xl",
+
+    navBorder:
+      "border border-white/20 shadow-[0_8px_32px_rgba(16,185,129,0.18)]",
+
+    logoFrom: "from-emerald-950",
+    logoTo: "to-lime-600",
+    logoSub: "text-emerald-950/60",
+
+    liveColor: "bg-lime-400",
+
+    liveShadow: "shadow-[0_0_10px_2px_rgba(163,230,53,0.7)]",
+
+    liveText: "text-emerald-950",
+
+    linkActive: "text-white",
+    linkHover: "hover:text-lime-100",
+    linkBar: "bg-lime-300",
+
+    logoutBorder: "border-white/20",
+    logoutText: "text-emerald-950",
+
+    logoutHoverBorder: "hover:border-red-400/50",
+    logoutHoverText: "hover:text-red-500",
     logoutHoverBg: "hover:bg-red-500/5",
-    accent: "shadow-[0_1px_0_0_rgba(125,211,252,0.15)]",
-    glowLine: "via-sky-400/20",
 
-    // Sidebar nav links
-    sideNavActive: "text-slate-900 bg-sky-500/10 border border-sky-500/25",
+    accent: "shadow-[0_1px_0_0_rgba(134,239,172,0.25)]",
+
+    glowLine: "via-emerald-300/40",
+
+    // ─── Sidebar nav ─────────────────────────────────────
+    sideNavActive:
+      "text-emerald-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
+
     sideNavIdle:
-      "text-slate-800 hover:text-slate-200 hover:bg-sky-900/30 border border-transparent",
-    sideNavDotActive: "bg-sky-200 shadow-[0_0_5px_rgba(125,211,252,0.7)]",
-    sideNavDotIdle: "bg-slate-700 group-hover:bg-slate-500",
-    sideNavLabel: "text-sky-600/60",
+      "text-emerald-900/80 hover:text-emerald-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
 
-    // Section header
-    sectionAccentBar: "from-sky-400 to-cyan-500",
-    sectionLabel: "text-sky-500/70",
-    sectionTitle: "text-slate-800",
-    sectionCountBg: "bg-slate-800/60",
-    sectionCountBorder: "border-slate-700/50",
-    sectionCountDot: "bg-sky-500 shadow-[0_0_4px_rgba(125,211,252,0.7)]",
-    sectionCountText: "text-slate-400",
-    sectionDivider: "border-sky-900/40",
+    sideNavDotActive: "bg-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.95)]",
 
-    // Cards
-    cardBg: "bg-slate-900/80 backdrop-blur-sm",
+    sideNavDotIdle: "bg-emerald-500/40 group-hover:bg-emerald-500",
 
-    cardNormalBorder: "border-green-500",
-    cardNormalGlow: "shadow-[0_0_16px_rgba(56,189,248,0.12)]",
-    cardNormalDot: "bg-green-500 shadow-[0_0_6px_rgba(125,211,252,0.7)]",
-    cardNormalAccent: "from-sky-600/15 to-transparent",
-    cardNormalPriority: "text-green-500",
-    cardEmergencyBorder: "border-red-600/60",
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(220,38,38,0.25)]",
-    cardEmergencyDot: "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]",
-    cardEmergencyAccent: "from-red-600/20 to-transparent",
-    cardEmergencyPriority: "text-red-400",
-    cardUrgentBorder: "border-amber-500/50",
-    cardUrgentGlow: "shadow-[0_0_16px_rgba(245,158,11,0.2)]",
-    cardUrgentDot: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.7)]",
-    cardUrgentAccent: "from-amber-500/15 to-transparent",
-    cardUrgentPriority: "text-amber-400",
-    cardDateLabel: "text-slate-500",
-    cardDateValue: "text-slate-300",
-    cardStatusBg: "bg-slate-800/80",
-    cardStatusBorder: "border-slate-700/50",
-    cardStatusText: "text-slate-400",
+    sideNavLabel: "text-emerald-950/50",
 
-    // Feedback badge
-    feedbackBadge: "bg-sky-400 text-sky-950",
+    // ─── Section headers ─────────────────────────────────
+    sectionAccentBar: "from-emerald-500 to-lime-400",
 
-    // Mobile toggle button
-    mobileToggleBg: "bg-slate-900",
-    mobileToggleBorder: "border-sky-800",
-    mobileToggleText: "text-sky-400",
-    mobileToggleHover: "hover:bg-slate-800",
-    mobileBottomBg: "bg-slate-900",
-    mobileBottomBorder: "border-sky-800",
-    mobileBottomDot: "bg-sky-400",
-    mobileBottomText: "text-slate-200",
+    sectionLabel: "text-emerald-700/70",
 
-    // Bottom mobile sheet
-    sheetBg: "bg-slate-950",
-    sheetBorder: "border-sky-900",
-    sheetTopBar: "from-sky-400 via-cyan-400",
-    titleColor: "text-sky-100",
-    emptyText: "text-sky-500/50",
+    sectionTitle: "text-emerald-950",
 
-    // Slide-in panel
-    slideBg: "bg-slate-950/95",
-    slideBorder: "border-sky-900",
-    slideTopBar: "from-sky-400 via-cyan-400",
-    linkActiveBg: "bg-sky-500/12",
-    linkActiveBorder: "border-sky-400/40",
-    linkActiveText: "text-sky-300",
-    linkIdleBorder: "border-white/8",
-    linkIdleText: "text-white/35",
-    linkHoverText: "hover:text-sky-200",
-    linkHoverBorder: "hover:border-sky-400/30",
-    linkHoverBg: "hover:bg-sky-500/8",
+    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
 
-    // Spinner
-    spinnerOuter: "border-t-sky-400",
-    spinnerInner: "border-t-cyan-500/60",
-    dotColor: "bg-sky-400",
-    textColor: "text-sky-500/60",
+    sectionCountBorder: "border-white/30",
 
-    // Report details panel
-    detailsBg: "bg-slate-900",
-    detailsCloseText: "text-slate-300",
-    detailsLabelColor: "text-slate-200",
-    detailsValueColor: "text-sky-400",
+    sectionCountDot: "bg-lime-400 shadow-[0_0_6px_rgba(163,230,53,0.8)]",
+
+    sectionCountText: "text-emerald-950",
+
+    sectionDivider: "border-emerald-300/40",
+
+    // ─── Cards ───────────────────────────────────────────
+    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
+
+    cardNormalBorder: "border-emerald-400/50",
+
+    cardNormalGlow: "shadow-[0_0_18px_rgba(16,185,129,0.14)]",
+
+    cardNormalDot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
+
+    cardNormalAccent: "from-emerald-500/15 to-transparent",
+
+    cardNormalPriority: "text-emerald-700",
+
+    cardEmergencyBorder: "border-red-400/60",
+
+    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
+
+    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
+
+    cardEmergencyAccent: "from-red-500/20 to-transparent",
+
+    cardEmergencyPriority: "text-red-500",
+
+    cardUrgentBorder: "border-yellow-400/60",
+
+    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
+
+    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
+
+    cardUrgentAccent: "from-yellow-400/20 to-transparent",
+
+    cardUrgentPriority: "text-yellow-600",
+
+    cardDateLabel: "text-emerald-900/60",
+
+    cardDateValue: "text-emerald-950",
+
+    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
+
+    cardStatusBorder: "border-white/20",
+
+    cardStatusText: "text-emerald-900",
+
+    // ─── Feedback badge ──────────────────────────────────
+    feedbackBadge: "bg-lime-300 text-emerald-950 shadow-lg",
+
+    // ─── Mobile toggle ───────────────────────────────────
+    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
+
+    mobileToggleBorder: "border-white/30",
+
+    mobileToggleText: "text-emerald-950",
+
+    mobileToggleHover: "hover:bg-white/40",
+
+    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
+
+    mobileBottomBorder: "border-white/30",
+
+    mobileBottomDot: "bg-lime-400",
+
+    mobileBottomText: "text-emerald-950",
+
+    // ─── Bottom sheet ────────────────────────────────────
+    sheetBg:
+      "bg-gradient-to-br from-emerald-100/95 to-lime-50/95 backdrop-blur-2xl",
+
+    sheetBorder: "border-white/30",
+
+    sheetTopBar: "from-emerald-400 via-lime-400",
+
+    titleColor: "text-emerald-950",
+
+    emptyText: "text-emerald-700/50",
+
+    // ─── Slide panel ─────────────────────────────────────
+    slideBg:
+      "bg-gradient-to-br from-emerald-100/95 to-lime-50/95 backdrop-blur-2xl",
+
+    slideBorder: "border-white/30",
+
+    slideTopBar: "from-emerald-400 via-lime-400",
+
+    linkActiveBg: "bg-white/35 backdrop-blur-xl",
+
+    linkActiveBorder: "border-white/40",
+
+    linkActiveText: "text-emerald-950",
+
+    linkIdleBorder: "border-white/10",
+
+    linkIdleText: "text-emerald-900/50",
+
+    linkHoverText: "hover:text-emerald-950",
+
+    linkHoverBorder: "hover:border-white/30",
+
+    linkHoverBg: "hover:bg-white/20",
+
+    // ─── Spinner ─────────────────────────────────────────
+    spinnerOuter: "border-t-emerald-500",
+
+    spinnerInner: "border-t-lime-400/70",
+
+    dotColor: "bg-lime-400",
+
+    textColor: "text-emerald-700/70",
+
+    // ─── Report details ──────────────────────────────────
+    detailsBg: "bg-gradient-to-br from-emerald-100 to-lime-50",
+
+    detailsCloseText: "text-emerald-950",
+
+    detailsLabelColor: "text-emerald-900",
+
+    detailsValueColor: "text-emerald-700",
   },
 
   estate: {
-    pageBg: "bg-blue-200",
-    sidebarBg: "bg-blue-950",
-    sidebarBorder: "border-blue-800/50",
-    contentBg: "bg-blue-950",
+    // ─── Page ─────────────────────────────────────────────
+    pageBg: "bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-100",
 
-    navBg: "bg-blue-950",
-    navBorder: "border-blue-800/60",
-    logoFrom: "from-blue-300",
-    logoTo: "to-yellow-300",
-    logoSub: "text-blue-500",
-    liveColor: "bg-yellow-400",
-    liveShadow: "shadow-[0_0_8px_2px_rgba(250,204,21,0.6)]",
-    liveText: "text-yellow-400",
-    linkActive: "text-yellow-300",
-    linkHover: "hover:text-yellow-200",
-    linkBar: "bg-yellow-400",
-    logoutBorder: "border-blue-800",
-    logoutText: "text-blue-400",
-    logoutHoverBorder: "hover:border-red-500/60",
-    logoutHoverText: "hover:text-red-400",
+    sidebarBg:
+      "bg-gradient-to-br from-sky-200/55 via-blue-100/45 to-cyan-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-sky-200/35",
+
+    sidebarBorder:
+      "border border-white/30 shadow-[0_8px_32px_rgba(14,165,233,0.18)]",
+
+    contentBg: "bg-transparent",
+
+    // ─── Navbar ──────────────────────────────────────────
+    navBg:
+      "bg-gradient-to-r from-sky-500/90 via-blue-500/85 to-cyan-400/80 backdrop-blur-2xl",
+
+    navBorder:
+      "border border-white/20 shadow-[0_8px_32px_rgba(14,165,233,0.18)]",
+
+    logoFrom: "from-sky-950",
+    logoTo: "to-cyan-500",
+    logoSub: "text-sky-950/60",
+
+    liveColor: "bg-cyan-300",
+
+    liveShadow: "shadow-[0_0_10px_2px_rgba(103,232,249,0.7)]",
+
+    liveText: "text-sky-950",
+
+    linkActive: "text-white",
+    linkHover: "hover:text-cyan-100",
+    linkBar: "bg-cyan-200",
+
+    logoutBorder: "border-white/20",
+    logoutText: "text-sky-950",
+
+    logoutHoverBorder: "hover:border-red-400/50",
+    logoutHoverText: "hover:text-red-500",
     logoutHoverBg: "hover:bg-red-500/5",
-    accent: "shadow-[0_1px_0_0_rgba(250,204,21,0.15)]",
-    glowLine: "via-yellow-400/20",
 
+    accent: "shadow-[0_1px_0_0_rgba(125,211,252,0.25)]",
+
+    glowLine: "via-sky-300/40",
+
+    // ─── Sidebar nav ─────────────────────────────────────
     sideNavActive:
-      "text-yellow-300 bg-yellow-500/10 border border-yellow-500/25",
+      "text-sky-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
+
     sideNavIdle:
-      "text-blue-400 hover:text-blue-100 hover:bg-blue-800/30 border border-transparent",
-    sideNavDotActive: "bg-yellow-400 shadow-[0_0_5px_rgba(250,204,21,0.8)]",
-    sideNavDotIdle: "bg-blue-800 group-hover:bg-blue-600",
-    sideNavLabel: "text-blue-500/60",
+      "text-sky-900/80 hover:text-sky-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
 
-    sectionAccentBar: "from-blue-400 to-yellow-400",
-    sectionLabel: "text-blue-400/70",
-    sectionTitle: "text-blue-400",
-    sectionCountBg: "bg-blue-900/60",
-    sectionCountBorder: "border-blue-700/50",
-    sectionCountDot: "bg-yellow-400 shadow-[0_0_4px_rgba(250,204,21,0.7)]",
-    sectionCountText: "text-blue-300",
-    sectionDivider: "border-blue-800/50",
+    sideNavDotActive: "bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.95)]",
 
-    cardBg: "bg-blue-900/60 backdrop-blur-sm",
+    sideNavDotIdle: "bg-sky-500/40 group-hover:bg-sky-500",
 
-    cardNormalBorder: "border-green-500",
-    cardNormalGlow: "shadow-[0_0_16px_rgba(59,130,246,0.15)]",
-    cardNormalDot: "bg-green-500 shadow-[0_0_6px_rgba(250,204,21,0.8)]",
-    cardNormalAccent: "from-blue-600/15 to-transparent",
-    cardNormalPriority: "text-green-500",
-    cardEmergencyBorder: "border-red-500/60",
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.25)]",
-    cardEmergencyDot: "bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.8)]",
+    sideNavLabel: "text-sky-950/50",
+
+    // ─── Section headers ─────────────────────────────────
+    sectionAccentBar: "from-sky-500 to-cyan-400",
+
+    sectionLabel: "text-sky-700/70",
+
+    sectionTitle: "text-sky-950",
+
+    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
+
+    sectionCountBorder: "border-white/30",
+
+    sectionCountDot: "bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.8)]",
+
+    sectionCountText: "text-sky-950",
+
+    sectionDivider: "border-sky-300/40",
+
+    // ─── Cards ───────────────────────────────────────────
+    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
+
+    cardNormalBorder: "border-green-400/50",
+
+    cardNormalGlow: "shadow-[0_0_18px_rgba(34,197,94,0.14)]",
+
+    cardNormalDot: "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]",
+
+    cardNormalAccent: "from-green-500/15 to-transparent",
+
+    cardNormalPriority: "text-green-700",
+
+    cardEmergencyBorder: "border-red-400/60",
+
+    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
+
+    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
+
     cardEmergencyAccent: "from-red-500/20 to-transparent",
-    cardEmergencyPriority: "text-red-400",
-    cardUrgentBorder: "border-yellow-500/50",
-    cardUrgentGlow: "shadow-[0_0_16px_rgba(234,179,8,0.2)]",
-    cardUrgentDot: "bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]",
-    cardUrgentAccent: "from-yellow-500/15 to-transparent",
-    cardUrgentPriority: "text-yellow-400",
-    cardDateLabel: "text-blue-400",
-    cardDateValue: "text-blue-200",
-    cardStatusBg: "bg-blue-900/80",
-    cardStatusBorder: "border-blue-700/50",
-    cardStatusText: "text-blue-300",
 
-    feedbackBadge: "bg-yellow-400 text-blue-950",
+    cardEmergencyPriority: "text-red-500",
 
-    mobileToggleBg: "bg-blue-900",
-    mobileToggleBorder: "border-blue-700",
-    mobileToggleText: "text-yellow-400",
-    mobileToggleHover: "hover:bg-blue-800",
-    mobileBottomBg: "bg-blue-900",
-    mobileBottomBorder: "border-blue-700",
-    mobileBottomDot: "bg-yellow-400",
-    mobileBottomText: "text-blue-100",
+    cardUrgentBorder: "border-yellow-400/60",
 
-    sheetBg: "bg-blue-950",
-    sheetBorder: "border-blue-800",
-    sheetTopBar: "from-blue-400 via-yellow-400",
-    titleColor: "text-blue-100",
-    emptyText: "text-blue-500/50",
+    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
 
-    slideBg: "bg-blue-950/95",
-    slideBorder: "border-blue-800",
-    slideTopBar: "from-blue-400 via-yellow-400",
-    linkActiveBg: "bg-yellow-500/10",
-    linkActiveBorder: "border-yellow-400/40",
-    linkActiveText: "text-yellow-300",
-    linkIdleBorder: "border-white/8",
-    linkIdleText: "text-white/30",
-    linkHoverText: "hover:text-yellow-200",
-    linkHoverBorder: "hover:border-yellow-400/30",
-    linkHoverBg: "hover:bg-yellow-500/6",
+    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
 
-    spinnerOuter: "border-t-blue-400",
-    spinnerInner: "border-t-yellow-400/60",
-    dotColor: "bg-yellow-400",
-    textColor: "text-blue-400/60",
+    cardUrgentAccent: "from-yellow-400/20 to-transparent",
 
-    detailsBg: "bg-blue-900",
-    detailsCloseText: "text-blue-200",
-    detailsLabelColor: "text-blue-100",
-    detailsValueColor: "text-yellow-400",
+    cardUrgentPriority: "text-yellow-600",
+
+    cardDateLabel: "text-sky-900/60",
+
+    cardDateValue: "text-sky-950",
+
+    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
+
+    cardStatusBorder: "border-white/20",
+
+    cardStatusText: "text-sky-900",
+
+    // ─── Feedback badge ──────────────────────────────────
+    feedbackBadge: "bg-cyan-300 text-sky-950 shadow-lg",
+
+    // ─── Mobile toggle ───────────────────────────────────
+    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
+
+    mobileToggleBorder: "border-white/30",
+
+    mobileToggleText: "text-sky-950",
+
+    mobileToggleHover: "hover:bg-white/40",
+
+    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
+
+    mobileBottomBorder: "border-white/30",
+
+    mobileBottomDot: "bg-cyan-300",
+
+    mobileBottomText: "text-sky-950",
+
+    // ─── Bottom sheet ────────────────────────────────────
+    sheetBg:
+      "bg-gradient-to-br from-sky-100/95 to-cyan-50/95 backdrop-blur-2xl",
+
+    sheetBorder: "border-white/30",
+
+    sheetTopBar: "from-sky-400 via-cyan-400",
+
+    titleColor: "text-sky-950",
+
+    emptyText: "text-sky-700/50",
+
+    // ─── Slide panel ─────────────────────────────────────
+    slideBg:
+      "bg-gradient-to-br from-sky-100/95 to-cyan-50/95 backdrop-blur-2xl",
+
+    slideBorder: "border-white/30",
+
+    slideTopBar: "from-sky-400 via-cyan-400",
+
+    linkActiveBg: "bg-white/35 backdrop-blur-xl",
+
+    linkActiveBorder: "border-white/40",
+
+    linkActiveText: "text-sky-950",
+
+    linkIdleBorder: "border-white/10",
+
+    linkIdleText: "text-sky-900/50",
+
+    linkHoverText: "hover:text-sky-950",
+
+    linkHoverBorder: "hover:border-white/30",
+
+    linkHoverBg: "hover:bg-white/20",
+
+    // ─── Spinner ─────────────────────────────────────────
+    spinnerOuter: "border-t-sky-500",
+
+    spinnerInner: "border-t-cyan-400/70",
+
+    dotColor: "bg-cyan-300",
+
+    textColor: "text-sky-700/70",
+
+    // ─── Report details ──────────────────────────────────
+    detailsBg: "bg-gradient-to-br from-sky-100 to-cyan-50",
+
+    detailsCloseText: "text-sky-950",
+
+    detailsLabelColor: "text-sky-900",
+
+    detailsValueColor: "text-sky-700",
   },
 
   worker: {
-    pageBg: "bg-violet-300",
-    sidebarBg: "bg-violet-950",
-    sidebarBorder: "border-violet-800/50",
-    contentBg: "bg-violet-950",
+    // ─── Page ─────────────────────────────────────────────
+    pageBg: "bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-100",
 
-    navBg: "bg-violet-950",
-    navBorder: "border-violet-800/60",
-    logoFrom: "from-violet-300",
-    logoTo: "to-rose-300",
-    logoSub: "text-violet-500",
-    liveColor: "bg-rose-400",
-    liveShadow: "shadow-[0_0_8px_2px_rgba(251,113,133,0.6)]",
-    liveText: "text-rose-400",
-    linkActive: "text-rose-300",
-    linkHover: "hover:text-rose-200",
-    linkBar: "bg-rose-400",
-    logoutBorder: "border-violet-800",
-    logoutText: "text-violet-400",
-    logoutHoverBorder: "hover:border-red-500/60",
-    logoutHoverText: "hover:text-red-400",
+    sidebarBg:
+      "bg-gradient-to-br from-amber-200/55 via-yellow-100/45 to-orange-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-amber-200/35",
+
+    sidebarBorder:
+      "border border-white/30 shadow-[0_8px_32px_rgba(245,158,11,0.18)]",
+
+    contentBg: "bg-transparent",
+
+    // ─── Navbar ──────────────────────────────────────────
+    navBg:
+      "bg-gradient-to-r from-amber-400/90 via-yellow-400/85 to-orange-300/80 backdrop-blur-2xl",
+
+    navBorder:
+      "border border-white/20 shadow-[0_8px_32px_rgba(245,158,11,0.18)]",
+
+    logoFrom: "from-amber-950",
+    logoTo: "to-orange-500",
+    logoSub: "text-amber-950/60",
+
+    liveColor: "bg-orange-300",
+
+    liveShadow: "shadow-[0_0_10px_2px_rgba(253,186,116,0.7)]",
+
+    liveText: "text-amber-950",
+
+    linkActive: "text-white",
+    linkHover: "hover:text-yellow-100",
+    linkBar: "bg-yellow-100",
+
+    logoutBorder: "border-white/20",
+    logoutText: "text-amber-950",
+
+    logoutHoverBorder: "hover:border-red-400/50",
+    logoutHoverText: "hover:text-red-500",
     logoutHoverBg: "hover:bg-red-500/5",
-    accent: "shadow-[0_1px_0_0_rgba(251,113,133,0.2)]",
-    glowLine: "via-rose-400/20",
 
-    sideNavActive: "text-rose-300 bg-rose-500/10 border border-rose-500/25",
+    accent: "shadow-[0_1px_0_0_rgba(253,224,71,0.25)]",
+
+    glowLine: "via-yellow-200/40",
+
+    // ─── Sidebar nav ─────────────────────────────────────
+    sideNavActive:
+      "text-amber-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
+
     sideNavIdle:
-      "text-violet-400 hover:text-violet-100 hover:bg-violet-800/30 border border-transparent",
-    sideNavDotActive: "bg-rose-400 shadow-[0_0_5px_rgba(251,113,133,0.8)]",
-    sideNavDotIdle: "bg-violet-800 group-hover:bg-violet-600",
-    sideNavLabel: "text-violet-500/60",
+      "text-amber-900/80 hover:text-amber-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
 
-    sectionAccentBar: "from-violet-400 to-rose-400",
-    sectionLabel: "text-violet-400/70",
-    sectionTitle: "text-violet-50",
-    sectionCountBg: "bg-violet-900/60",
-    sectionCountBorder: "border-violet-700/50",
-    sectionCountDot: "bg-rose-400 shadow-[0_0_4px_rgba(251,113,133,0.7)]",
-    sectionCountText: "text-violet-300",
-    sectionDivider: "border-violet-800/50",
+    sideNavDotActive: "bg-orange-300 shadow-[0_0_8px_rgba(253,186,116,0.95)]",
 
-    cardBg: "bg-violet-900/60 backdrop-blur-sm",
+    sideNavDotIdle: "bg-amber-500/40 group-hover:bg-amber-500",
 
+    sideNavLabel: "text-amber-950/50",
+
+    // ─── Section headers ─────────────────────────────────
+    sectionAccentBar: "from-amber-400 to-orange-300",
+
+    sectionLabel: "text-amber-700/70",
+
+    sectionTitle: "text-amber-950",
+
+    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
+
+    sectionCountBorder: "border-white/30",
+
+    sectionCountDot: "bg-orange-300 shadow-[0_0_6px_rgba(253,186,116,0.8)]",
+
+    sectionCountText: "text-amber-950",
+
+    sectionDivider: "border-amber-300/40",
+
+    // ─── Cards ───────────────────────────────────────────
+    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
+
+    // Routine / Normal
     normalTimeLeftBg: "bg-green-500",
-    cardNormalBorder: "border-green-500",
-    cardNormalGlow: "shadow-[0_0_16px_rgba(139,92,246,0.15)]",
-    cardNormalDot: "bg-green-500 shadow-[0_0_6px_rgba(251,113,133,0.8)]",
-    cardNormalAccent: "from-violet-600/15 to-transparent",
-    cardNormalPriority: "text-green-500",
-    cardEmergencyBorder: "border-red-500/60",
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.25)]",
-    cardEmergencyDot: "bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.8)]",
+
+    cardNormalBorder: "border-green-400/50",
+
+    cardNormalGlow: "shadow-[0_0_18px_rgba(34,197,94,0.14)]",
+
+    cardNormalDot: "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]",
+
+    cardNormalAccent: "from-green-500/15 to-transparent",
+
+    cardNormalPriority: "text-green-700",
+
+    // Emergency
+    cardEmergencyBorder: "border-red-400/60",
+
+    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
+
+    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
+
     cardEmergencyAccent: "from-red-500/20 to-transparent",
-    cardEmergencyPriority: "text-red-400",
-    cardUrgentBorder: "border-fuchsia-500/50",
-    cardUrgentGlow: "shadow-[0_0_16px_rgba(232,121,249,0.2)]",
-    cardUrgentDot: "bg-fuchsia-400 shadow-[0_0_6px_rgba(232,121,249,0.8)]",
-    cardUrgentAccent: "from-fuchsia-500/15 to-transparent",
-    cardUrgentPriority: "text-fuchsia-400",
-    cardDateLabel: "text-violet-400",
-    cardDateValue: "text-violet-200",
-    cardStatusBg: "bg-violet-900/80",
-    cardStatusBorder: "border-violet-700/50",
-    cardStatusText: "text-violet-300",
 
-    feedbackBadge: "bg-rose-400 text-violet-950",
+    cardEmergencyPriority: "text-red-500",
 
-    mobileToggleBg: "bg-violet-900",
-    mobileToggleBorder: "border-violet-700",
-    mobileToggleText: "text-rose-400",
-    mobileToggleHover: "hover:bg-violet-800",
-    mobileBottomBg: "bg-violet-900",
-    mobileBottomBorder: "border-violet-700",
-    mobileBottomDot: "bg-rose-400",
-    mobileBottomText: "text-violet-100",
+    // Urgent
+    cardUrgentBorder: "border-yellow-400/60",
 
-    sheetBg: "bg-violet-950",
-    sheetBorder: "border-violet-800",
-    sheetTopBar: "from-violet-400 via-rose-400",
-    titleColor: "text-violet-100",
-    emptyText: "text-violet-500/50",
+    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
 
-    slideBg: "bg-violet-950/95",
-    slideBorder: "border-violet-800",
-    slideTopBar: "from-violet-400 via-rose-400",
-    linkActiveBg: "bg-rose-500/10",
-    linkActiveBorder: "border-rose-400/40",
-    linkActiveText: "text-rose-300",
-    linkIdleBorder: "border-white/8",
-    linkIdleText: "text-white/30",
-    linkHoverText: "hover:text-rose-200",
-    linkHoverBorder: "hover:border-rose-400/30",
-    linkHoverBg: "hover:bg-rose-500/6",
+    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
 
-    spinnerOuter: "border-t-violet-400",
-    spinnerInner: "border-t-rose-400/60",
-    dotColor: "bg-rose-400",
-    textColor: "text-violet-400/60",
+    cardUrgentAccent: "from-yellow-400/20 to-transparent",
 
-    detailsBg: "bg-violet-900",
-    detailsCloseText: "text-violet-200",
-    detailsLabelColor: "text-violet-100",
-    detailsValueColor: "text-rose-400",
+    cardUrgentPriority: "text-yellow-600",
+
+    cardDateLabel: "text-amber-900/60",
+
+    cardDateValue: "text-amber-950",
+
+    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
+
+    cardStatusBorder: "border-white/20",
+
+    cardStatusText: "text-amber-900",
+
+    // ─── Feedback badge ──────────────────────────────────
+    feedbackBadge: "bg-orange-300 text-amber-950 shadow-lg",
+
+    // ─── Mobile toggle ───────────────────────────────────
+    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
+
+    mobileToggleBorder: "border-white/30",
+
+    mobileToggleText: "text-amber-950",
+
+    mobileToggleHover: "hover:bg-white/40",
+
+    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
+
+    mobileBottomBorder: "border-white/30",
+
+    mobileBottomDot: "bg-orange-300",
+
+    mobileBottomText: "text-amber-950",
+
+    // ─── Bottom sheet ────────────────────────────────────
+    sheetBg:
+      "bg-gradient-to-br from-amber-100/95 to-yellow-50/95 backdrop-blur-2xl",
+
+    sheetBorder: "border-white/30",
+
+    sheetTopBar: "from-amber-400 via-orange-300",
+
+    titleColor: "text-amber-950",
+
+    emptyText: "text-amber-700/50",
+
+    // ─── Slide panel ─────────────────────────────────────
+    slideBg:
+      "bg-gradient-to-br from-amber-100/95 to-yellow-50/95 backdrop-blur-2xl",
+
+    slideBorder: "border-white/30",
+
+    slideTopBar: "from-amber-400 via-orange-300",
+
+    linkActiveBg: "bg-white/35 backdrop-blur-xl",
+
+    linkActiveBorder: "border-white/40",
+
+    linkActiveText: "text-amber-950",
+
+    linkIdleBorder: "border-white/10",
+
+    linkIdleText: "text-amber-900/50",
+
+    linkHoverText: "hover:text-amber-950",
+
+    linkHoverBorder: "hover:border-white/30",
+
+    linkHoverBg: "hover:bg-white/20",
+
+    // ─── Spinner ─────────────────────────────────────────
+    spinnerOuter: "border-t-amber-500",
+
+    spinnerInner: "border-t-orange-300/70",
+
+    dotColor: "bg-orange-300",
+
+    textColor: "text-amber-700/70",
+
+    // ─── Report details ──────────────────────────────────
+    detailsBg: "bg-gradient-to-br from-amber-100 to-yellow-50",
+
+    detailsCloseText: "text-amber-950",
+
+    detailsLabelColor: "text-amber-900",
+
+    detailsValueColor: "text-amber-700",
   },
 };
 
@@ -675,11 +931,11 @@ export default function Home({
           {/* Overdue */}
           {report.overdue && (
             <div className="flex flex-col gap-1 bg-red-950/50 border border-red-800/40 rounded-xl px-3 py-2">
-              <span className="text-[10px] font-black text-red-400 tracking-widest uppercase flex items-center gap-1">
+              <span className="text-[10px] font-black text-red-500 tracking-widest uppercase flex items-center gap-1">
                 <span>⚠</span> Overdue
               </span>
               {report.dateDue && report.status !== "completed" && (
-                <span className="text-[10px] text-red-400/60 font-mono">
+                <span className="text-[10px] text-yellow-400/90 font-mono">
                   Due {timeAgo(report.dateDue)}
                 </span>
               )}
@@ -833,8 +1089,14 @@ export default function Home({
       <main className={`flex ${theme.pageBg} min-h-screen`}>
         {/* Sidebar */}
         <div
-          className={`w-full fixed inset-y-0 z-10 max-w-[20%] h-screen ${theme.sidebarBg} border-r ${theme.sidebarBorder} md:flex flex-col pt-28 px-6 gap-1.5 hidden`}
+          className={`w-full fixed inset-y-0 z-10 max-w-[20%] h-screen ${theme.sidebarBg} ${theme.sidebarBorder} md:flex flex-col pt-28 px-5 gap-2 hidden overflow-hidden`}
         >
+          {/* Glass glow effects */}
+          <div className="absolute top-0 left-0 w-40 h-40 bg-emerald-400/20 blur-3xl rounded-full pointer-events-none" />
+
+          <div className="absolute bottom-0 right-0 w-40 h-40 bg-lime-300/20 blur-3xl rounded-full pointer-events-none" />
+
+          <div className="absolute inset-0 bg-white/[0.06] backdrop-blur-2xl pointer-events-none" />
           <div
             className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent ${theme.glowLine} to-transparent`}
           />

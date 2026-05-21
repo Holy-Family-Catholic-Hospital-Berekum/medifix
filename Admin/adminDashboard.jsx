@@ -491,8 +491,8 @@ function GenIDModal({ role, onClose }) {
                     onClick={() => setGenType(type)}
                     className={`px-4 py-2 rounded-full capitalize text-sm font-medium border transition cursor-pointer ${
                       genType === type
-                        ? "bg-red-400 text-white border-red-400"
-                        : "bg-white text-gray-700 border-gray-300 hover:border-red-300"
+                        ? "bg-[#FF8825] text-white border-[#FF8825]"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-[#FF8825]"
                     }`}
                   >
                     {type}
@@ -512,7 +512,7 @@ function GenIDModal({ role, onClose }) {
                 type="button"
                 onClick={handleGenerate}
                 disabled={genLoading}
-                className={`flex-1 py-2 rounded-lg text-white font-medium transition cursor-pointer ${genLoading ? "bg-red-300 cursor-not-allowed" : "bg-red-400 hover:bg-red-500"}`}
+                className={`flex-1 py-2 rounded-lg text-white font-medium transition cursor-pointer ${genLoading ? "bg-[#FF8825] cursor-not-allowed" : "bg-[#FF8825] hover:bg-orange-500"}`}
               >
                 {genLoading ? "Generating..." : "Generate"}
               </button>
@@ -550,7 +550,7 @@ function GenIDModal({ role, onClose }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-2 rounded-lg bg-red-400 hover:bg-red-500 text-white font-medium transition cursor-pointer"
+                className="flex-1 py-2 rounded-lg bg-[#FF8825] hover:bg-orange-500 text-white font-medium transition cursor-pointer"
               >
                 Done
               </button>
@@ -970,30 +970,7 @@ export default function AdminDashboard({
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh" }} className="bg-blue-100">
-      <NavBar
-        homeRedirect="/adminHome"
-        dashboardRedirect="/adminDashboard"
-        theme={{
-          navBg: "bg-sky-600",
-          navBorder: "border-sky-900/60",
-          logoFrom: "from-sky-300",
-          logoTo: "to-blue-100",
-          logoSub: "text-slate-600",
-          liveColor: "bg-emerald-400",
-          liveShadow: "shadow-[0_0_8px_2px_rgba(52,211,153,0.6)]",
-          liveText: "text-blue-100",
-          linkActive: "text-sky-300",
-          linkHover: "hover:text-sky-200",
-          linkBar: "bg-sky-400",
-          logoutBorder: "border-sky-900",
-          logoutText: "text-slate-900",
-          logoutHoverBorder: "hover:border-red-500/60",
-          logoutHoverText: "hover:text-red-400",
-          logoutHoverBg: "hover:bg-red-500/5",
-          accent: "shadow-[0_1px_0_0_rgba(125,211,252,0.15)]",
-          glowLine: "via-sky-400/20",
-        }}
-      />
+      <NavBar homeRedirect="/adminHome" dashboardRedirect="/adminDashboard" />
 
       {showGenID && (
         <GenIDModal role={role} onClose={() => setShowGenID(false)} />
