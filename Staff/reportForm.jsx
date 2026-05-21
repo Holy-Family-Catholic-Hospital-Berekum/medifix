@@ -126,7 +126,7 @@ export default function ReportForm({ formPopup, onClose }) {
         // Status tracking
         status: "incoming",
         overdue: false,
-
+        cost: null,
         // Date fields
         dateSent: serverTimestamp(),
         dateReportDenied: null,

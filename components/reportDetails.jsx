@@ -1021,6 +1021,42 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
+
+      {/* ESTATE ACTIONS - Submit Actual Cost */}
+      {canUserSubmitCost(user, report) && (
+        <div className="bg-white rounded-lg p-5 space-y-3">
+          <h3 className="font-bold text-gray-800">
+            Estate Actions - Submit Actual Cost
+          </h3>
+          <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
+            Enter the actual cost of materials after procurement.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Actual Cost (₵)
+            </label>
+            <input
+              type="number"
+              placeholder="e.g. 450.00"
+              value={actualCost}
+              onChange={(e) => setActualCost(e.target.value)}
+              className="w-full p-2 border border-gray-400 rounded"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <button
+            onClick={handleSubmitCost}
+            disabled={loading}
+            className="bg-emerald-500 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded w-full"
+          >
+            {loading ? "Submitting..." : "Submit Cost"}
+          </button>
+        </div>
+      )}
+
+     
+
       {/* WORKER ACTIONS - Complete Work */}
       {canUserComplete(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
@@ -1087,42 +1123,7 @@ export default function ReportDetailsContainer({
     </div>
   );
 
-  {
-    /* ESTATE ACTIONS - Submit Actual Cost */
-  }
-  {
-    canUserSubmitCost(user, report) && (
-      <div className="bg-white rounded-lg p-5 space-y-3">
-        <h3 className="font-bold text-gray-800">
-          Estate Actions - Submit Actual Cost
-        </h3>
-        <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
-          Enter the actual cost of materials after procurement.
-        </p>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Actual Cost (₵)
-          </label>
-          <input
-            type="number"
-            placeholder="e.g. 450.00"
-            value={actualCost}
-            onChange={(e) => setActualCost(e.target.value)}
-            className="w-full p-2 border border-gray-400 rounded"
-            min="0"
-            step="0.01"
-          />
-        </div>
-        <button
-          onClick={handleSubmitCost}
-          disabled={loading}
-          className="bg-emerald-500 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded w-full"
-        >
-          {loading ? "Submitting..." : "Submit Cost"}
-        </button>
-      </div>
-    );
-  }
+  
 
   return (
     <div

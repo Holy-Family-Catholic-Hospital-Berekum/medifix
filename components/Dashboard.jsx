@@ -777,6 +777,48 @@ export default function Dashboard({
           (a.createdAt?.toDate?.() ?? new Date(0)),
       );
 
+    // ── Cost analytics ──────────────────────────────────────────────────────
+    const reportsWithCost = reports.filter(
+      (r) => r.cost != null && !isNaN(r.cost),
+    );
+    const totalCost = reportsWithCost.reduce((s, r) => s + r.cost, 0);
+    const avgCost = reportsWithCost.length
+      ? totalCost / reportsWithCost.length
+      : null;
+    const maxCost = reportsWithCost.length
+      ? Math.max(...reportsWithCost.map((r) => r.cost))
+      : null;
+
+    // Cost by category
+    const costByCategory = {};
+    reportsWithCost.forEach((r) => {
+      costByCategory[r.category] = (costByCategory[r.category] || 0) + r.cost;
+    });
+
+    // Monthly cost trend (last 6 months)
+    const costTrend = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const monthReports = reportsWithCost.filter((r) => {
+        const rd = r.dateSent?.toDate
+          ? r.dateSent.toDate()
+          : new Date(r.dateSent);
+        return (
+          rd.getFullYear() === d.getFullYear() && rd.getMonth() === d.getMonth()
+        );
+      });
+      return {
+        label: d.toLocaleString("default", { month: "short" }),
+        value: monthReports.reduce((s, r) => s + r.cost, 0),
+      };
+    });
+
+    // Cost by priority
+    const costByPriority = { emergency: 0, urgent: 0, routine: 0 };
+    reportsWithCost.forEach((r) => {
+      if (r.priorityLevel in costByPriority)
+        costByPriority[r.priorityLevel] += r.cost;
+    });
+
     return {
       total,
       completed,
@@ -797,6 +839,13 @@ export default function Dashboard({
       completionRate,
       avgResolutionDays,
       recentUsers,
+      reportsWithCost: reportsWithCost.length,
+      totalCost,
+      avgCost,
+      maxCost,
+      costByCategory,
+      costTrend,
+      costByPriority,
     };
   }, [reports, users]);
 
@@ -988,7 +1037,7 @@ export default function Dashboard({
               style={{
                 fontSize: 11,
                 fontWeight: 800,
-                color: "#ef4444",
+                color: "#FF8825",
                 letterSpacing: ".1em",
                 textTransform: "uppercase",
                 margin: "0 0 4px",
@@ -1010,7 +1059,7 @@ export default function Dashboard({
             {(isAdmin || isManager) && (
               <button
                 onClick={() => setShowGenID(true)}
-                className="bg-red-400 hover:bg-red-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                className="bg-[#FF8825] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
               >
                 + Generate Registration ID
               </button>
@@ -1302,6 +1351,222 @@ export default function Dashboard({
             <SectionTitle>Submissions last 6 months</SectionTitle>
             <Card style={{ padding: "18px 20px" }}>
               <BarChart data={stats.trend} color="#3b82f6" height={130} />
+            </Card>
+
+            <SectionTitle>Cost analytics</SectionTitle>
+            <div className="kpi-3" style={{ marginBottom: 20 }}>
+              <StatCard
+                label="Total Spend"
+                value={
+                  stats.totalCost
+                    ? `₵${stats.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "—"
+                }
+                icon="💰"
+                accent="#10b981"
+                sub={`${stats.reportsWithCost} reports with cost`}
+              />
+              <StatCard
+                label="Avg Cost / Job"
+                value={
+                  stats.avgCost
+                    ? `₵${stats.avgCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "—"
+                }
+                icon="📊"
+                accent="#3b82f6"
+                sub="Per completed job"
+              />
+              <StatCard
+                label="Highest Job"
+                value={
+                  stats.maxCost
+                    ? `₵${stats.maxCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "—"
+                }
+                icon="📈"
+                accent="#f97316"
+                sub="Single job cost"
+              />
+            </div>
+
+            <div className="two-col" style={{ marginBottom: 20 }}>
+              <Card style={{ padding: "18px 20px" }}>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: "#9ca3af",
+                    textTransform: "uppercase",
+                    letterSpacing: ".07em",
+                    margin: "0 0 16px",
+                  }}
+                >
+                  Monthly spend — last 6 months
+                </p>
+                {stats.costTrend.some((d) => d.value > 0) ? (
+                  <BarChart
+                    data={stats.costTrend.map((d) => ({
+                      label: d.label,
+                      value: Math.round(d.value),
+                    }))}
+                    color="#10b981"
+                    height={120}
+                  />
+                ) : (
+                  <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                    No cost data yet.
+                  </p>
+                )}
+              </Card>
+
+              <Card style={{ padding: "18px 20px" }}>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: "#9ca3af",
+                    textTransform: "uppercase",
+                    letterSpacing: ".07em",
+                    margin: "0 0 16px",
+                  }}
+                >
+                  Spend by category
+                </p>
+                {Object.keys(stats.costByCategory).length > 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}
+                  >
+                    {Object.entries(stats.costByCategory)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([cat, total], i) => {
+                        const pct = stats.totalCost
+                          ? Math.round((total / stats.totalCost) * 100)
+                          : 0;
+                        const c = CAT_COLORS[i % CAT_COLORS.length];
+                        return (
+                          <div key={cat}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginBottom: 4,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: "#374151",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {cat}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: "#64748b",
+                                  fontFamily: "monospace",
+                                }}
+                              >
+                                ₵
+                                {total.toLocaleString(undefined, {
+                                  maximumFractionDigits: 0,
+                                })}
+                                <span
+                                  style={{ color: "#9ca3af", marginLeft: 6 }}
+                                >
+                                  {pct}%
+                                </span>
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                height: 5,
+                                borderRadius: 999,
+                                background: "#f1f5f9",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  height: "100%",
+                                  borderRadius: 999,
+                                  width: `${pct}%`,
+                                  background: c,
+                                  transition: "width .5s ease",
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                    No cost data yet.
+                  </p>
+                )}
+              </Card>
+            </div>
+
+            <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#9ca3af",
+                  textTransform: "uppercase",
+                  letterSpacing: ".07em",
+                  margin: "0 0 16px",
+                }}
+              >
+                Spend by priority
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {Object.entries(stats.costByPriority).map(([k, v]) => {
+                  const m = PRIORITY_META[k];
+                  return (
+                    <div
+                      key={k}
+                      style={{
+                        flex: "1 1 120px",
+                        background: m.bg,
+                        borderRadius: 10,
+                        padding: "12px 16px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: m.text,
+                          textTransform: "uppercase",
+                          letterSpacing: ".06em",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {m.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 20,
+                          fontWeight: 800,
+                          color: m.text,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {v > 0
+                          ? `₵${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                          : "—"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </Card>
           </>
         )}
