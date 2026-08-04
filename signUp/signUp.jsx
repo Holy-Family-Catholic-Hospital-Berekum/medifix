@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   doc,
   getDoc,
@@ -11,6 +11,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   deleteUser,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { useNavigate } from "react-router";
 
@@ -266,6 +267,10 @@ const CSS = `
   }
 `;
 
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 30_000; // 30 seconds
+const STORAGE_KEY = "phix_login_attempts";
+
 export default function SignUp() {
   const [mode, setMode] = useState("login");
   const [step, setStep] = useState(0);
@@ -281,6 +286,43 @@ export default function SignUp() {
   const [closing, setClosing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState("");
+
+  // ── attempt-limiting state ───────────────────────────────────────────────────
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(null); // epoch ms
+  const [countdown, setCountdown] = useState(0); // seconds remaining
+
+  // Restore persisted lockout on mount
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (!saved) return;
+    if (saved.lockoutUntil && Date.now() < saved.lockoutUntil) {
+      setLoginAttempts(saved.attempts);
+      setLockoutUntil(saved.lockoutUntil);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
+
+  // Live countdown ticker
+  useEffect(() => {
+    if (!lockoutUntil) return;
+    const tick = () => {
+      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockoutUntil(null);
+        setLoginAttempts(0);
+        setCountdown(0);
+        localStorage.removeItem(STORAGE_KEY);
+      } else {
+        setCountdown(remaining);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [lockoutUntil]);
 
   const navigate = useNavigate();
 
@@ -453,12 +495,45 @@ export default function SignUp() {
   };
 
   // ── login ────────────────────────────────────────────────────────────────────
+  const handleForgotPassword = async () => {
+    const emailToReset = loginId.trim();
+    if (!emailToReset) {
+      alert("Enter your email address first, then click Forgot Password.");
+      return;
+    }
+    if (loading) return;
+
+    setLoading(true);
+    setResetFeedback("");
+
+    try {
+      await sendPasswordResetEmail(auth, emailToReset);
+      setResetFeedback(
+        "If that account exists, a secure password reset link has been sent to your email.",
+      );
+      setLoginPassword("");
+    } catch (error) {
+      console.error("Password reset email failed:", error);
+      if (error.code === "auth/invalid-email") {
+        alert("Please enter a valid email address.");
+      } else {
+        alert(
+          "Unable to send reset instructions right now. Please try again later.",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginId.trim() || !loginPassword.trim()) {
       alert("Please fill in both email and password.");
       return;
     }
+    // Block if locked out
+    if (lockoutUntil && Date.now() < lockoutUntil) return;
     if (loading) return;
     setLoading(true);
     try {
@@ -482,6 +557,11 @@ export default function SignUp() {
         );
         return;
       }
+      // ✅ Success — clear attempt counter
+      setLoginAttempts(0);
+      setLockoutUntil(null);
+      localStorage.removeItem(STORAGE_KEY);
+
       localStorage.setItem(
         "user",
         JSON.stringify({ data: userData, timestamp: Date.now() }),
@@ -498,19 +578,39 @@ export default function SignUp() {
       setTimeout(() => navigate(routes[userData.role] || "/"), 300);
     } catch (error) {
       console.error("Login failed:", error);
-      if (
-        [
-          "auth/wrong-password",
-          "auth/user-not-found",
-          "auth/invalid-credential",
-        ].includes(error.code)
-      )
-        alert("Invalid email or password. Please try again.");
-      else alert("Unable to log in. Please try again later.");
+      const next = loginAttempts + 1;
+      setLoginAttempts(next);
+
+      if (next >= MAX_ATTEMPTS) {
+        // Trigger lockout
+        const until = Date.now() + LOCKOUT_MS;
+        setLockoutUntil(until);
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ attempts: next, lockoutUntil: until }),
+        );
+        alert(
+          "Too many failed attempts. Please wait 30 seconds before trying again.",
+        );
+      } else {
+        const left = MAX_ATTEMPTS - next;
+        const attemptsMsg = `${left} attempt${left !== 1 ? "s" : ""} remaining.`;
+        if (
+          [
+            "auth/wrong-password",
+            "auth/user-not-found",
+            "auth/invalid-credential",
+          ].includes(error.code)
+        )
+          alert(`Invalid email or password. ${attemptsMsg}`);
+        else alert("Unable to log in. Please try again later.");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const isLockedOut = !!lockoutUntil && Date.now() < lockoutUntil;
 
   // ── render ───────────────────────────────────────────────────────────────────
   return (
@@ -690,6 +790,7 @@ export default function SignUp() {
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
                     placeholder="you@example.com"
+                    disabled={isLockedOut}
                   />
                 </div>
 
@@ -706,6 +807,7 @@ export default function SignUp() {
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       placeholder="Your password"
+                      disabled={isLockedOut}
                     />
                     <span
                       className="material-symbols-outlined phix-eye"
@@ -719,12 +821,56 @@ export default function SignUp() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isLockedOut}
                 className="phix-btn-primary"
-                style={{ marginBottom: 24 }}
+                style={{ marginBottom: 12 }}
               >
-                {loading ? "Signing in…" : "Sign In"}
+                {isLockedOut
+                  ? `Try again in ${countdown}s`
+                  : loading
+                    ? "Signing in…"
+                    : "Sign In"}
               </button>
+
+              <button
+                type="button"
+                disabled={loading || isLockedOut}
+                className="phix-btn-ghost"
+                style={{ width: "100%", marginBottom: 12 }}
+                onClick={handleForgotPassword}
+              >
+                Forgot Password?
+              </button>
+
+              {resetFeedback && (
+                <p
+                  style={{
+                    color: "rgba(255,255,255,.9)",
+                    fontSize: 12,
+                    textAlign: "center",
+                    margin: "0 0 12px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {resetFeedback}
+                </p>
+              )}
+
+              {/* Attempts remaining hint */}
+              {loginAttempts > 0 && !isLockedOut && (
+                <p
+                  style={{
+                    color: "rgba(255,255,255,.65)",
+                    fontSize: 12,
+                    textAlign: "center",
+                    margin: "0 0 12px",
+                  }}
+                >
+                  {MAX_ATTEMPTS - loginAttempts} attempt
+                  {MAX_ATTEMPTS - loginAttempts !== 1 ? "s" : ""} remaining
+                  before lockout
+                </p>
+              )}
 
               <div className="phix-divider" />
               <p className="phix-footer-text" style={{ marginTop: 16 }}>

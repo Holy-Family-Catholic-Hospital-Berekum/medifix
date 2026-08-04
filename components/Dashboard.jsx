@@ -8,8 +8,11 @@ import {
   deleteDoc,
   setDoc,
 } from "firebase/firestore";
-import { db } from "../src/firebase";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth, db } from "../src/firebase";
 import NavBar from "./navBar";
+import { THEMES } from "./Home";
+import { generateDashboardStatsPDF } from "../src/utils";
 
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -101,7 +104,6 @@ const CAT_COLORS = [
   "#8b5cf6",
   "#ec4899",
 ];
-
 const ALLOWED_ROLES = ["admin", "manager", "estate"];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -447,7 +449,7 @@ function GenIDModal({ role, onClose }) {
   const allowedTypes =
     role === "admin"
       ? ["manager", "estate", "staff", "worker"]
-      : ["estate", "staff", "worker"]; // manager
+      : ["estate", "staff", "worker"];
 
   const [genType, setGenType] = useState(allowedTypes[0]);
   const [genLoading, setGenLoading] = useState(false);
@@ -489,11 +491,7 @@ function GenIDModal({ role, onClose }) {
                     key={type}
                     type="button"
                     onClick={() => setGenType(type)}
-                    className={`px-4 py-2 rounded-full capitalize text-sm font-medium border transition cursor-pointer ${
-                      genType === type
-                        ? "bg-[#F8934C] text-white border-[#F8934C]"
-                        : "bg-white text-gray-700 border-gray-300 hover:border-[#F8934C]"
-                    }`}
+                    className={`px-4 py-2 rounded-full capitalize text-sm font-medium border transition cursor-pointer ${genType === type ? "bg-[#F8934C] text-white border-[#F8934C]" : "bg-white text-gray-700 border-gray-300 hover:border-[#F8934C]"}`}
                   >
                     {type}
                   </button>
@@ -562,7 +560,194 @@ function GenIDModal({ role, onClose }) {
   );
 }
 
-// ─── Access Denied screen ────────────────────────────────────────────────────
+// ─── Reset Password modal ─────────────────────────────────────────────────────
+// Admin / IT Manager can send a secure Firebase password-reset email to a user.
+// This uses Firebase Auth's built-in reset-link flow and does not require any
+// paid Cloud Functions endpoint or backend deployment.
+
+function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleReset = async () => {
+    if (!targetUser?.email || loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      await sendPasswordResetEmail(auth, targetUser.email);
+      onSuccess(targetUser.name);
+    } catch (err) {
+      console.error("Password reset failed:", err);
+      setError(
+        err?.message ??
+          "Failed to send password reset instructions. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,.5)",
+        zIndex: 1100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <Card style={{ padding: 28, maxWidth: 420, width: "100%" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            marginBottom: 18,
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 800,
+                color: "#0f172a",
+                margin: "0 0 4px",
+              }}
+            >
+              Reset Password
+            </h2>
+            <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+              Send a secure password reset link to{" "}
+              <strong style={{ color: "#0f172a" }}>{targetUser.name}</strong>.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 20,
+              color: "#94a3b8",
+              lineHeight: 1,
+              padding: "0 0 0 12px",
+              flexShrink: 0,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div
+          style={{
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            borderRadius: 10,
+            padding: "10px 14px",
+            marginBottom: 18,
+            fontSize: 12,
+            color: "#1e40af",
+            lineHeight: 1.6,
+          }}
+        >
+          <strong>How it works:</strong> The system sends a one-time password
+          reset link to the user’s registered email address. They open the link
+          and choose a new password securely.
+        </div>
+
+        <div
+          style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            padding: "12px 14px",
+            marginBottom: 16,
+            fontSize: 13,
+            color: "#0f172a",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>
+            Recipient email
+          </div>
+          <div>{targetUser.email || "No email on record"}</div>
+        </div>
+
+        {error && (
+          <div
+            style={{
+              background: "#fee2e2",
+              border: "1px solid #fca5a5",
+              borderRadius: 8,
+              padding: "8px 12px",
+              marginBottom: 16,
+              fontSize: 12,
+              color: "#991b1b",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            style={{
+              flex: 1,
+              padding: "10px 0",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#fff",
+              color: "#374151",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={loading}
+            style={{
+              flex: 2,
+              padding: "10px 0",
+              borderRadius: 10,
+              border: "none",
+              background: loading ? "#fed7aa" : "#f97316",
+              color: "#fff",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: 13,
+              fontWeight: 700,
+              transition: "background .2s",
+            }}
+          >
+            {loading ? "Sending…" : "Send Reset Link"}
+          </button>
+        </div>
+
+        <p
+          style={{
+            fontSize: 11,
+            color: "#94a3b8",
+            marginTop: 14,
+            textAlign: "center",
+            lineHeight: 1.5,
+          }}
+        >
+          This uses Firebase Auth secure email reset links and does not require
+          a paid function deployment.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Access Denied screen ─────────────────────────────────────────────────────
 function AccessDenied({ role }) {
   return (
     <div
@@ -590,7 +775,6 @@ function AccessDenied({ role }) {
         <p style={{ color: "#64748b", fontSize: 14, marginBottom: 8 }}>
           You don't have permission to view this page.
         </p>
-        {/* Debug helper — remove before production if desired */}
         {role && (
           <p style={{ color: "#94a3b8", fontSize: 12 }}>
             Your role:{" "}
@@ -611,15 +795,12 @@ function AccessDenied({ role }) {
 }
 
 // ─── main component ───────────────────────────────────────────────────────────
-// IMPORTANT: ALL hooks must be called unconditionally before any early return.
-// Moving the access guard after hooks fixes the React rules-of-hooks violation
-// that caused managers to see "Access Denied" despite having the correct role.
 export default function Dashboard({
   navBarColor,
   homeRedirect,
   dashboardRedirect,
 }) {
-  // ── state — ALL hooks first, no early returns before this block ──────────
+  // ── all hooks first — no early returns before this block ─────────────────
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -629,9 +810,13 @@ export default function Dashboard({
   const [userFilter, setUserFilter] = useState("all");
   const [userSearch, setUserSearch] = useState("");
   const [showGenID, setShowGenID] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [downloadPeriod, setDownloadPeriod] = useState("month");
 
-  // ── read user from localStorage — done once outside effects ─────────────
-  // Safe parse: handles null / malformed JSON gracefully.
+  // ── password reset modal state ────────────────────────────────────────────
+  const [resetTarget, setResetTarget] = useState(null); // user object or null
+
+  // ── read user from localStorage ───────────────────────────────────────────
   const stored = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem("user") ?? "null");
@@ -646,8 +831,28 @@ export default function Dashboard({
   const isManager = role === "manager";
   const isEstate = role === "estate";
   const hasAccess = ALLOWED_ROLES.includes(role);
+  const canDownloadDashboardPDF = ["admin", "manager", "estate"].includes(role);
+  const roleTheme = THEMES[role] || {};
+  const resolvedHomeRedirect =
+    homeRedirect ||
+    (role === "admin"
+      ? "/adminHome"
+      : role === "estate"
+        ? "/estateHome"
+        : role === "manager"
+          ? "/manager"
+          : "/Home");
+  const resolvedDashboardRedirect =
+    dashboardRedirect ||
+    (role === "admin"
+      ? "/adminDashboard"
+      : role === "estate"
+        ? "/estateDashboard"
+        : role === "manager"
+          ? "/manager"
+          : "/");
 
-  // ── Firestore subscriptions — always called, but skip work if no access ──
+  // ── Firestore subscriptions ───────────────────────────────────────────────
   useEffect(() => {
     if (!hasAccess) return;
     const unsub = onSnapshot(
@@ -671,7 +876,7 @@ export default function Dashboard({
     return unsub;
   }, [hasAccess]);
 
-  // ── derived stats — always computed, safe when arrays are empty ──────────
+  // ── derived stats ─────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const total = reports.length;
     const completed = reports.filter((r) => r.status === "completed").length;
@@ -700,6 +905,46 @@ export default function Dashboard({
     });
 
     const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextYearStart = new Date(now.getFullYear() + 1, 0, 1);
+
+    const monthReports = reports.filter((r) => {
+      const sent = r.dateSent?.toDate
+        ? r.dateSent.toDate()
+        : new Date(r.dateSent);
+      if (Number.isNaN(sent.getTime())) return false;
+      return sent >= monthStart && sent < nextMonthStart;
+    });
+
+    const yearReports = reports.filter((r) => {
+      const sent = r.dateSent?.toDate
+        ? r.dateSent.toDate()
+        : new Date(r.dateSent);
+      if (Number.isNaN(sent.getTime())) return false;
+      return sent >= yearStart && sent < nextYearStart;
+    });
+
+    const monthCompleted = monthReports.filter(
+      (r) => r.status === "completed",
+    ).length;
+    const monthOverdue = monthReports.filter(
+      (r) => r.overdue && r.status !== "completed",
+    ).length;
+    const monthActive = monthReports.filter(
+      (r) => !["completed", "denied"].includes(r.status),
+    ).length;
+    const yearCompleted = yearReports.filter(
+      (r) => r.status === "completed",
+    ).length;
+    const yearOverdue = yearReports.filter(
+      (r) => r.overdue && r.status !== "completed",
+    ).length;
+    const yearActive = yearReports.filter(
+      (r) => !["completed", "denied"].includes(r.status),
+    ).length;
+
     const trend = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       return {
@@ -708,6 +953,7 @@ export default function Dashboard({
           const rd = r.dateSent?.toDate
             ? r.dateSent.toDate()
             : new Date(r.dateSent);
+          if (Number.isNaN(rd.getTime())) return false;
           return (
             rd.getFullYear() === d.getFullYear() &&
             rd.getMonth() === d.getMonth()
@@ -748,20 +994,22 @@ export default function Dashboard({
     const deactivatedCount = users.filter((u) => u.deactivated).length;
     const completionRate = total ? Math.round((completed / total) * 100) : 0;
 
-    const avgResolutionDays = (() => {
-      const resolved = reports.filter((r) => r.dateCompleted && r.dateSent);
+    const getResolutionAverage = (subset) => {
+      const resolved = subset.filter((r) => r.dateCompleted && r.dateSent);
       if (!resolved.length) return null;
-      const t = resolved.reduce((s, r) => {
+      const totalDays = resolved.reduce((sum, r) => {
         const sent = r.dateSent?.toDate
           ? r.dateSent.toDate()
           : new Date(r.dateSent);
         const done = r.dateCompleted?.toDate
           ? r.dateCompleted.toDate()
           : new Date(r.dateCompleted);
-        return s + (done - sent) / 86400000;
+        return sum + (done - sent) / 86400000;
       }, 0);
-      return (t / resolved.length).toFixed(1);
-    })();
+      return (totalDays / resolved.length).toFixed(1);
+    };
+
+    const avgResolutionDays = getResolutionAverage(reports);
 
     const weekAgo = Date.now() - 7 * 86400000;
     const recentUsers = [...users]
@@ -777,7 +1025,6 @@ export default function Dashboard({
           (a.createdAt?.toDate?.() ?? new Date(0)),
       );
 
-    // ── Cost analytics ──────────────────────────────────────────────────────
     const reportsWithCost = reports.filter(
       (r) => r.cost != null && !isNaN(r.cost),
     );
@@ -789,13 +1036,11 @@ export default function Dashboard({
       ? Math.max(...reportsWithCost.map((r) => r.cost))
       : null;
 
-    // Cost by category
     const costByCategory = {};
     reportsWithCost.forEach((r) => {
       costByCategory[r.category] = (costByCategory[r.category] || 0) + r.cost;
     });
 
-    // Monthly cost trend (last 6 months)
     const costTrend = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       const monthReports = reportsWithCost.filter((r) => {
@@ -812,7 +1057,6 @@ export default function Dashboard({
       };
     });
 
-    // Cost by priority
     const costByPriority = { emergency: 0, urgent: 0, routine: 0 };
     reportsWithCost.forEach((r) => {
       if (r.priorityLevel in costByPriority)
@@ -846,6 +1090,20 @@ export default function Dashboard({
       costByCategory,
       costTrend,
       costByPriority,
+      monthStats: {
+        total: monthReports.length,
+        completed: monthCompleted,
+        overdue: monthOverdue,
+        active: monthActive,
+        avgResolutionDays: getResolutionAverage(monthReports),
+      },
+      yearStats: {
+        total: yearReports.length,
+        completed: yearCompleted,
+        overdue: yearOverdue,
+        active: yearActive,
+        avgResolutionDays: getResolutionAverage(yearReports),
+      },
     };
   }, [reports, users]);
 
@@ -866,10 +1124,20 @@ export default function Dashboard({
       );
   }, [users, userFilter, userSearch, isManager]);
 
-  // ── toast helper ─────────────────────────────────────────────────────────
+  // ── toast helper ──────────────────────────────────────────────────────────
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3200);
+  };
+
+  const handleDownloadDashboardPDF = (period = downloadPeriod) => {
+    generateDashboardStatsPDF(
+      stats,
+      role?.toUpperCase?.() || role,
+      user?.name || "User",
+      period,
+    );
+    setShowDownloadMenu(false);
   };
 
   // ── user action helpers ───────────────────────────────────────────────────
@@ -923,16 +1191,14 @@ export default function Dashboard({
   const tabs = (() => {
     if (isAdmin) return ["overview", "reports", "workers", "activity", "users"];
     if (isManager) return ["overview", "workers", "activity", "users"];
-    return ["overview", "reports", "workers", "activity"]; // estate
+    return ["overview", "reports", "workers", "activity"];
   })();
 
   const filterRoles = isAdmin
     ? ["all", "admin", "manager", "estate", "staff", "worker"]
     : ["all", "manager", "estate", "staff", "worker"];
 
-  // ── NOW it is safe to do early returns (all hooks are done) ──────────────
-
-  // Access guard — rendered AFTER all hooks.
+  // ── access guard — after all hooks ────────────────────────────────────────
   if (!hasAccess) return <AccessDenied role={role} />;
 
   if (loading)
@@ -973,7 +1239,25 @@ export default function Dashboard({
         <GenIDModal role={role} onClose={() => setShowGenID(false)} />
       )}
 
-      <NavBar />
+      {/* Password Reset Modal */}
+      {resetTarget && (
+        <ResetPasswordModal
+          targetUser={resetTarget}
+          onClose={() => setResetTarget(null)}
+          onSuccess={(name) => {
+            setResetTarget(null);
+            showToast(
+              `Password reset for ${name}. They'll be prompted to set a new one on next login.`,
+            );
+          }}
+        />
+      )}
+
+      <NavBar
+        homeRedirect={resolvedHomeRedirect}
+        dashboardRedirect={resolvedDashboardRedirect}
+        theme={roleTheme}
+      />
 
       {toast && (
         <div
@@ -986,7 +1270,7 @@ export default function Dashboard({
             color: "#fff",
             padding: "12px 20px",
             borderRadius: 10,
-            maxWidth: 300,
+            maxWidth: 340,
             fontSize: 13,
             fontWeight: 500,
             boxShadow: "0 4px 24px rgba(0,0,0,.18)",
@@ -1020,7 +1304,7 @@ export default function Dashboard({
       <div
         style={{ maxWidth: 1120, margin: "0 auto", padding: "88px 16px 64px" }}
       >
-        {/* ── header ────────────────────────────────────────────────── */}
+        {/* ── header ───────────────────────────────────────────────── */}
         <div
           style={{
             marginBottom: 24,
@@ -1056,14 +1340,86 @@ export default function Dashboard({
             >
               Welcome back, {user?.name?.split(" ")[0]} 👋
             </h1>
-            {(isAdmin || isManager) && (
-              <button
-                onClick={() => setShowGenID(true)}
-                className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
-              >
-                + Generate Registration ID
-              </button>
-            )}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(isAdmin || isManager) && (
+                <button
+                  onClick={() => setShowGenID(true)}
+                  className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                >
+                  + Generate Registration ID
+                </button>
+              )}
+              {canDownloadDashboardPDF && (
+                <div style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDownloadMenu((prev) => !prev)}
+                    className="bg-slate-900 hover:bg-slate-700 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                  >
+                    Download Dashboard PDF
+                  </button>
+
+                  {showDownloadMenu && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 8px)",
+                        left: 0,
+                        background: "#fff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 12,
+                        padding: 12,
+                        boxShadow: "0 10px 30px rgba(15,23,42,.12)",
+                        width: 250,
+                        zIndex: 20,
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#64748b",
+                          marginBottom: 8,
+                          textTransform: "uppercase",
+                          letterSpacing: ".06em",
+                        }}
+                      >
+                        Report period
+                      </label>
+                      <select
+                        value={downloadPeriod}
+                        onChange={(e) => setDownloadPeriod(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: "1px solid #cbd5e1",
+                          outline: "none",
+                          fontSize: 13,
+                          marginBottom: 10,
+                          background: "#f8fafc",
+                        }}
+                      >
+                        <option value="month">Current month</option>
+                        <option value="year">Current year</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDownloadDashboardPDF(downloadPeriod)
+                        }
+                        className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm w-full"
+                      >
+                        Download{" "}
+                        {downloadPeriod === "month" ? "Monthly" : "Yearly"}{" "}
+                        Report
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <span style={{ fontSize: 12, color: "#94a3b8" }}>
             {new Date().toLocaleDateString("en-GB", {
@@ -1419,7 +1775,6 @@ export default function Dashboard({
                   </p>
                 )}
               </Card>
-
               <Card style={{ padding: "18px 20px" }}>
                 <p
                   style={{
@@ -1571,7 +1926,7 @@ export default function Dashboard({
           </>
         )}
 
-        {/* ══════════════════ REPORTS (admin + estate only) ══════════════════ */}
+        {/* ══════════════════ REPORTS ══════════════════ */}
         {activeTab === "reports" && (isAdmin || isEstate) && (
           <>
             <SectionTitle>All reports ({reports.length})</SectionTitle>
@@ -1993,7 +2348,7 @@ export default function Dashboard({
           </>
         )}
 
-        {/* ══════════════════ USERS (admin + manager only) ══════════════════ */}
+        {/* ══════════════════ USERS ══════════════════ */}
         {activeTab === "users" && (isAdmin || isManager) && (
           <>
             <SectionTitle>User summary</SectionTitle>
@@ -2208,6 +2563,7 @@ export default function Dashboard({
                       key={u.id}
                       style={{ borderBottom: "1px solid #f1f5f9" }}
                     >
+                      {/* Name */}
                       <td style={{ padding: "11px 14px", background: rowBg }}>
                         <div
                           style={{
@@ -2259,6 +2615,7 @@ export default function Dashboard({
                           </span>
                         </div>
                       </td>
+                      {/* Role */}
                       <td style={{ padding: "11px 14px", background: rowBg }}>
                         {rm ? (
                           <Badge bg={rm.bg} text={rm.text}>
@@ -2268,6 +2625,7 @@ export default function Dashboard({
                           u.role
                         )}
                       </td>
+                      {/* Email */}
                       <td
                         style={{
                           padding: "11px 14px",
@@ -2281,6 +2639,7 @@ export default function Dashboard({
                       >
                         {u.email ?? "—"}
                       </td>
+                      {/* Phone */}
                       <td
                         style={{
                           padding: "11px 14px",
@@ -2291,6 +2650,7 @@ export default function Dashboard({
                       >
                         {u.phoneNumber ?? "—"}
                       </td>
+                      {/* Joined */}
                       <td
                         style={{
                           padding: "11px 14px",
@@ -2301,8 +2661,13 @@ export default function Dashboard({
                       >
                         {formatDate(u.createdAt)}
                       </td>
+                      {/* Status */}
                       <td style={{ padding: "11px 14px", background: rowBg }}>
-                        {u.deactivated ? (
+                        {u.requiresPasswordChange ? (
+                          <Badge bg="#fef3c7" text="#92400e">
+                            🔑 Pw Reset
+                          </Badge>
+                        ) : u.deactivated ? (
                           <Badge bg="#f1f5f9" text="#94a3b8">
                             🚫 Deactivated
                           </Badge>
@@ -2312,9 +2677,17 @@ export default function Dashboard({
                           </Badge>
                         )}
                       </td>
+                      {/* Actions */}
                       <td style={{ padding: "11px 14px", background: rowBg }}>
                         {canAct ? (
-                          <div style={{ display: "flex", gap: 6 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 5,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {/* Deactivate / Reactivate */}
                             <button
                               className="act-btn"
                               onClick={() => toggleDeactivate(u)}
@@ -2333,6 +2706,28 @@ export default function Dashboard({
                             >
                               {u.deactivated ? "Reactivate" : "Deactivate"}
                             </button>
+
+                            {/* Reset Password — admin and IT manager */}
+                            {canActOnUser(u) && (
+                              <button
+                                className="act-btn"
+                                onClick={() => setResetTarget(u)}
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  border: "1px solid #fed7aa",
+                                  background: "#fed7aa",
+                                  color: "#9a3412",
+                                }}
+                              >
+                                Reset Pw
+                              </button>
+                            )}
+
+                            {/* Delete */}
                             <button
                               className="act-btn"
                               onClick={() => deleteUserDoc(u)}
@@ -2405,3 +2800,46 @@ export default function Dashboard({
     </div>
   );
 }
+
+/*
+────────────────────────────────────────────────────────────────────────────────
+CLOUD FUNCTION — deploy this to Firebase Functions (functions/index.js)
+────────────────────────────────────────────────────────────────────────────────
+
+const { onRequest } = require("firebase-functions/v2/https");
+const admin = require("firebase-admin");
+const cors  = require("cors")({ origin: true });
+
+admin.initializeApp();
+
+exports.adminResetPassword = onRequest((req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+    const { uid, tempPassword } = req.body ?? {};
+    if (!uid || !tempPassword) return res.status(400).json({ error: "uid and tempPassword are required" });
+    if (tempPassword.length < 6)  return res.status(400).json({ error: "Password must be at least 6 characters" });
+
+    try {
+      // Optional: verify the caller is an admin by checking their ID token
+      // const token = req.headers.authorization?.split("Bearer ")[1];
+      // const decoded = await admin.auth().verifyIdToken(token);
+      // const callerDoc = await admin.firestore().collection("users").doc(decoded.uid).get();
+      // if (!["admin","manager"].includes(callerDoc.data()?.role)) return res.status(403).json({ error: "Forbidden" });
+
+      await admin.auth().updateUser(uid, { password: tempPassword });
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("adminResetPassword error:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+});
+
+Deploy with:
+  firebase deploy --only functions:adminResetPassword
+
+Then set in your .env:
+  VITE_ADMIN_RESET_FN_URL=https://<region>-<project>.cloudfunctions.net/adminResetPassword
+────────────────────────────────────────────────────────────────────────────────
+*/

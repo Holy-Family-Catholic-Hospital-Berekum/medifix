@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 import NavBar from "../components/navBar";
+import { generateDashboardStatsPDF } from "../src/utils";
 
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -642,6 +643,7 @@ export default function EstateDashboard() {
   const isManager = role === "manager";
   const isEstate = role === "estate";
   const hasAccess = ALLOWED_ROLES.includes(role);
+  const canDownloadDashboardPDF = ["admin", "manager", "estate"].includes(role);
 
   // ── Firestore subscriptions — always called, but skip work if no access ──
   useEffect(() => {
@@ -696,6 +698,46 @@ export default function EstateDashboard() {
     });
 
     const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextYearStart = new Date(now.getFullYear() + 1, 0, 1);
+
+    const monthReports = reports.filter((r) => {
+      const sent = r.dateSent?.toDate
+        ? r.dateSent.toDate()
+        : new Date(r.dateSent);
+      if (Number.isNaN(sent.getTime())) return false;
+      return sent >= monthStart && sent < nextMonthStart;
+    });
+
+    const yearReports = reports.filter((r) => {
+      const sent = r.dateSent?.toDate
+        ? r.dateSent.toDate()
+        : new Date(r.dateSent);
+      if (Number.isNaN(sent.getTime())) return false;
+      return sent >= yearStart && sent < nextYearStart;
+    });
+
+    const monthCompleted = monthReports.filter(
+      (r) => r.status === "completed",
+    ).length;
+    const monthOverdue = monthReports.filter(
+      (r) => r.overdue && r.status !== "completed",
+    ).length;
+    const monthActive = monthReports.filter(
+      (r) => !["completed", "denied"].includes(r.status),
+    ).length;
+    const yearCompleted = yearReports.filter(
+      (r) => r.status === "completed",
+    ).length;
+    const yearOverdue = yearReports.filter(
+      (r) => r.overdue && r.status !== "completed",
+    ).length;
+    const yearActive = yearReports.filter(
+      (r) => !["completed", "denied"].includes(r.status),
+    ).length;
+
     const trend = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       return {
@@ -704,6 +746,7 @@ export default function EstateDashboard() {
           const rd = r.dateSent?.toDate
             ? r.dateSent.toDate()
             : new Date(r.dateSent);
+          if (Number.isNaN(rd.getTime())) return false;
           return (
             rd.getFullYear() === d.getFullYear() &&
             rd.getMonth() === d.getMonth()
@@ -842,6 +885,19 @@ export default function EstateDashboard() {
       costByCategory,
       costTrend,
       costByPriority,
+      monthStats: {
+        total: monthReports.length,
+        completed: monthCompleted,
+        overdue: monthOverdue,
+        active: monthActive,
+        avgResolutionDays,
+      },
+      yearStats: {
+        total: yearReports.length,
+        completed: yearCompleted,
+        overdue: yearOverdue,
+        active: yearActive,
+      },
     };
   }, [reports, users]);
 
@@ -866,6 +922,14 @@ export default function EstateDashboard() {
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3200);
+  };
+
+  const handleDownloadDashboardPDF = () => {
+    generateDashboardStatsPDF(
+      stats,
+      role?.toUpperCase?.() || role,
+      user?.name || "User",
+    );
   };
 
   // ── user action helpers ───────────────────────────────────────────────────
@@ -1094,14 +1158,24 @@ export default function EstateDashboard() {
             >
               Welcome back, {user?.name?.split(" ")[0]} 👋
             </h1>
-            {(isAdmin || isManager) && (
-              <button
-                onClick={() => setShowGenID(true)}
-                className="bg-red-400 hover:bg-red-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
-              >
-                + Generate Registration ID
-              </button>
-            )}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(isAdmin || isManager) && (
+                <button
+                  onClick={() => setShowGenID(true)}
+                  className="bg-red-400 hover:bg-red-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                >
+                  + Generate Registration ID
+                </button>
+              )}
+              {canDownloadDashboardPDF && (
+                <button
+                  onClick={handleDownloadDashboardPDF}
+                  className="bg-slate-900 hover:bg-slate-700 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                >
+                  Download Dashboard PDF
+                </button>
+              )}
+            </div>
           </div>
           <span style={{ fontSize: 12, color: "#94a3b8" }}>
             {new Date().toLocaleDateString("en-GB", {

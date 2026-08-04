@@ -8,6 +8,7 @@ import {
   collection,
   query,
   where,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 import {
@@ -475,6 +476,34 @@ export default function ReportDetailsContainer({
     } catch (error) {
       console.error("Error completing work:", error);
       alert("Failed to complete work");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelReport = async () => {
+    if (
+      user?.role !== "staff" ||
+      report?.reporterId !== user?.ID ||
+      report?.status !== "incoming"
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this report? This will permanently delete it from Firestore.",
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, "reports", report.id));
+      alert("Report cancelled and removed successfully.");
+      setDisplayDetails(false);
+    } catch (error) {
+      console.error("Error cancelling report:", error);
+      alert("Failed to cancel report. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -1021,7 +1050,6 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-
       {/* ESTATE ACTIONS - Submit Actual Cost */}
       {canUserSubmitCost(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
@@ -1055,8 +1083,6 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-     
-
       {/* WORKER ACTIONS - Complete Work */}
       {canUserComplete(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
@@ -1070,6 +1096,26 @@ export default function ReportDetailsContainer({
           </button>
         </div>
       )}
+
+      {/* STAFF ACTIONS - Cancel Incoming Report */}
+      {user?.role === "staff" &&
+        report?.reporterId === user?.ID &&
+        report?.status === "incoming" && (
+          <div className="bg-white rounded-lg p-5 space-y-3">
+            <h3 className="font-bold text-gray-800">Staff Actions</h3>
+            <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
+              Cancel this report only while it is still incoming. This
+              permanently deletes the report from Firestore.
+            </p>
+            <button
+              onClick={handleCancelReport}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded w-full"
+            >
+              {loading ? "Processing..." : "Cancel Report"}
+            </button>
+          </div>
+        )}
 
       {/* STAFF ACTIONS - Send Feedback */}
       {canUserSendFeedback(user, report) && (
@@ -1122,8 +1168,6 @@ export default function ReportDetailsContainer({
       )}
     </div>
   );
-
-  
 
   return (
     <div

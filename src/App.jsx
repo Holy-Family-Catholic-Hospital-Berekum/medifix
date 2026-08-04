@@ -10,12 +10,11 @@ import Pending from "../Staff/Pending";
 import EstateHome from "../Estate-manager/estateHome";
 import EstateAssigned from "../Estate-manager/estateAssigned";
 import EstateCompleted from "../Estate-manager/estateCompleted";
-import EstateDashboard from "../Estate-manager/estateDashboard";
+import Dashboard from "../components/Dashboard";
 
 import AdminHome from "../Admin/adminHome";
 import AdminAssigned from "../Admin/adminAssigned";
 import AdminCompleted from "../Admin/adminCompleted";
-import AdminDashboard from "../Admin/adminDashboard";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
@@ -93,7 +92,10 @@ export default function App() {
         path="/adminDashboard"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminDashboard />
+            <Dashboard
+              homeRedirect="/adminHome"
+              dashboardRedirect="/adminDashboard"
+            />
           </ProtectedRoute>
         }
       />
@@ -118,7 +120,10 @@ export default function App() {
         path="/estateDashboard"
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
-            <EstateDashboard />
+            <Dashboard
+              homeRedirect="/estateHome"
+              dashboardRedirect="/estateDashboard"
+            />
           </ProtectedRoute>
         }
       />
