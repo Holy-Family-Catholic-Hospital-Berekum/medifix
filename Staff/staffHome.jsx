@@ -142,7 +142,7 @@ export default function StaffHome() {
             Maintenance Department
           </span>
           <h1 className="text-2xl  font-black text-gray-900 leading-tight mb-3">
-            What can we <span style={{ color: ORANGE }}>fix</span> for you?
+            What can we <span style={{ color: ORANGE }}>phix</span> for you?
           </h1>
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
             Click on the Report button at the top right corner to submit a

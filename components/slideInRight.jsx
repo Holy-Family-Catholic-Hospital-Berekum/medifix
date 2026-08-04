@@ -85,7 +85,7 @@ export default function SlideInRight({
         </span>
       </NavLink>
 
-      {["admin", "estate"].includes(user?.role) && (
+      {["admin", "estate", "procurement"].includes(user?.role) && (
         <NavLink
           to={`${dashboardRedirect}`}
           className={({ isActive }) =>

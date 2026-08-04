@@ -22,6 +22,10 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() == 'admin';
     }
 
+    function isManager() {
+      return isAuthenticated() && getUserRole() == 'manager';
+    }
+
     function isEstateManager() {
       return isAuthenticated() && getUserRole() == 'estate';
     }
@@ -34,23 +38,31 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() == 'worker';
     }
 
+    function isProcurement() {
+      return isAuthenticated() && getUserRole() == 'procurement';
+    }
+
     match /users/{userId} {
       allow get: if isAuthenticated() && (
-        request.auth.uid == userId || isAdmin() || isEstateManager()
+        request.auth.uid == userId ||
+        isAdmin() ||
+        isManager() ||
+        isEstateManager() ||
+        isProcurement()
       );
 
-      // ✅ anonymous auth + limit(1) covers login ID lookup
-      // admin/estate can list all users
       allow list: if isAuthenticated() && (
         isAdmin() ||
+        isManager() ||
         isEstateManager() ||
-        request.query.limit <= 1
+        isProcurement() ||
+        request.query.limit <= 1 ||
+        (isStaff() && request.query.limit <= 10)
       );
 
-      // ✅ no getUserData() — doc doesn't exist yet at signup time
       allow create: if isAuthenticated() &&
         request.auth.uid == userId &&
-        request.resource.data.role in ['staff', 'worker'] &&
+        request.resource.data.role in ['staff', 'worker', 'estate', 'admin', 'manager', 'procurement'] &&
         request.resource.data.keys().hasAll([
           'name', 'email', 'role', 'ID',
           'phoneNumber', 'location', 'profession', 'createdAt'
@@ -63,19 +75,34 @@ service cloud.firestore {
         request.resource.data.location is string &&
         request.resource.data.profession is string;
 
-      allow update: if isAuthenticated() &&
-        (request.auth.uid == userId || isAdmin()) &&
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin());
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (isManager() &&
+          resource.data.role != 'admin' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deactivated'])) ||
+        (request.auth.uid == userId &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'deactivated']))
+      );
 
       allow delete: if isAdmin();
     }
 
     match /reports/{reportId} {
-      allow read: if isAuthenticated() && (
+      allow get: if isAuthenticated() && (
         isAdmin() ||
         isEstateManager() ||
+        isProcurement() ||
         (isStaff() && resource.data.reporterId == getUserID()) ||
         (isWorker() && resource.data.assignedTo == getUserID())
+      );
+
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        isManager() ||
+        isEstateManager() ||
+        isProcurement() ||
+        isStaff() ||
+        isWorker()
       );
 
       allow create: if isAuthenticated() &&
@@ -89,82 +116,106 @@ service cloud.firestore {
         request.resource.data.reporterId is string &&
         request.resource.data.reporter is string &&
         request.resource.data.category is string &&
-        request.resource.data.priorityLevel in ['urgent', 'routine'] &&
+        request.resource.data.priorityLevel in ['urgent', 'routine', 'emergency'] &&
         request.resource.data.location is string &&
         request.resource.data.reportDescription is string;
 
       allow update: if isAuthenticated() && (
-        // ✅ Admin: approve/deny incoming reports, add notes, confirm cost
-        (isAdmin() && (
-          (resource.data.status == 'incoming' && 
-            request.resource.data.status in ['approved', 'denied']) ||
-          (resource.data.status == 'pending' && 
-            request.resource.data.status == 'confirmed') ||
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notes'])
-        )) ||
+        ((isAdmin() || isEstateManager()) &&
+          request.resource.data.overdue == true &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['overdue'])) ||
 
-        // ✅ Estate: add cost & description to approved reports, assign worker, add instructions
-        (isEstateManager() && (
-          // Add cost to approved reports
-          (resource.data.status == 'approved' &&
-            request.resource.data.status == 'pending' &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cost', 'costDescription', 'status'])) ||
-          
-          // Assign worker to confirmed reports
-          (resource.data.status == 'confirmed' &&
-            request.resource.data.status == 'assigned' &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedTo', 'status', 'dateAssigned', 'notes'])) ||
-          
-          // Add instructions to assigned reports
-          ((resource.data.status == 'assigned' || resource.data.status == 'confirmed') &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['instructions', 'notes'])) ||
-        )) ||
+        (isAdmin() &&
+          resource.data.status == 'incoming' &&
+          request.resource.data.status in ['approved', 'denied'] &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'dateApproved', 'alerts', 'dateDue'])) ||
 
-        // ✅ Worker: mark report as completed
+        (isAdmin() &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'confirmed' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'dateConfirmed', 'alerts'])) ||
+
+        (isAdmin() &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'costDenied' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'dateCostDenied', 'alerts'])) ||
+
+        (isAdmin() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notes'])) ||
+
+        (isEstateManager() &&
+          (resource.data.status == 'approved' || resource.data.status == 'costDenied') &&
+          request.resource.data.status == 'pending' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['materials', 'status', 'dateCostAdded'])) ||
+
+        (isEstateManager() &&
+          (resource.data.status == 'confirmed' || resource.data.status == 'assigned' || resource.data.status == 'approved') &&
+          request.resource.data.status == 'assigned' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedTo', 'status', 'dateAssigned', 'alerts', 'instructions'])) ||
+
+        (isEstateManager() &&
+          (resource.data.status == 'assigned' || resource.data.status == 'confirmed') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['instructions', 'alerts'])) ||
+
+        (isEstateManager() &&
+          (resource.data.status == 'assigned' || resource.data.status == 'completed') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cost'])) ||
+
         (isWorker() &&
           resource.data.assignedTo == getUserID() &&
           resource.data.status == 'assigned' &&
-          request.resource.data.status == 'completed') ||
+          request.resource.data.status == 'completed' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'dateCompleted'])) ||
 
-        // ✅ Staff: add feedback to completed reports
         (isStaff() &&
           resource.data.reporterId == getUserID() &&
           resource.data.status == 'completed' &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedback', 'feedbackDate'])) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedback', 'feedbackDate', 'alerts'])) ||
 
-        isAdmin()
+        (isAuthenticated() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feedbackViewedBy']))
       );
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() ||
+        (isStaff() && resource.data.reporterId == getUserID() && resource.data.status == 'incoming');
     }
 
     match /registrationIDs/{registrationId} {
-      // ✅ anyone can get a single doc by ID — needed before auth exists
       allow get: if true;
 
-      // ✅ only admin/estate can list all registration IDs
-      allow list: if isAuthenticated() && (isAdmin() || isEstateManager());
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        isManager() ||
+        isEstateManager()
+      );
 
-      // ✅ only admin/estate can create new registration IDs
-      allow create: if isAuthenticated() &&
-        (isAdmin() || isEstateManager()) &&
-        request.resource.data.keys().hasAll(['type', 'used']) &&
-        request.resource.data.type in ['staff', 'worker'] &&
-        request.resource.data.used == false;
+      allow create: if isAuthenticated() && (
+        (isAdmin() &&
+          request.resource.data.type in ['estate', 'staff', 'worker', 'manager', 'procurement'] &&
+          request.resource.data.used == false &&
+          request.resource.data.keys().hasAll(['type', 'used'])) ||
 
-      // ✅ updateDoc runs after createUserWithEmailAndPassword
-      // so the user IS authenticated at this point
-      // any authenticated user can flip used: false → true only
-      // admin/estate can update freely
+        (isManager() &&
+          request.resource.data.type in ['estate', 'staff', 'worker', 'procurement'] &&
+          request.resource.data.used == false &&
+          request.resource.data.keys().hasAll(['type', 'used'])) ||
+
+        (isEstateManager() &&
+          request.resource.data.type in ['staff', 'worker'] &&
+          request.resource.data.used == false &&
+          request.resource.data.keys().hasAll(['type', 'used']))
+      );
+
       allow update: if isAuthenticated() && (
         isAdmin() ||
+        isManager() ||
         isEstateManager() ||
         (resource.data.used == false &&
           request.resource.data.used == true &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used']))
       );
 
-      allow delete: if isAuthenticated() && (isAdmin() || isEstateManager());
+      allow delete: if isAuthenticated() && (isAdmin() || isManager() || isEstateManager());
     }
 
     match /{document=**} {

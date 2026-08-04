@@ -759,6 +759,283 @@ export const THEMES = {
 
     detailsValueColor: "text-amber-700",
   },
+  manager: {
+    // ─── Page ─────────────────────────────────────────────
+    pageBg: "bg-gradient-to-br from-orange-50 via-amber-50 to-orange-100",
+
+    sidebarBg:
+      "bg-gradient-to-br from-orange-200/55 via-amber-100/45 to-orange-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-orange-200/35",
+
+    sidebarBorder:
+      "border border-white/30 shadow-[0_8px_32px_rgba(255,136,37,0.18)]",
+
+    contentBg: "bg-transparent",
+
+    // ─── Navbar ──────────────────────────────────────────
+    navBg:
+      "bg-gradient-to-r from-[#FF8825]/90 via-[#FF9F52]/85 to-[#FFB878]/80 backdrop-blur-2xl",
+
+    navBorder:
+      "border border-white/20 shadow-[0_8px_32px_rgba(255,136,37,0.18)]",
+
+    logoFrom: "from-[#7C3A00]",
+    logoTo: "to-[#FF8825]",
+    logoSub: "text-[#7C3A00]/60",
+
+    liveColor: "bg-[#FFD166]",
+    liveShadow: "shadow-[0_0_10px_2px_rgba(255,209,102,0.7)]",
+    liveText: "text-[#7C3A00]",
+
+    linkActive: "text-white",
+    linkHover: "hover:text-[#FFE3C2]",
+    linkBar: "bg-[#FFD166]",
+
+    logoutBorder: "border-white/20",
+    logoutText: "text-[#7C3A00]",
+
+    logoutHoverBorder: "hover:border-red-400/50",
+    logoutHoverText: "hover:text-red-500",
+    logoutHoverBg: "hover:bg-red-500/5",
+
+    accent: "shadow-[0_1px_0_0_rgba(255,209,102,0.25)]",
+    glowLine: "via-[#FFCB91]/40",
+
+    // ─── Sidebar nav ─────────────────────────────────────
+    sideNavActive:
+      "text-[#7C3A00] bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
+
+    sideNavIdle:
+      "text-[#7C3A00]/80 hover:text-[#7C3A00] hover:bg-white/20 backdrop-blur-md border border-transparent",
+
+    sideNavDotActive: "bg-[#FFD166] shadow-[0_0_8px_rgba(255,209,102,0.95)]",
+    sideNavDotIdle: "bg-[#FF8825]/40 group-hover:bg-[#FF8825]",
+    sideNavLabel: "text-[#7C3A00]/50",
+
+    // ─── Section headers ─────────────────────────────────
+    sectionAccentBar: "from-[#FF8825] to-[#FFB878]",
+    sectionLabel: "text-[#7C3A00]/70",
+    sectionTitle: "text-[#7C3A00]",
+    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
+    sectionCountBorder: "border-white/30",
+    sectionCountDot: "bg-[#FFD166] shadow-[0_0_6px_rgba(255,209,102,0.8)]",
+    sectionCountText: "text-[#7C3A00]",
+    sectionDivider: "border-orange-300/40",
+
+    // ─── Cards ───────────────────────────────────────────
+    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
+
+    cardNormalBorder: "border-emerald-400/50",
+    cardNormalGlow: "shadow-[0_0_18px_rgba(16,185,129,0.14)]",
+    cardNormalDot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
+    cardNormalAccent: "from-emerald-500/15 to-transparent",
+    cardNormalPriority: "text-emerald-700",
+
+    cardEmergencyBorder: "border-red-400/60",
+    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
+    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
+    cardEmergencyAccent: "from-red-500/20 to-transparent",
+    cardEmergencyPriority: "text-red-500",
+
+    cardUrgentBorder: "border-yellow-400/60",
+    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
+    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
+    cardUrgentAccent: "from-yellow-400/20 to-transparent",
+    cardUrgentPriority: "text-yellow-600",
+
+    cardDateLabel: "text-[#7C3A00]/60",
+    cardDateValue: "text-[#7C3A00]",
+    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
+    cardStatusBorder: "border-white/20",
+    cardStatusText: "text-[#7C3A00]/90",
+
+    // ─── Feedback badge ──────────────────────────────────
+    feedbackBadge: "bg-[#FFD166] text-[#7C3A00] shadow-lg",
+
+    // ─── Mobile toggle ───────────────────────────────────
+    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
+    mobileToggleBorder: "border-white/30",
+    mobileToggleText: "text-[#7C3A00]",
+    mobileToggleHover: "hover:bg-white/40",
+
+    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
+    mobileBottomBorder: "border-white/30",
+    mobileBottomDot: "bg-[#FFD166]",
+    mobileBottomText: "text-[#7C3A00]",
+
+    // ─── Bottom sheet ────────────────────────────────────
+    sheetBg:
+      "bg-gradient-to-br from-orange-100/95 to-amber-50/95 backdrop-blur-2xl",
+    sheetBorder: "border-white/30",
+    sheetTopBar: "from-[#FF8825] via-[#FFB878]",
+    titleColor: "text-[#7C3A00]",
+    emptyText: "text-[#7C3A00]/50",
+
+    // ─── Slide panel ─────────────────────────────────────
+    slideBg:
+      "bg-gradient-to-br from-orange-100/95 to-amber-50/95 backdrop-blur-2xl",
+    slideBorder: "border-white/30",
+    slideTopBar: "from-[#FF8825] via-[#FFB878]",
+
+    linkActiveBg: "bg-white/35 backdrop-blur-xl",
+    linkActiveBorder: "border-white/40",
+    linkActiveText: "text-[#7C3A00]",
+    linkIdleBorder: "border-white/10",
+    linkIdleText: "text-[#7C3A00]/50",
+    linkHoverText: "hover:text-[#7C3A00]",
+    linkHoverBorder: "hover:border-white/30",
+    linkHoverBg: "hover:bg-white/20",
+
+    // ─── Spinner ─────────────────────────────────────────
+    spinnerOuter: "border-t-[#FF8825]",
+    spinnerInner: "border-t-[#FFB878]/70",
+    dotColor: "bg-[#FFD166]",
+    textColor: "text-[#7C3A00]/70",
+
+    // ─── Report details ──────────────────────────────────
+    detailsBg: "bg-gradient-to-br from-orange-100 to-amber-50",
+    detailsCloseText: "text-[#7C3A00]",
+    detailsLabelColor: "text-[#7C3A00]/90",
+    detailsValueColor: "text-[#7C3A00]/70",
+  },
+
+  procurement: {
+    // ─── Page ─────────────────────────────────────────────
+    pageBg: "bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100",
+
+    sidebarBg:
+      "bg-gradient-to-br from-violet-200/55 via-purple-100/45 to-indigo-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-violet-200/35",
+
+    sidebarBorder:
+      "border border-white/30 shadow-[0_8px_32px_rgba(124,58,237,0.18)]",
+
+    contentBg: "bg-transparent",
+
+    // ─── Navbar ──────────────────────────────────────────
+    navBg:
+      "bg-gradient-to-r from-violet-500/90 via-purple-500/85 to-indigo-400/80 backdrop-blur-2xl",
+
+    navBorder:
+      "border border-white/20 shadow-[0_8px_32px_rgba(124,58,237,0.18)]",
+
+    logoFrom: "from-violet-950",
+    logoTo: "to-indigo-600",
+    logoSub: "text-violet-950/60",
+
+    liveColor: "bg-indigo-300",
+    liveShadow: "shadow-[0_0_10px_2px_rgba(165,180,252,0.7)]",
+    liveText: "text-violet-950",
+
+    linkActive: "text-white",
+    linkHover: "hover:text-indigo-100",
+    linkBar: "bg-indigo-200",
+
+    logoutBorder: "border-white/20",
+    logoutText: "text-violet-950",
+
+    logoutHoverBorder: "hover:border-red-400/50",
+    logoutHoverText: "hover:text-red-500",
+    logoutHoverBg: "hover:bg-red-500/5",
+
+    accent: "shadow-[0_1px_0_0_rgba(199,210,254,0.25)]",
+    glowLine: "via-violet-300/40",
+
+    // ─── Sidebar nav ─────────────────────────────────────
+    sideNavActive:
+      "text-violet-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
+
+    sideNavIdle:
+      "text-violet-900/80 hover:text-violet-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
+
+    sideNavDotActive: "bg-indigo-300 shadow-[0_0_8px_rgba(165,180,252,0.95)]",
+    sideNavDotIdle: "bg-violet-500/40 group-hover:bg-violet-500",
+    sideNavLabel: "text-violet-950/50",
+
+    // ─── Section headers ─────────────────────────────────
+    sectionAccentBar: "from-violet-500 to-indigo-400",
+    sectionLabel: "text-violet-700/70",
+    sectionTitle: "text-violet-950",
+    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
+    sectionCountBorder: "border-white/30",
+    sectionCountDot: "bg-indigo-300 shadow-[0_0_6px_rgba(165,180,252,0.8)]",
+    sectionCountText: "text-violet-950",
+    sectionDivider: "border-violet-300/40",
+
+    // ─── Cards ───────────────────────────────────────────
+    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
+
+    cardNormalBorder: "border-emerald-400/50",
+    cardNormalGlow: "shadow-[0_0_18px_rgba(16,185,129,0.14)]",
+    cardNormalDot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
+    cardNormalAccent: "from-emerald-500/15 to-transparent",
+    cardNormalPriority: "text-emerald-700",
+
+    cardEmergencyBorder: "border-red-400/60",
+    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
+    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
+    cardEmergencyAccent: "from-red-500/20 to-transparent",
+    cardEmergencyPriority: "text-red-500",
+
+    cardUrgentBorder: "border-yellow-400/60",
+    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
+    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
+    cardUrgentAccent: "from-yellow-400/20 to-transparent",
+    cardUrgentPriority: "text-yellow-600",
+
+    cardDateLabel: "text-violet-900/60",
+    cardDateValue: "text-violet-950",
+    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
+    cardStatusBorder: "border-white/20",
+    cardStatusText: "text-violet-900",
+
+    // ─── Feedback badge ──────────────────────────────────
+    feedbackBadge: "bg-indigo-300 text-violet-950 shadow-lg",
+
+    // ─── Mobile toggle ───────────────────────────────────
+    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
+    mobileToggleBorder: "border-white/30",
+    mobileToggleText: "text-violet-950",
+    mobileToggleHover: "hover:bg-white/40",
+
+    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
+    mobileBottomBorder: "border-white/30",
+    mobileBottomDot: "bg-indigo-300",
+    mobileBottomText: "text-violet-950",
+
+    // ─── Bottom sheet ────────────────────────────────────
+    sheetBg:
+      "bg-gradient-to-br from-violet-100/95 to-indigo-50/95 backdrop-blur-2xl",
+    sheetBorder: "border-white/30",
+    sheetTopBar: "from-violet-400 via-indigo-400",
+    titleColor: "text-violet-950",
+    emptyText: "text-violet-700/50",
+
+    // ─── Slide panel ─────────────────────────────────────
+    slideBg:
+      "bg-gradient-to-br from-violet-100/95 to-indigo-50/95 backdrop-blur-2xl",
+    slideBorder: "border-white/30",
+    slideTopBar: "from-violet-400 via-indigo-400",
+
+    linkActiveBg: "bg-white/35 backdrop-blur-xl",
+    linkActiveBorder: "border-white/40",
+    linkActiveText: "text-violet-950",
+    linkIdleBorder: "border-white/10",
+    linkIdleText: "text-violet-900/50",
+    linkHoverText: "hover:text-violet-950",
+    linkHoverBorder: "hover:border-white/30",
+    linkHoverBg: "hover:bg-white/20",
+
+    // ─── Spinner ─────────────────────────────────────────
+    spinnerOuter: "border-t-violet-500",
+    spinnerInner: "border-t-indigo-400/70",
+    dotColor: "bg-indigo-300",
+    textColor: "text-violet-700/70",
+
+    // ─── Report details ──────────────────────────────────
+    detailsBg: "bg-gradient-to-br from-violet-100 to-indigo-50",
+    detailsCloseText: "text-violet-950",
+    detailsLabelColor: "text-violet-900",
+    detailsValueColor: "text-violet-700",
+  },
 };
 
 // ─── Main Home component ──────────────────────────────────────────────────────

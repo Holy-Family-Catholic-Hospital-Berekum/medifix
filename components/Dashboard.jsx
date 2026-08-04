@@ -40,6 +40,12 @@ const STATUS_META = {
     bg: "#d1fae5",
     text: "#065f46",
   },
+  procured: {
+    label: "Procured",
+    color: "#14b8a6",
+    bg: "#ccfbf1",
+    text: "#0f766e",
+  },
   assigned: {
     label: "Assigned",
     color: "#8b5cf6",
@@ -91,6 +97,12 @@ const ROLE_META = {
     text: "#1e40af",
     color: "#3b82f6",
   },
+  procurement: {
+    label: "Procurement",
+    bg: "#ede9fe",
+    text: "#5b21b6",
+    color: "#8b5cf6",
+  },
   staff: { label: "Staff", bg: "#ede9fe", text: "#4c1d95", color: "#8b5cf6" },
   worker: { label: "Worker", bg: "#d1fae5", text: "#065f46", color: "#10b981" },
 };
@@ -104,7 +116,7 @@ const CAT_COLORS = [
   "#8b5cf6",
   "#ec4899",
 ];
-const ALLOWED_ROLES = ["admin", "manager", "estate"];
+const ALLOWED_ROLES = ["admin", "manager", "estate", "procurement"];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function timeAgo(date) {
@@ -448,8 +460,10 @@ function THead({ cols }) {
 function GenIDModal({ role, onClose }) {
   const allowedTypes =
     role === "admin"
-      ? ["manager", "estate", "staff", "worker"]
-      : ["estate", "staff", "worker"];
+      ? ["manager", "estate", "staff", "worker", "procurement"]
+      : role === "manager"
+        ? ["estate", "staff", "worker", "procurement"]
+        : ["estate", "staff", "worker"];
 
   const [genType, setGenType] = useState(allowedTypes[0]);
   const [genLoading, setGenLoading] = useState(false);
@@ -831,7 +845,12 @@ export default function Dashboard({
   const isManager = role === "manager";
   const isEstate = role === "estate";
   const hasAccess = ALLOWED_ROLES.includes(role);
-  const canDownloadDashboardPDF = ["admin", "manager", "estate"].includes(role);
+  const canDownloadDashboardPDF = [
+    "admin",
+    "manager",
+    "estate",
+    "procurement",
+  ].includes(role);
   const roleTheme = THEMES[role] || {};
   const resolvedHomeRedirect =
     homeRedirect ||
@@ -841,7 +860,9 @@ export default function Dashboard({
         ? "/estateHome"
         : role === "manager"
           ? "/manager"
-          : "/Home");
+          : role === "procurement"
+            ? "/procurementHome"
+            : "/Home");
   const resolvedDashboardRedirect =
     dashboardRedirect ||
     (role === "admin"
@@ -850,7 +871,9 @@ export default function Dashboard({
         ? "/estateDashboard"
         : role === "manager"
           ? "/manager"
-          : "/");
+          : role === "procurement"
+            ? "/procurementDashboard"
+            : "/");
 
   // ── Firestore subscriptions ───────────────────────────────────────────────
   useEffect(() => {
@@ -1025,20 +1048,38 @@ export default function Dashboard({
           (a.createdAt?.toDate?.() ?? new Date(0)),
       );
 
+    // ── Cost analytics ──────────────────────────────────────────────────────
+    const getReportTotalCost = (r) =>
+      (Number(r.cost) || 0) + (Number(r.maintenanceCost) || 0);
+
     const reportsWithCost = reports.filter(
-      (r) => r.cost != null && !isNaN(r.cost),
+      (r) =>
+        (r.cost != null && !isNaN(r.cost)) ||
+        (r.maintenanceCost != null && !isNaN(r.maintenanceCost)),
     );
-    const totalCost = reportsWithCost.reduce((s, r) => s + r.cost, 0);
+    const totalCost = reportsWithCost.reduce(
+      (s, r) => s + getReportTotalCost(r),
+      0,
+    );
+    const totalMaterialsCost = reportsWithCost.reduce(
+      (s, r) => s + (Number(r.cost) || 0),
+      0,
+    );
+    const totalMaintenanceCost = reportsWithCost.reduce(
+      (s, r) => s + (Number(r.maintenanceCost) || 0),
+      0,
+    );
     const avgCost = reportsWithCost.length
       ? totalCost / reportsWithCost.length
       : null;
     const maxCost = reportsWithCost.length
-      ? Math.max(...reportsWithCost.map((r) => r.cost))
+      ? Math.max(...reportsWithCost.map(getReportTotalCost))
       : null;
 
     const costByCategory = {};
     reportsWithCost.forEach((r) => {
-      costByCategory[r.category] = (costByCategory[r.category] || 0) + r.cost;
+      costByCategory[r.category] =
+        (costByCategory[r.category] || 0) + getReportTotalCost(r);
     });
 
     const costTrend = Array.from({ length: 6 }, (_, i) => {
@@ -1053,15 +1094,19 @@ export default function Dashboard({
       });
       return {
         label: d.toLocaleString("default", { month: "short" }),
-        value: monthReports.reduce((s, r) => s + r.cost, 0),
+        value: monthReports.reduce((s, r) => s + getReportTotalCost(r), 0),
       };
     });
 
     const costByPriority = { emergency: 0, urgent: 0, routine: 0 };
     reportsWithCost.forEach((r) => {
       if (r.priorityLevel in costByPriority)
-        costByPriority[r.priorityLevel] += r.cost;
+        costByPriority[r.priorityLevel] += getReportTotalCost(r);
     });
+
+    const procurementCount = users.filter(
+      (u) => u.role === "procurement",
+    ).length;
 
     return {
       total,
@@ -1090,6 +1135,14 @@ export default function Dashboard({
       costByCategory,
       costTrend,
       costByPriority,
+      totalCost,
+      totalMaterialsCost,
+      totalMaintenanceCost,
+      avgCost,
+      maxCost,
+      estateCount,
+      procurementCount,
+      adminCount,
       monthStats: {
         total: monthReports.length,
         completed: monthCompleted,
@@ -1195,8 +1248,8 @@ export default function Dashboard({
   })();
 
   const filterRoles = isAdmin
-    ? ["all", "admin", "manager", "estate", "staff", "worker"]
-    : ["all", "manager", "estate", "staff", "worker"];
+    ? ["all", "admin", "manager", "estate", "procurement", "staff", "worker"]
+    : ["all", "manager", "estate", "procurement", "staff", "worker"];
 
   // ── access guard — after all hooks ────────────────────────────────────────
   if (!hasAccess) return <AccessDenied role={role} />;
@@ -1544,6 +1597,12 @@ export default function Dashboard({
                 icon="🏢"
                 accent="#10b981"
               />
+              <StatCard
+                label="Procurement"
+                value={stats.procurementCount}
+                icon="🛒"
+                accent="#f59e0b"
+              />
             </div>
 
             <SectionTitle>Status breakdown</SectionTitle>
@@ -1720,7 +1779,11 @@ export default function Dashboard({
                 }
                 icon="💰"
                 accent="#10b981"
-                sub={`${stats.reportsWithCost} reports with cost`}
+                sub={
+                  stats.totalCost
+                    ? `Materials ₵${stats.totalMaterialsCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} · Maintenance ₵${stats.totalMaintenanceCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : `${stats.reportsWithCost} reports with cost`
+                }
               />
               <StatCard
                 label="Avg Cost / Job"
@@ -2380,6 +2443,12 @@ export default function Dashboard({
                 value={stats.estateCount}
                 icon="🏢"
                 accent="#10b981"
+              />
+              <StatCard
+                label="Procurement"
+                value={stats.procurementCount}
+                icon="🛒"
+                accent="#f59e0b"
               />
               {isAdmin && (
                 <StatCard

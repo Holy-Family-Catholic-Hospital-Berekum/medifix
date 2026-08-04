@@ -26,6 +26,7 @@ export async function markOverdueReports(user) {
       "approved",
       "pending",
       "confirmed",
+      "procured",
       "assigned",
       "costDenied",
     ];
@@ -323,6 +324,23 @@ export const generatePDFReport = (
     addLine(`Feedback Date: ${formatDate(report.feedbackDate)}`);
   }
 
+  if (report.cost != null || report.maintenanceCost != null) {
+    addSectionGap(6);
+    addLine("Cost Summary", 11, true);
+    if (report.cost != null) {
+      addLine(`Materials Cost: ₵${Number(report.cost).toLocaleString()}`, 10);
+    }
+    if (report.maintenanceCost != null) {
+      addLine(
+        `Maintenance Cost: ₵${Number(report.maintenanceCost).toLocaleString()}`,
+        10,
+      );
+    }
+    const total =
+      (Number(report.cost) || 0) + (Number(report.maintenanceCost) || 0);
+    addLine(`Total Cost: ₵${total.toLocaleString()}`, 11, true);
+  }
+
   // ── Dates ────────────────────────────────────────────────────────────────────
   addSectionGap(10);
   doc.line(margin, y, pageWidth - margin, y);
@@ -334,6 +352,7 @@ export const generatePDFReport = (
     ["Approved", report.dateApproved],
     ["Confirmation Request", report.dateCostAdded],
     ["Confirmed", report.dateConfirmed],
+    ["Procured", report.dateProcured],
     ["Assigned", report.dateAssigned],
     ["Completed", report.dateCompleted],
   ].forEach(([label, date]) => {
@@ -575,6 +594,7 @@ export const getStatusColor = (status) => {
     approved: "bg-blue-400 text-white",
     pending: "bg-orange-400 text-white",
     confirmed: "bg-green-400 text-white",
+    procured: "bg-teal-500 text-white",
     assigned: "bg-purple-400 text-white",
     completed: "bg-green-600 text-white",
     denied: "bg-red-600 text-white",
@@ -598,18 +618,23 @@ export const canUserAddCost = (user, report) => {
   );
 };
 
+// New: only procurement, only when materials are confirmed and awaiting purchase
+export const canUserMarkProcured = (user, report) => {
+  return user?.role === "procurement" && report?.status === "confirmed";
+};
+
 export const canUserAssignWorker = (user, report) => {
   return (
     user?.role === "estate" &&
-    ["approved", "confirmed", "assigned"].includes(report?.status)
+    ["approved", "procured", "assigned"].includes(report?.status)
   );
 };
 
 export const canUserSubmitCost = (user, report) => {
   return (
     user?.role === "estate" &&
-    (report?.status === "assigned" || report?.status === "completed") &&
-    (report?.cost === null || report?.cost === undefined)
+    report?.status === "completed" &&
+    (report?.maintenanceCost === null || report?.maintenanceCost === undefined)
   );
 };
 
@@ -631,14 +656,21 @@ export const canUserSendFeedback = (user, report) => {
 };
 
 export const canUserDownloadPDF = (user, report) => {
-  // No PDF for reports that skipped the materials flow (no materials array)
   const hasMaterials =
     Array.isArray(report?.materials) && report.materials.length > 0;
   return (
-    user?.role === "estate" &&
     hasMaterials &&
-    (report?.status === "confirmed" ||
-      report?.status === "assigned" ||
-      report?.status === "completed")
+    ((user?.role === "estate" &&
+      ["confirmed", "procured", "assigned", "completed"].includes(
+        report?.status,
+      )) ||
+      (user?.role === "procurement" &&
+        ["confirmed", "procured", "completed"].includes(report?.status)))
   );
+};
+
+export const getTotalCost = (report) => {
+  const materials = Number(report?.cost) || 0;
+  const maintenance = Number(report?.maintenanceCost) || 0;
+  return materials + maintenance;
 };

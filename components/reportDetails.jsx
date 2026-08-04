@@ -22,6 +22,8 @@ import {
   canUserSendFeedback,
   canUserDownloadPDF,
   canUserSubmitCost,
+  canUserMarkProcured,
+  getTotalCost,
   createAlert,
 } from "../src/utils";
 
@@ -184,6 +186,7 @@ export default function ReportDetailsContainer({
   const [loading, setLoading] = useState(false);
   const [workers, setWorkers] = useState([]);
   const [materials, setMaterials] = useState([{ ...EMPTY_MATERIAL }]);
+  const [procurementCost, setProcurementCost] = useState("");
   const [formData, setFormData] = useState({
     note: "",
     instructions: "",
@@ -369,6 +372,39 @@ export default function ReportDetailsContainer({
     }
   };
 
+  const handleMarkProcured = async () => {
+    if (!canUserMarkProcured(user, report)) return;
+    const parsed = parseFloat(procurementCost);
+    if (!procurementCost || isNaN(parsed) || parsed <= 0) {
+      alert("Please enter a valid cost amount");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        status: "procured",
+        cost: parsed,
+        dateProcured: serverTimestamp(),
+        alerts: arrayUnion(
+          createAlert(
+            `Materials procured at ₵${parsed.toLocaleString()}`,
+            "procurement",
+            "estate",
+            report.status,
+          ),
+        ),
+      });
+      alert("Materials marked as procured!");
+      setProcurementCost("");
+      setDisplayDetails(false);
+    } catch (error) {
+      console.error("Error marking procured:", error);
+      alert("Failed to mark as procured");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAssignWorker = async () => {
     if (!canUserAssignWorker(user, report)) return;
     if (!formData.selectedWorker) {
@@ -451,13 +487,14 @@ export default function ReportDetailsContainer({
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
-        cost: parsed,
+        maintenanceCost: parsed,
+        dateMaintenanceCostAdded: serverTimestamp(),
       });
-      alert("Cost submitted successfully!");
+      alert("Maintenance cost submitted successfully!");
       setActualCost("");
     } catch (error) {
-      console.error("Error submitting cost:", error);
-      alert("Failed to submit cost");
+      console.error("Error submitting maintenance cost:", error);
+      alert("Failed to submit maintenance cost");
     } finally {
       setLoading(false);
     }
@@ -713,6 +750,19 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
+      {report.dateProcured && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Procured:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateProcured)}
+          </p>
+        </div>
+      )}
+
       {report.dateAssigned && (
         <div className="flex items-center gap-2">
           <h2
@@ -778,7 +828,7 @@ export default function ReportDetailsContainer({
       {/* Materials table — shown to admin & estate when materials exist */}
       {Array.isArray(report.materials) &&
         report.materials.length > 0 &&
-        ["admin", "estate"].includes(user.role) && (
+        ["admin", "estate", "procurement"].includes(user.role) && (
           <div className="flex flex-col gap-2">
             <h2
               className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
@@ -793,20 +843,34 @@ export default function ReportDetailsContainer({
           </div>
         )}
 
-      {report.cost != null && ["admin", "estate"].includes(user?.role) && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Actual Cost:
-          </h2>
-          <p
-            className={`text-red-400 md:text-lg font-semibold ${theme.detailsValueColor}`}
-          >
-            ₵{report.cost.toLocaleString()}
-          </p>
-        </div>
-      )}
+      {(report.cost != null || report.maintenanceCost != null) &&
+        ["admin", "estate"].includes(user?.role) && (
+          <div className="flex flex-col gap-1">
+            <h2
+              className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+            >
+              Cost Summary:
+            </h2>
+            <div className="pl-2 space-y-1">
+              {report.cost != null && (
+                <p className={`text-red-400 ${theme.detailsValueColor}`}>
+                  Materials Cost: ₵{Number(report.cost).toLocaleString()}
+                </p>
+              )}
+              {report.maintenanceCost != null && (
+                <p className={`text-red-400 ${theme.detailsValueColor}`}>
+                  Maintenance Cost: ₵
+                  {Number(report.maintenanceCost).toLocaleString()}
+                </p>
+              )}
+              <p
+                className={`font-semibold text-red-400 md:text-lg ${theme.detailsValueColor}`}
+              >
+                Total Cost: ₵{getTotalCost(report).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        )}
 
       {relevantAlert && (
         <div className="flex items-center gap-2">
@@ -969,6 +1033,51 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
+      {/* PROCUREMENT ACTIONS - Enter Cost & Mark Procured */}
+      {canUserMarkProcured(user, report) && (
+        <div className="bg-white rounded-lg p-5 space-y-4">
+          <h3 className="font-bold text-gray-800">
+            Procurement Actions - Purchase Materials
+          </h3>
+
+          {Array.isArray(report.materials) && report.materials.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-2">
+                Materials to Procure:
+              </p>
+              <MaterialsTable
+                materials={report.materials}
+                onChange={() => {}}
+                readOnly
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cost of Materials (₵)
+            </label>
+            <input
+              type="number"
+              placeholder="e.g. 450.00"
+              value={procurementCost}
+              onChange={(e) => setProcurementCost(e.target.value)}
+              className="w-full p-2 border border-gray-400 rounded"
+              min="0"
+              step="0.01"
+            />
+          </div>
+
+          <button
+            onClick={handleMarkProcured}
+            disabled={loading}
+            className="bg-teal-500 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded w-full"
+          >
+            {loading ? "Processing..." : "Mark as Procured"}
+          </button>
+        </div>
+      )}
+
       {/* ESTATE ACTIONS - Assign Worker */}
       {canUserAssignWorker(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
@@ -1050,22 +1159,23 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* ESTATE ACTIONS - Submit Actual Cost */}
+      {/* ESTATE ACTIONS - Submit Maintenance Cost */}
       {canUserSubmitCost(user, report) && (
         <div className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">
-            Estate Actions - Submit Actual Cost
+            Estate Actions - Submit Maintenance Cost
           </h3>
           <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
-            Enter the actual cost of materials after procurement.
+            Enter any additional labor/maintenance cost for the completed work.
+            This will be added to the materials cost to give the total cost.
           </p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Actual Cost (₵)
+              Maintenance Cost (₵)
             </label>
             <input
               type="number"
-              placeholder="e.g. 450.00"
+              placeholder="e.g. 150.00"
               value={actualCost}
               onChange={(e) => setActualCost(e.target.value)}
               className="w-full p-2 border border-gray-400 rounded"
@@ -1078,7 +1188,7 @@ export default function ReportDetailsContainer({
             disabled={loading}
             className="bg-emerald-500 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded w-full"
           >
-            {loading ? "Submitting..." : "Submit Cost"}
+            {loading ? "Submitting..." : "Submit Maintenance Cost"}
           </button>
         </div>
       )}

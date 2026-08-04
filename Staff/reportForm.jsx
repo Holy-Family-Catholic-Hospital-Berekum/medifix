@@ -134,6 +134,7 @@ export default function ReportForm({ formPopup, onClose }) {
         dateCostAdded: null,
         dateCostDenied: null,
         dateConfirmed: null,
+        dateProcured: null,
         dateAssigned: null,
         dateCompleted: null,
 

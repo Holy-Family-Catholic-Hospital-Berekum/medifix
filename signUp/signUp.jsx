@@ -444,7 +444,16 @@ export default function SignUp() {
         alert("This registration ID has already been used.");
         return;
       }
-      if (!["staff", "worker", "estate", "admin", "manager"].includes(type)) {
+      if (
+        ![
+          "staff",
+          "worker",
+          "estate",
+          "admin",
+          "manager",
+          "procurement",
+        ].includes(type)
+      ) {
         alert("Invalid registration ID type. Contact the IT Manager.");
         return;
       }
@@ -574,6 +583,7 @@ export default function SignUp() {
         admin: "/adminHome",
         estate: "/estateHome",
         manager: "/manager",
+        procurement: "/procurementHome",
       };
       setTimeout(() => navigate(routes[userData.role] || "/"), 300);
     } catch (error) {

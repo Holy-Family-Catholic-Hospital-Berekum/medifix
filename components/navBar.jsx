@@ -112,7 +112,9 @@ export default function NavBar({
             )}
           </NavLink>
         )}
-        {(user?.role === "admin" || user?.role === "estate") && (
+        {(user?.role === "admin" ||
+          user?.role === "estate" ||
+          user?.role === "procurement") && (
           <NavLink
             to={`${dashboardRedirect}`}
             end

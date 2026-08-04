@@ -6,7 +6,7 @@ export default function Footer({ page }) {
       <div className="flex justify-start">
         <div className="flex justify-center flex-col items-center mb-10">
           <h1 className="text-xl text-[#FF8825] font-bold">PHIX-HFCH</h1>
-          <p className="text-blue-200">We will fix it</p>
+          <p className="text-blue-200">We will phix it</p>
         </div>
       </div>
       <small>&copy; {new Date().getFullYear()} All rights reserved.</small>

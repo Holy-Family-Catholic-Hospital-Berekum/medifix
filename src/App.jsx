@@ -19,7 +19,8 @@ import AdminCompleted from "../Admin/adminCompleted";
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
 
-import Manager from "../ItManager/manager";
+import ProcurementHome from "../Procurement/procurementHome";
+import ProcurementCompleted from "../Procurement/procurementCompleted";
 
 const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -41,7 +42,7 @@ export default function App() {
         path="/manager"
         element={
           <ProtectedRoute allowedRoles={["manager"]}>
-            <Manager />
+            <Dashboard homeRedirect="/manager" dashboardRedirect="/manager" />
           </ProtectedRoute>
         }
       />
@@ -51,6 +52,36 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
             <EstateHome />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/procurementHome"
+        element={
+          <ProtectedRoute allowedRoles={["procurement"]}>
+            <ProcurementHome />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/procurementCompleted"
+        element={
+          <ProtectedRoute allowedRoles={["procurement"]}>
+            <ProcurementCompleted />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/procurementDashboard"
+        element={
+          <ProtectedRoute allowedRoles={["procurement"]}>
+            <Dashboard
+              homeRedirect="/procurementHome"
+              dashboardRedirect="/procurementDashboard"
+            />
           </ProtectedRoute>
         }
       />
