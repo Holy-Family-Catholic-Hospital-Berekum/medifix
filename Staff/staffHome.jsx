@@ -66,7 +66,7 @@ const systemWorkflows = [
   { step: "05", text: "Admin confirms the materials request" },
   {
     step: "06",
-    text: "Estate Manager sends a materials request for procurement",
+    text: "Procurement purchases the materials.",
   },
   { step: "07", text: "Work is assigned to appropriate technician" },
   { step: "08", text: "Technician executes the task and updates progress" },

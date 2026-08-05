@@ -14,12 +14,12 @@ export default function StaffSlideInRight({ sidePopup }) {
       setVisible(true);
       setClosing(false);
     } else if (visible) {
-      // ✅ Play slide-out before unmounting
       setClosing(true);
       const t = setTimeout(() => {
         setVisible(false);
         setClosing(false);
       }, 300);
+
       return () => clearTimeout(t);
     }
   }, [sidePopup]);
@@ -27,10 +27,11 @@ export default function StaffSlideInRight({ sidePopup }) {
   if (!visible) return null;
 
   const navClass = ({ isActive }) =>
-    `cursor-pointer transition bg-orange-100 w-full text-center py-1 shadow-lg max-w-80 rounded-full border border-orange-500 ${
+    `w-full max-w-xs rounded-xl py-3 text-center font-semibold transition-all duration-300 shadow-md
+    ${
       isActive
-        ? "text-white bg-orange-400"
-        : "text-[#111827] hover:text-blue-200 hover:bg-orange-400  "
+        ? "bg-white text-[#F88534] shadow-xl scale-105"
+        : "bg-white/20 backdrop-blur-md text-white hover:bg-white hover:text-[#F88534] hover:scale-105"
     }`;
 
   const handleLogout = async () => {
@@ -45,26 +46,36 @@ export default function StaffSlideInRight({ sidePopup }) {
 
   return (
     <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"></div>
+
+      {/* Sidebar */}
       <div
-        className={`fixed md:pt-10 top-0 flex flex-col gap-10 items-center justify-center right-0 w-full md:max-w-[500px] h-screen md:top-[12%] md:h-[80%] md:right-5 md:rounded-xl bg-blue-50 z-50 shadow-xl overflow-y-auto ${
-          closing ? "slide-out-right" : "slide-in-right"
-        }`}
+        className={`fixed top-0 right-0 z-50 h-screen w-full md:w-[420px]
+        flex flex-col justify-center items-center gap-8 px-8
+        rounded-l-3xl shadow-2xl
+        ${closing ? "slide-out-right" : "slide-in-right"}`}
+        style={{
+          background:
+            "linear-gradient(160deg, #F88534 0%, #FF9F57 45%, #FFD2B4 100%)",
+        }}
       >
-        {
-          <NavLink to="/Pending" className={navClass}>
-            Pending
-          </NavLink>
-        }
-        <NavLink to="/History" className={navClass}>
-          Completed
+        <h2 className="text-3xl font-bold text-white mb-4">Staff Dashboard</h2>
+
+        <NavLink to="/Pending" className={navClass}>
+          📋 Pending Requests
         </NavLink>
 
-        <small
-          className="text-[#40499F] bg-blue-100 px-4 rounded border hover:border-red-500   cursor-pointer hover:text-red-800 transition"
+        <NavLink to="/History" className={navClass}>
+          ✅ Completed Jobs
+        </NavLink>
+
+        <button
           onClick={handleLogout}
+          className="mt-10 px-8 py-3 rounded-full bg-white text-red-600 font-semibold shadow-lg transition-all duration-300 hover:bg-red-500 hover:text-white hover:scale-105"
         >
           Logout
-        </small>
+        </button>
       </div>
     </>
   );

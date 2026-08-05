@@ -190,91 +190,160 @@ export default function ReportForm({ formPopup, onClose }) {
   if (!formPopup && !closing) return null;
 
   return (
-    <div className="z-100 fixed inset-0 flex items-end justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center items-end">
       <form
-        className={`bg-blue-50 w-full h-full text-[#FF8825] overflow-y-auto pt-24 flex flex-col items-center gap-4 rounded-t-2xl ${
+        onSubmit={handleSubmit}
+        className={`w-full h-full md:h-auto md:max-w-3xl md:rounded-3xl overflow-hidden shadow-2xl ${
           closing ? "slide-down" : "slide-up"
         }`}
-        onSubmit={handleSubmit}
+        style={{
+          background:
+            "linear-gradient(180deg,#FFF7F2 0%,#FFECDD 45%,#FFF 100%)",
+        }}
       >
-        <div className="w-full max-w-[300px] md:max-w-[600px] pt-5 md:pt-10">
-          <label htmlFor="category" className="text-lg text-gray-900">
-            Category <span className="text-red-600">*</span>
-          </label>
-          <select
-            name="category"
-            id="category"
-            value={formData.category}
-            onChange={handleInputChange}
-            className="px-2 w-full border border-red-400 rounded py-2 cursor-pointer"
-            required
-          >
-            <option value="Plumbing">Plumbing</option>
-            <option value="Electricity">Electricity</option>
-            <option value="Carpentry">Carpentry</option>
-            <option value="Masonery">Masonery</option>
-            <option value="Refrigerator">Refrigerator</option>
-            <option value="Air-conditioner">Air-conditioner</option>
-          </select>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#F88534] to-orange-500 px-8 py-8 text-white">
+          <h1 className="text-3xl font-bold">Maintenance Report</h1>
+
+          <p className="mt-2 text-orange-100">
+            Report a maintenance issue and our team will attend to it as soon as
+            possible.
+          </p>
         </div>
 
-        <div className="w-full max-w-[300px] md:max-w-[600px]">
-          <label htmlFor="priorityLevel" className="text-lg text-gray-900">
-            Priority Level <span className="text-red-600 ">*</span>
-          </label>
-          <select
-            name="priorityLevel"
-            id="priorityLevel"
-            value={formData.priorityLevel}
-            onChange={handleInputChange}
-            className="px-2 w-full border border-red-400 rounded py-2 cursor-pointer"
-            required
-          >
-            <option value="routine">Routine (Due in 1 to 2 days)</option>
-            <option value="urgent">Urgent (Due in 12 hours)</option>
-            <option value="emergency">Emergency (Emmediate responds)</option>
-          </select>
-        </div>
+        {/* Form */}
+        <div className="overflow-y-auto max-h-[75vh] px-8 py-8">
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-300 bg-red-100 p-4 text-red-700">
+              {error}
+            </div>
+          )}
 
-        <div className="w-full max-w-[300px] md:max-w-[600px]">
-          <label htmlFor="location" className="text-lg text-gray-900">
-            Location <span className="text-red-600">*</span>
-          </label>
-          <input
-            type="text"
-            id="location"
-            name="location"
-            value={formData.location}
-            onChange={handleInputChange}
-            className="bg-blue-300 w-full p-2 rounded"
-            placeholder="Eg. Doctors flat room 20"
-            required
-          />
-        </div>
+          <div className="space-y-6">
+            {/* Category */}
+            <div>
+              <label
+                htmlFor="category"
+                className="block mb-2 font-semibold text-gray-700"
+              >
+                🔧 Category
+              </label>
 
-        <div className="w-full max-w-[300px] md:max-w-[600px]">
-          <label htmlFor="reportDescription" className="text-lg text-gray-900">
-            Problem Description <span className="text-red-600">*</span>
-          </label>
-          <textarea
-            name="reportDescription"
-            id="reportDescription"
-            value={formData.reportDescription}
-            onChange={handleInputChange}
-            className="bg-blue-300 text-blue-900 w-full p-2 rounded"
-            placeholder="Briefly describe the problem"
-            rows="4"
-            required
-          />
-        </div>
+              <select
+                name="category"
+                id="category"
+                value={formData.category}
+                onChange={handleInputChange}
+                required
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:border-[#F88534] focus:ring-4 focus:ring-orange-200 outline-none transition"
+              >
+                <option value="Plumbing">Plumbing</option>
+                <option value="Electricity">Electricity</option>
+                <option value="Carpentry">Carpentry</option>
+                <option value="Masonery">Masonry</option>
+                <option value="Refrigerator">Refrigerator</option>
+                <option value="Air-conditioner">Air Conditioner</option>
+              </select>
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-[#40499F] text-blue-100 border border-white w-full max-w-[300px] md:max-w-[600px] w-full rounded py-2 text-lg hover:shadow hover:bg-blue-900 shadow-white cursor-pointer mt-10 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Submitting..." : "Submit Report"}
-        </button>
+            {/* Priority */}
+            <div>
+              <label
+                htmlFor="priorityLevel"
+                className="block mb-2 font-semibold text-gray-700"
+              >
+                ⚠ Priority Level
+              </label>
+
+              <select
+                name="priorityLevel"
+                id="priorityLevel"
+                value={formData.priorityLevel}
+                onChange={handleInputChange}
+                required
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:border-[#F88534] focus:ring-4 focus:ring-orange-200 outline-none transition"
+              >
+                <option value="routine">
+                  🟢 Routine (Due within 1–2 days)
+                </option>
+
+                <option value="urgent">🟠 Urgent (Due within 12 hours)</option>
+
+                <option value="emergency">
+                  🔴 Emergency (Immediate response)
+                </option>
+              </select>
+            </div>
+
+            {/* Location */}
+            <div>
+              <label
+                htmlFor="location"
+                className="block mb-2 font-semibold text-gray-700"
+              >
+                📍 Location
+              </label>
+
+              <input
+                type="text"
+                id="location"
+                name="location"
+                value={formData.location}
+                onChange={handleInputChange}
+                required
+                placeholder="e.g. Doctors Flat, Room 20"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:border-[#F88534] focus:ring-4 focus:ring-orange-200 outline-none transition"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label
+                htmlFor="reportDescription"
+                className="block mb-2 font-semibold text-gray-700"
+              >
+                📝 Problem Description
+              </label>
+
+              <textarea
+                name="reportDescription"
+                id="reportDescription"
+                value={formData.reportDescription}
+                onChange={handleInputChange}
+                rows={6}
+                required
+                placeholder="Describe the issue in as much detail as possible..."
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 resize-none focus:border-[#F88534] focus:ring-4 focus:ring-orange-200 outline-none transition"
+              />
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="mt-10 flex flex-col-reverse md:flex-row gap-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-gray-300 py-3 font-semibold text-gray-700 hover:bg-gray-100 transition"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 rounded-xl py-3 font-semibold text-lg text-white bg-gradient-to-r from-[#F88534] to-orange-600 hover:shadow-xl hover:scale-[1.02] transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-5 w-5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                  Submitting...
+                </span>
+              ) : (
+                "Submit Report"
+              )}
+            </button>
+          </div>
+        </div>
       </form>
     </div>
   );
