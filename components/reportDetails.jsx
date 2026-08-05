@@ -711,6 +711,22 @@ export default function ReportDetailsContainer({
         </p>
       </div>
 
+      {report.image && (
+        <div className="flex flex-col gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Attached Image:
+          </h2>
+          <img
+            src={report.image}
+            alt="Report attachment"
+            className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
+            onClick={() => window.open(report.image, "_blank")}
+          />
+        </div>
+      )}
+
       {report.dateApproved && (
         <div className="flex items-center gap-2">
           <h2

@@ -15,6 +15,8 @@ export default function ReportForm({ formPopup, onClose }) {
   const [closing, setClosing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   // Get current user from localStorage
   const storedUser = JSON.parse(localStorage.getItem("user"));
@@ -43,12 +45,69 @@ export default function ReportForm({ formPopup, onClose }) {
     return null; // Only staff can see and use this form
   }
 
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+
+      reader.readAsDataURL(file);
+
+      reader.onload = (event) => {
+        const img = new Image();
+
+        img.src = event.target.result;
+
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+
+          const maxWidth = 600;
+
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Converts to compressed JPEG
+          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.5);
+
+          resolve(compressedBase64);
+        };
+      };
+    });
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file");
+      return;
+    }
+
+    setImage(file);
+
+    const preview = URL.createObjectURL(file);
+
+    setImagePreview(preview);
   };
 
   const calculateDueDate = (priorityLevel) => {
@@ -121,6 +180,12 @@ export default function ReportForm({ formPopup, onClose }) {
           })
           .filter((sentDate) => sentDate && sentDate >= thisMonth).length + 1;
 
+      let imageBase64 = "";
+
+      if (image) {
+        imageBase64 = await compressImage(image);
+      }
+
       // Create the report document
       const reportData = {
         // Status tracking
@@ -137,6 +202,7 @@ export default function ReportForm({ formPopup, onClose }) {
         dateProcured: null,
         dateAssigned: null,
         dateCompleted: null,
+        image: imageBase64,
 
         dateDue: calculateDueDate(formData.priorityLevel),
 
@@ -178,6 +244,8 @@ export default function ReportForm({ formPopup, onClose }) {
         reportDescription: "",
         costDescription: "",
       });
+      setImage(null);
+      setImagePreview("");
       onClose();
     } catch (err) {
       console.error("Error submitting report:", err);
@@ -315,6 +383,68 @@ export default function ReportForm({ formPopup, onClose }) {
                 placeholder="Describe the issue in as much detail as possible..."
                 className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 resize-none focus:border-[#F88534] focus:ring-4 focus:ring-orange-200 outline-none transition"
               />
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <label className="block mb-2 font-semibold text-gray-700">
+                📷 Attach Image (Optional)
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Take Photo */}
+                <label className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-orange-300 rounded-2xl bg-orange-50 cursor-pointer hover:bg-orange-100 transition">
+                  <span className="text-4xl">📷</span>
+                  <p className="text-gray-600 text-sm text-center px-2">
+                    Take a photo
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Choose from Library */}
+                <label className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-orange-300 rounded-2xl bg-orange-50 cursor-pointer hover:bg-orange-100 transition">
+                  <span className="text-4xl">🖼️</span>
+                  <p className="text-gray-600 text-sm text-center px-2">
+                    Choose from gallery
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <p className="text-xs text-gray-400 mt-2 text-center">
+                Maximum 1 image
+              </p>
+
+              {imagePreview && (
+                <div className="mt-4">
+                  <img
+                    src={imagePreview}
+                    alt="preview"
+                    className="w-full h-48 object-cover rounded-xl shadow"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImage(null);
+                      setImagePreview("");
+                    }}
+                    className="mt-2 text-red-500 text-sm"
+                  >
+                    Remove image
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
