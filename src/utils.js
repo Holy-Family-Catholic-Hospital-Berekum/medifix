@@ -413,10 +413,52 @@ export const generateDashboardStatsPDF = (
   const pageHeight = 842;
   const margin = 40;
   const now = new Date();
-  const periodLabel = period === "year" ? "Current Year" : "Current Month";
-  const periodName = period === "year" ? "Yearly" : "Monthly";
+
+  // ── period metadata ──────────────────────────────────────────────────────
+  const PERIOD_LABELS = {
+    month: "This Month",
+    year: "This Year",
+    lastYear: "Last Year",
+    overall: "Overall (All Time)",
+  };
+  const PERIOD_FILE_TAGS = {
+    month: "Monthly",
+    year: "Yearly",
+    lastYear: "LastYear",
+    overall: "Overall",
+  };
+
+  const periodLabel = PERIOD_LABELS[period] || PERIOD_LABELS.month;
+  const periodName = PERIOD_FILE_TAGS[period] || PERIOD_FILE_TAGS.month;
+
+  // stats.periodStats holds { overall, month, year, lastYear }, each built
+  // via buildPeriodStats() — falls back to the legacy monthStats/overall shape
+  // if periodStats isn't present (older callers), so this stays backwards compatible.
   const selectedStats =
-    period === "year" ? stats?.yearStats || {} : stats?.monthStats || {};
+    stats?.periodStats?.[period] ??
+    (period === "year"
+      ? stats?.yearStats
+      : period === "lastYear"
+        ? stats?.lastYearStats
+        : period === "overall"
+          ? null
+          : stats?.monthStats) ??
+    {};
+
+  const overallStats = stats?.periodStats?.overall ?? {
+    total: stats?.total ?? 0,
+    completed: stats?.completed ?? 0,
+    active: stats?.active ?? 0,
+    overdue: stats?.overdue ?? 0,
+    avgResolutionDays: stats?.avgResolutionDays ?? null,
+    totalCost: stats?.totalCost ?? 0,
+    avgCost: stats?.avgCost ?? null,
+    maxCost: stats?.maxCost ?? null,
+    costByPriority: stats?.costByPriority ?? {},
+    byStatus: stats?.byStatus ?? {},
+    catCount: stats?.catCount ?? {},
+  };
+
   const displayMonth = now.toLocaleString("default", {
     month: "long",
     year: "numeric",
@@ -480,11 +522,17 @@ export const generateDashboardStatsPDF = (
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
 
-    items.forEach((item) => {
-      const lines = doc.splitTextToSize(item, pageWidth - margin * 2 - 12);
-      doc.text(lines, margin, y);
-      y += lines.length * 14;
-    });
+    if (items.length === 0) {
+      doc.setTextColor(148, 163, 184);
+      doc.text("No data for this period.", margin, y);
+      y += 14;
+    } else {
+      items.forEach((item) => {
+        const lines = doc.splitTextToSize(item, pageWidth - margin * 2 - 12);
+        doc.text(lines, margin, y);
+        y += lines.length * 14;
+      });
+    }
 
     y += 8;
   };
@@ -495,10 +543,14 @@ export const generateDashboardStatsPDF = (
       maximumFractionDigits: 0,
     })}`;
 
-  const statusEntries = Object.entries(stats?.byStatus || {})
+  const statusEntries = Object.entries(
+    selectedStats.byStatus || stats?.byStatus || {},
+  )
     .filter(([, count]) => Number(count) > 0)
     .map(([status, count]) => `• ${status}: ${count}`);
-  const categoryEntries = Object.entries(stats?.catCount || {})
+  const categoryEntries = Object.entries(
+    selectedStats.catCount || stats?.catCount || {},
+  )
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([category, count]) => `• ${category}: ${count}`);
@@ -527,51 +579,61 @@ export const generateDashboardStatsPDF = (
   });
 
   y += 22;
+
   const completion = selectedStats.total
     ? Math.round((selectedStats.completed / selectedStats.total) * 100)
     : 0;
-  const yearCompletion = stats?.yearStats?.total
-    ? Math.round((stats.yearStats.completed / stats.yearStats.total) * 100)
+  const overallCompletion = overallStats.total
+    ? Math.round((overallStats.completed / overallStats.total) * 100)
     : 0;
 
-  addInfoBox("Selected Period Summary", [
+  addInfoBox(`Selected Period Summary — ${periodLabel}`, [
     `Total submissions: ${selectedStats.total ?? 0}`,
     `Completed: ${selectedStats.completed ?? 0}`,
     `Active: ${selectedStats.active ?? 0}`,
     `Overdue: ${selectedStats.overdue ?? 0}`,
     `Completion rate: ${completion}%`,
     `Average resolution: ${selectedStats.avgResolutionDays ?? "—"} days`,
+    `Total spend: ${formatCedis(selectedStats.totalCost ?? 0)}`,
   ]);
 
-  addInfoBox(
-    "Year-to-Date Comparison",
-    [
-      `Total submissions: ${stats?.yearStats?.total ?? 0}`,
-      `Completed: ${stats?.yearStats?.completed ?? 0}`,
-      `Active: ${stats?.yearStats?.active ?? 0}`,
-      `Overdue: ${stats?.yearStats?.overdue ?? 0}`,
-      `Completion rate: ${yearCompletion}%`,
-      `Average resolution: ${stats?.yearStats?.avgResolutionDays ?? "—"} days`,
-      `Total spend: ${formatCedis(stats?.totalCost ?? 0)}`,
-    ],
-    [30, 64, 175],
-  );
+  // Only show the separate "Overall" comparison box when a narrower period
+  // was selected — for "overall" itself it would just duplicate the box above.
+  if (period !== "overall") {
+    addInfoBox(
+      "Overall Comparison (All Time)",
+      [
+        `Total submissions: ${overallStats.total ?? 0}`,
+        `Completed: ${overallStats.completed ?? 0}`,
+        `Active: ${overallStats.active ?? 0}`,
+        `Overdue: ${overallStats.overdue ?? 0}`,
+        `Completion rate: ${overallCompletion}%`,
+        `Average resolution: ${overallStats.avgResolutionDays ?? "—"} days`,
+        `Total spend: ${formatCedis(overallStats.totalCost ?? 0)}`,
+      ],
+      [30, 64, 175],
+    );
+  }
 
   addInfoBox(
-    "Financial Summary",
+    `Financial Summary — ${periodLabel}`,
     [
-      `Total spend: ${formatCedis(stats?.totalCost ?? 0)}`,
-      `Average cost per completed work: ${formatCedis(stats?.avgCost ?? 0)}`,
-      `Highest work cost: ${formatCedis(stats?.maxCost ?? 0)}`,
-      `Emergency: ${formatCedis(stats?.costByPriority?.emergency ?? 0)}`,
-      `Urgent: ${formatCedis(stats?.costByPriority?.urgent ?? 0)}`,
-      `Routine: ${formatCedis(stats?.costByPriority?.routine ?? 0)}`,
+      `Total spend: ${formatCedis(selectedStats.totalCost ?? 0)}`,
+      `Average cost per completed work: ${formatCedis(selectedStats.avgCost ?? 0)}`,
+      `Highest work cost: ${formatCedis(selectedStats.maxCost ?? 0)}`,
+      `Emergency: ${formatCedis(selectedStats.costByPriority?.emergency ?? 0)}`,
+      `Urgent: ${formatCedis(selectedStats.costByPriority?.urgent ?? 0)}`,
+      `Routine: ${formatCedis(selectedStats.costByPriority?.routine ?? 0)}`,
     ],
     [127, 29, 29],
   );
 
-  addInfoBox("Status Breakdown", statusEntries, [34, 197, 94]);
-  addInfoBox("Top Work Categories", categoryEntries, [76, 29, 149]);
+  addInfoBox(`Status Breakdown — ${periodLabel}`, statusEntries, [34, 197, 94]);
+  addInfoBox(
+    `Top Work Categories — ${periodLabel}`,
+    categoryEntries,
+    [76, 29, 149],
+  );
 
   addInfoBox(
     "Last 6 Months Submissions",

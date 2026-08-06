@@ -118,6 +118,21 @@ const CAT_COLORS = [
 ];
 const ALLOWED_ROLES = ["admin", "manager", "estate", "procurement"];
 
+// ─── period selector options (shared by overview display + PDF download) ────
+const PERIOD_OPTIONS = [
+  { value: "overall", label: "Overall" },
+  { value: "month", label: "This Month" },
+  { value: "year", label: "This Year" },
+  { value: "lastYear", label: "Last Year" },
+];
+
+const DOWNLOAD_PERIOD_LABELS = {
+  month: "Monthly",
+  year: "Yearly",
+  lastYear: "Last Year's",
+  overall: "Overall",
+};
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function timeAgo(date) {
   if (!date) return "";
@@ -139,6 +154,113 @@ function formatDate(date) {
     month: "short",
     year: "numeric",
   });
+}
+
+// Computes report + cost stats for an arbitrary subset of reports.
+// Used to build the "overall / month / year / lastYear" period breakdowns
+// that drive the Overview tab and the PDF download period select.
+function buildPeriodStats(subset) {
+  const total = subset.length;
+  const completed = subset.filter((r) => r.status === "completed").length;
+  const overdue = subset.filter(
+    (r) => r.overdue && r.status !== "completed",
+  ).length;
+  const active = subset.filter(
+    (r) => !["completed", "denied"].includes(r.status),
+  ).length;
+
+  const byStatus = Object.fromEntries(
+    Object.keys(STATUS_META).map((s) => [s, 0]),
+  );
+  subset.forEach((r) => {
+    if (r.status in byStatus) byStatus[r.status]++;
+  });
+
+  const byPriority = { emergency: 0, urgent: 0, routine: 0 };
+  subset.forEach((r) => {
+    if (r.priorityLevel in byPriority) byPriority[r.priorityLevel]++;
+  });
+
+  const catCount = {};
+  subset.forEach((r) => {
+    catCount[r.category] = (catCount[r.category] || 0) + 1;
+  });
+
+  const resolved = subset.filter((r) => r.dateCompleted && r.dateSent);
+  const avgResolutionDays = resolved.length
+    ? (
+        resolved.reduce((sum, r) => {
+          const sent = r.dateSent?.toDate
+            ? r.dateSent.toDate()
+            : new Date(r.dateSent);
+          const done = r.dateCompleted?.toDate
+            ? r.dateCompleted.toDate()
+            : new Date(r.dateCompleted);
+          return sum + (done - sent) / 86400000;
+        }, 0) / resolved.length
+      ).toFixed(1)
+    : null;
+
+  const completionRate = total ? Math.round((completed / total) * 100) : 0;
+
+  const getReportTotalCost = (r) =>
+    (Number(r.cost) || 0) + (Number(r.maintenanceCost) || 0);
+
+  const reportsWithCost = subset.filter(
+    (r) =>
+      (r.cost != null && !isNaN(r.cost)) ||
+      (r.maintenanceCost != null && !isNaN(r.maintenanceCost)),
+  );
+  const totalCost = reportsWithCost.reduce(
+    (s, r) => s + getReportTotalCost(r),
+    0,
+  );
+  const totalMaterialsCost = reportsWithCost.reduce(
+    (s, r) => s + (Number(r.cost) || 0),
+    0,
+  );
+  const totalMaintenanceCost = reportsWithCost.reduce(
+    (s, r) => s + (Number(r.maintenanceCost) || 0),
+    0,
+  );
+  const avgCost = reportsWithCost.length
+    ? totalCost / reportsWithCost.length
+    : null;
+  const maxCost = reportsWithCost.length
+    ? Math.max(...reportsWithCost.map(getReportTotalCost))
+    : null;
+
+  const costByCategory = {};
+  reportsWithCost.forEach((r) => {
+    costByCategory[r.category] =
+      (costByCategory[r.category] || 0) + getReportTotalCost(r);
+  });
+
+  const costByPriority = { emergency: 0, urgent: 0, routine: 0 };
+  reportsWithCost.forEach((r) => {
+    if (r.priorityLevel in costByPriority)
+      costByPriority[r.priorityLevel] += getReportTotalCost(r);
+  });
+
+  return {
+    total,
+    completed,
+    overdue,
+    active,
+    byStatus,
+    byPriority,
+    catCount,
+    completionRate,
+    avgResolutionDays,
+    reportsWithCost: reportsWithCost.length,
+    totalCost,
+    totalMaterialsCost,
+    totalMaintenanceCost,
+    avgCost,
+    maxCost,
+    costByCategory,
+    costByPriority,
+  };
 }
 
 // ─── primitives ──────────────────────────────────────────────────────────────
@@ -190,6 +312,32 @@ function SectionTitle({ children }) {
     >
       {children}
     </h2>
+  );
+}
+
+function PeriodSelect({ value, onChange }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        padding: "8px 12px",
+        borderRadius: 8,
+        border: "1px solid #e2e8f0",
+        background: "#fff",
+        color: "#374151",
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer",
+        outline: "none",
+      }}
+    >
+      {PERIOD_OPTIONS.map((p) => (
+        <option key={p.value} value={p.value}>
+          {p.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -575,10 +723,6 @@ function GenIDModal({ role, onClose }) {
 }
 
 // ─── Reset Password modal ─────────────────────────────────────────────────────
-// Admin / IT Manager can send a secure Firebase password-reset email to a user.
-// This uses Firebase Auth's built-in reset-link flow and does not require any
-// paid Cloud Functions endpoint or backend deployment.
-
 function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -827,6 +971,9 @@ export default function Dashboard({
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [downloadPeriod, setDownloadPeriod] = useState("month");
 
+  // ── which period's stats to display on the Overview tab ──────────────────
+  const [displayPeriod, setDisplayPeriod] = useState("overall");
+
   // ── password reset modal state ────────────────────────────────────────────
   const [resetTarget, setResetTarget] = useState(null); // user object or null
 
@@ -932,21 +1079,27 @@ export default function Dashboard({
     const yearStart = new Date(now.getFullYear(), 0, 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const nextYearStart = new Date(now.getFullYear() + 1, 0, 1);
+    const lastYearStart = new Date(now.getFullYear() - 1, 0, 1);
+
+    const getSent = (r) =>
+      r.dateSent?.toDate ? r.dateSent.toDate() : new Date(r.dateSent);
 
     const monthReports = reports.filter((r) => {
-      const sent = r.dateSent?.toDate
-        ? r.dateSent.toDate()
-        : new Date(r.dateSent);
+      const sent = getSent(r);
       if (Number.isNaN(sent.getTime())) return false;
       return sent >= monthStart && sent < nextMonthStart;
     });
 
     const yearReports = reports.filter((r) => {
-      const sent = r.dateSent?.toDate
-        ? r.dateSent.toDate()
-        : new Date(r.dateSent);
+      const sent = getSent(r);
       if (Number.isNaN(sent.getTime())) return false;
       return sent >= yearStart && sent < nextYearStart;
+    });
+
+    const lastYearReports = reports.filter((r) => {
+      const sent = getSent(r);
+      if (Number.isNaN(sent.getTime())) return false;
+      return sent >= lastYearStart && sent < yearStart;
     });
 
     const monthCompleted = monthReports.filter(
@@ -973,9 +1126,7 @@ export default function Dashboard({
       return {
         label: d.toLocaleString("default", { month: "short" }),
         value: reports.filter((r) => {
-          const rd = r.dateSent?.toDate
-            ? r.dateSent.toDate()
-            : new Date(r.dateSent);
+          const rd = getSent(r);
           if (Number.isNaN(rd.getTime())) return false;
           return (
             rd.getFullYear() === d.getFullYear() &&
@@ -1048,7 +1199,7 @@ export default function Dashboard({
           (a.createdAt?.toDate?.() ?? new Date(0)),
       );
 
-    // ── Cost analytics ──────────────────────────────────────────────────────
+    // ── Cost analytics (overall, used for trend charts) ────────────────────
     const getReportTotalCost = (r) =>
       (Number(r.cost) || 0) + (Number(r.maintenanceCost) || 0);
 
@@ -1084,17 +1235,18 @@ export default function Dashboard({
 
     const costTrend = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      const monthReports = reportsWithCost.filter((r) => {
-        const rd = r.dateSent?.toDate
-          ? r.dateSent.toDate()
-          : new Date(r.dateSent);
+      const monthReportsForTrend = reportsWithCost.filter((r) => {
+        const rd = getSent(r);
         return (
           rd.getFullYear() === d.getFullYear() && rd.getMonth() === d.getMonth()
         );
       });
       return {
         label: d.toLocaleString("default", { month: "short" }),
-        value: monthReports.reduce((s, r) => s + getReportTotalCost(r), 0),
+        value: monthReportsForTrend.reduce(
+          (s, r) => s + getReportTotalCost(r),
+          0,
+        ),
       };
     });
 
@@ -1107,6 +1259,14 @@ export default function Dashboard({
     const procurementCount = users.filter(
       (u) => u.role === "procurement",
     ).length;
+
+    // ── Period breakdowns (drives Overview display select + PDF download) ─
+    const periodStats = {
+      overall: buildPeriodStats(reports),
+      month: buildPeriodStats(monthReports),
+      year: buildPeriodStats(yearReports),
+      lastYear: buildPeriodStats(lastYearReports),
+    };
 
     return {
       total,
@@ -1135,14 +1295,12 @@ export default function Dashboard({
       costByCategory,
       costTrend,
       costByPriority,
-      totalCost,
       totalMaterialsCost,
       totalMaintenanceCost,
-      avgCost,
-      maxCost,
       estateCount,
       procurementCount,
       adminCount,
+      periodStats,
       monthStats: {
         total: monthReports.length,
         completed: monthCompleted,
@@ -1157,8 +1315,24 @@ export default function Dashboard({
         active: yearActive,
         avgResolutionDays: getResolutionAverage(yearReports),
       },
+      lastYearStats: {
+        total: lastYearReports.length,
+        completed: lastYearReports.filter((r) => r.status === "completed")
+          .length,
+        overdue: lastYearReports.filter(
+          (r) => r.overdue && r.status !== "completed",
+        ).length,
+        active: lastYearReports.filter(
+          (r) => !["completed", "denied"].includes(r.status),
+        ).length,
+        avgResolutionDays: getResolutionAverage(lastYearReports),
+      },
     };
   }, [reports, users]);
+
+  // Stats for whichever period is currently selected on the Overview tab
+  const displayStats =
+    stats.periodStats[displayPeriod] ?? stats.periodStats.overall;
 
   const filteredUsers = useMemo(() => {
     let list = isManager ? users.filter((u) => u.role !== "admin") : users;
@@ -1456,6 +1630,8 @@ export default function Dashboard({
                       >
                         <option value="month">Current month</option>
                         <option value="year">Current year</option>
+                        <option value="lastYear">Last year</option>
+                        <option value="overall">Overall (all time)</option>
                       </select>
                       <button
                         type="button"
@@ -1464,9 +1640,7 @@ export default function Dashboard({
                         }
                         className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm w-full"
                       >
-                        Download{" "}
-                        {downloadPeriod === "month" ? "Monthly" : "Yearly"}{" "}
-                        Report
+                        Download {DOWNLOAD_PERIOD_LABELS[downloadPeriod]} Report
                       </button>
                     </div>
                   )}
@@ -1536,32 +1710,46 @@ export default function Dashboard({
         {/* ══════════════════ OVERVIEW ══════════════════ */}
         {activeTab === "overview" && (
           <>
-            <SectionTitle>Report summary</SectionTitle>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 10,
+                marginTop: 28,
+              }}
+            >
+              <SectionTitle>Report summary</SectionTitle>
+              <PeriodSelect value={displayPeriod} onChange={setDisplayPeriod} />
+            </div>
             <div className="kpi-5" style={{ marginBottom: 20 }}>
               <StatCard
                 label="Total"
-                value={stats.total}
+                value={displayStats.total}
                 icon="📋"
                 accent="#3b82f6"
-                sub="All time"
+                sub={
+                  PERIOD_OPTIONS.find((p) => p.value === displayPeriod)?.label
+                }
               />
               <StatCard
                 label="Active"
-                value={stats.active}
+                value={displayStats.active}
                 icon="⚙️"
                 accent="#f97316"
                 sub="In pipeline"
               />
               <StatCard
                 label="Completed"
-                value={stats.completed}
+                value={displayStats.completed}
                 icon="✅"
                 accent="#22c55e"
-                sub={`${stats.completionRate}% rate`}
+                sub={`${displayStats.completionRate}% rate`}
               />
               <StatCard
                 label="Overdue"
-                value={stats.overdue}
+                value={displayStats.overdue}
                 icon="⚠️"
                 accent="#ef4444"
                 sub="Needs attention"
@@ -1569,7 +1757,9 @@ export default function Dashboard({
               <StatCard
                 label="Avg Resolution"
                 value={
-                  stats.avgResolutionDays ? `${stats.avgResolutionDays}d` : "—"
+                  displayStats.avgResolutionDays
+                    ? `${displayStats.avgResolutionDays}d`
+                    : "—"
                 }
                 icon="⏱️"
                 accent="#8b5cf6"
@@ -1608,60 +1798,62 @@ export default function Dashboard({
             <SectionTitle>Status breakdown</SectionTitle>
             <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {Object.entries(stats.byStatus).map(([status, count]) => {
-                  const m = STATUS_META[status];
-                  return (
-                    <div
-                      key={status}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        background: m?.bg ?? "#f1f5f9",
-                        borderRadius: 10,
-                        padding: "10px 14px",
-                        flex: "1 1 120px",
-                        minWidth: 0,
-                      }}
-                    >
-                      <span
+                {Object.entries(displayStats.byStatus).map(
+                  ([status, count]) => {
+                    const m = STATUS_META[status];
+                    return (
+                      <div
+                        key={status}
                         style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: m?.color ?? "#94a3b8",
-                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          background: m?.bg ?? "#f1f5f9",
+                          borderRadius: 10,
+                          padding: "10px 14px",
+                          flex: "1 1 120px",
+                          minWidth: 0,
                         }}
-                      />
-                      <div style={{ minWidth: 0 }}>
-                        <div
+                      >
+                        <span
                           style={{
-                            fontSize: 10,
-                            color: m?.text ?? "#374151",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: ".04em",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: m?.color ?? "#94a3b8",
+                            flexShrink: 0,
                           }}
-                        >
-                          {m?.label ?? status}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 20,
-                            fontWeight: 800,
-                            color: m?.text ?? "#0f172a",
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {count}
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: m?.text ?? "#374151",
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              letterSpacing: ".04em",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {m?.label ?? status}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 20,
+                              fontWeight: 800,
+                              color: m?.text ?? "#0f172a",
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {count}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  },
+                )}
               </div>
             </Card>
 
@@ -1682,10 +1874,12 @@ export default function Dashboard({
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
                   <Donut
-                    slices={Object.entries(stats.byPriority).map(([k, v]) => ({
-                      value: v,
-                      color: PRIORITY_META[k].color,
-                    }))}
+                    slices={Object.entries(displayStats.byPriority).map(
+                      ([k, v]) => ({
+                        value: v,
+                        color: PRIORITY_META[k].color,
+                      }),
+                    )}
                     size={90}
                   />
                   <div
@@ -1697,7 +1891,7 @@ export default function Dashboard({
                       minWidth: 0,
                     }}
                   >
-                    {Object.entries(stats.byPriority).map(([k, v]) => (
+                    {Object.entries(displayStats.byPriority).map(([k, v]) => (
                       <div
                         key={k}
                         style={{
@@ -1747,9 +1941,9 @@ export default function Dashboard({
                 >
                   By category
                 </p>
-                {Object.keys(stats.catCount).length > 0 ? (
+                {Object.keys(displayStats.catCount).length > 0 ? (
                   <BarChart
-                    data={Object.entries(stats.catCount).map(
+                    data={Object.entries(displayStats.catCount).map(
                       ([label, value]) => ({ label: label.slice(0, 7), value }),
                     )}
                     color="#ef4444"
@@ -1768,28 +1962,38 @@ export default function Dashboard({
               <BarChart data={stats.trend} color="#3b82f6" height={130} />
             </Card>
 
-            <SectionTitle>Cost analytics</SectionTitle>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 10,
+              }}
+            >
+              <SectionTitle>Cost analytics</SectionTitle>
+            </div>
             <div className="kpi-3" style={{ marginBottom: 20 }}>
               <StatCard
                 label="Total Spend"
                 value={
-                  stats.totalCost
-                    ? `₵${stats.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  displayStats.totalCost
+                    ? `₵${displayStats.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                     : "—"
                 }
                 icon="💰"
                 accent="#10b981"
                 sub={
-                  stats.totalCost
-                    ? `Materials ₵${stats.totalMaterialsCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} · Maintenance ₵${stats.totalMaintenanceCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                    : `${stats.reportsWithCost} reports with cost`
+                  displayStats.totalCost
+                    ? `Materials ₵${displayStats.totalMaterialsCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} · Maintenance ₵${displayStats.totalMaintenanceCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : `${displayStats.reportsWithCost} reports with cost`
                 }
               />
               <StatCard
                 label="Avg Cost / Job"
                 value={
-                  stats.avgCost
-                    ? `₵${stats.avgCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  displayStats.avgCost
+                    ? `₵${displayStats.avgCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                     : "—"
                 }
                 icon="📊"
@@ -1799,8 +2003,8 @@ export default function Dashboard({
               <StatCard
                 label="Highest Job"
                 value={
-                  stats.maxCost
-                    ? `₵${stats.maxCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  displayStats.maxCost
+                    ? `₵${displayStats.maxCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                     : "—"
                 }
                 icon="📈"
@@ -1851,7 +2055,7 @@ export default function Dashboard({
                 >
                   Spend by category
                 </p>
-                {Object.keys(stats.costByCategory).length > 0 ? (
+                {Object.keys(displayStats.costByCategory).length > 0 ? (
                   <div
                     style={{
                       display: "flex",
@@ -1859,11 +2063,11 @@ export default function Dashboard({
                       gap: 10,
                     }}
                   >
-                    {Object.entries(stats.costByCategory)
+                    {Object.entries(displayStats.costByCategory)
                       .sort((a, b) => b[1] - a[1])
                       .map(([cat, total], i) => {
-                        const pct = stats.totalCost
-                          ? Math.round((total / stats.totalCost) * 100)
+                        const pct = displayStats.totalCost
+                          ? Math.round((total / displayStats.totalCost) * 100)
                           : 0;
                         const c = CAT_COLORS[i % CAT_COLORS.length];
                         return (
@@ -1945,7 +2149,7 @@ export default function Dashboard({
                 Spend by priority
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                {Object.entries(stats.costByPriority).map(([k, v]) => {
+                {Object.entries(displayStats.costByPriority).map(([k, v]) => {
                   const m = PRIORITY_META[k];
                   return (
                     <div
@@ -2869,46 +3073,3 @@ export default function Dashboard({
     </div>
   );
 }
-
-/*
-────────────────────────────────────────────────────────────────────────────────
-CLOUD FUNCTION — deploy this to Firebase Functions (functions/index.js)
-────────────────────────────────────────────────────────────────────────────────
-
-const { onRequest } = require("firebase-functions/v2/https");
-const admin = require("firebase-admin");
-const cors  = require("cors")({ origin: true });
-
-admin.initializeApp();
-
-exports.adminResetPassword = onRequest((req, res) => {
-  cors(req, res, async () => {
-    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
-    const { uid, tempPassword } = req.body ?? {};
-    if (!uid || !tempPassword) return res.status(400).json({ error: "uid and tempPassword are required" });
-    if (tempPassword.length < 6)  return res.status(400).json({ error: "Password must be at least 6 characters" });
-
-    try {
-      // Optional: verify the caller is an admin by checking their ID token
-      // const token = req.headers.authorization?.split("Bearer ")[1];
-      // const decoded = await admin.auth().verifyIdToken(token);
-      // const callerDoc = await admin.firestore().collection("users").doc(decoded.uid).get();
-      // if (!["admin","manager"].includes(callerDoc.data()?.role)) return res.status(403).json({ error: "Forbidden" });
-
-      await admin.auth().updateUser(uid, { password: tempPassword });
-      return res.json({ success: true });
-    } catch (err) {
-      console.error("adminResetPassword error:", err);
-      return res.status(500).json({ error: err.message });
-    }
-  });
-});
-
-Deploy with:
-  firebase deploy --only functions:adminResetPassword
-
-Then set in your .env:
-  VITE_ADMIN_RESET_FN_URL=https://<region>-<project>.cloudfunctions.net/adminResetPassword
-────────────────────────────────────────────────────────────────────────────────
-*/

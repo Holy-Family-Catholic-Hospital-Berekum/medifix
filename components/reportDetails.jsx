@@ -29,6 +29,33 @@ import {
 
 const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
 
+// Reusable, UX-friendly "call" button — bigger tap target, icon, clear affordance
+function PhoneCallButton({ phoneNumber, label }) {
+  if (!phoneNumber) return null;
+  return (
+    <a
+      href={`tel:${phoneNumber}`}
+      aria-label={
+        label ? `Call ${label} at ${phoneNumber}` : `Call ${phoneNumber}`
+      }
+      className="inline-flex items-center gap-2 rounded-full bg-green-50 hover:bg-green-100 active:bg-green-200
+                 border border-green-300 text-green-700 px-4 py-2 min-h-[44px] text-sm md:text-base font-medium
+                 transition-colors duration-150 shadow-sm active:scale-[0.98]"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="w-4 h-4 md:w-5 md:h-5 shrink-0"
+        aria-hidden="true"
+      >
+        <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V20a1 1 0 01-1 1C10.4 21 3 13.6 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.58a1 1 0 01-.25 1.01l-2.2 2.2z" />
+      </svg>
+      <span>{phoneNumber}</span>
+    </a>
+  );
+}
+
 function MaterialsTable({ materials, onChange, readOnly = false }) {
   const addRow = () => onChange([...materials, { ...EMPTY_MATERIAL }]);
 
@@ -692,12 +719,10 @@ export default function ReportDetailsContainer({
         >
           Sender Contact:
         </h2>
-        <a
-          href={`tel:${report.reporterContact}`}
-          className="text-red-700 md:text-lg border-b"
-        >
-          {report.reporterContact}
-        </a>
+        <PhoneCallButton
+          phoneNumber={report.reporterContact}
+          label={report.reporter}
+        />
       </div>
 
       <div className="flex items-center gap-2">
@@ -799,18 +824,14 @@ export default function ReportDetailsContainer({
           >
             Technician:
           </h2>
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-1">
             <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
               {assignedWorker?.name}
             </p>
-            {assignedWorker?.phoneNumber && (
-              <a
-                href={`tel:${assignedWorker.phoneNumber}`}
-                className="text-red-700 md:text-lg border-b w-fit"
-              >
-                {assignedWorker.phoneNumber}
-              </a>
-            )}
+            <PhoneCallButton
+              phoneNumber={assignedWorker?.phoneNumber}
+              label={assignedWorker?.name}
+            />
           </div>
         </div>
       )}

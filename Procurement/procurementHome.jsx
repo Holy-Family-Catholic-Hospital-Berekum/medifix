@@ -6,11 +6,11 @@ export default function ProcurementHome() {
       bgColor="bg-[#eff6ff]"
       firstReportsStatus="confirmed"
       primaryColor="text-red-800"
-      title1="Confirmed Reports"
+      title1="Materials Requests"
       secColor={"bg-yellow-500"}
       titleBgColor={"bg-yellow-500"}
       reportCardHoverColor={"hover:bg-yellow-600"}
-      reportDate1="dateAssigned"
+      reportDate1="dateConfirmed"
       titleBorderColor={"border-red-800"}
       navBarColor="bg-red-800"
       slideInBgColor="bg-yellow-500"
