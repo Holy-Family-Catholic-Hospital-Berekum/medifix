@@ -24,6 +24,20 @@ const CATEGORY_ICONS = {
   "Air Conditioner": "🌬️",
 };
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function getFormalName(userObj) {
+  if (!userObj) return "";
+  const surname = userObj.name?.trim().split(" ").slice(-1)[0] || "";
+  const title = userObj.profession?.trim();
+  return title ? `${title} ${surname}` : surname;
+}
+
 function getCategoryIcon(category = "") {
   const key = Object.keys(CATEGORY_ICONS).find((k) =>
     category.toLowerCase().includes(k.toLowerCase()),
@@ -238,6 +252,14 @@ export default function History() {
   const HistoryContent = (
     <div className="min-h-screen bg-gray-50 py-24 px-4 md:px-8 lg:px-16">
       {/* ── Header ───────────────────────────────────────── */}
+
+      {/* ── Welcome message ──────────────────────────────────────── */}
+      {!loading && userData && (
+        <p className="text-gray-500 font-semibold mb-2">
+          {getGreeting()}, {getFormalName(userData)} 👋
+        </p>
+      )}
+
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900">Completed Reports</h1>
         <p className="text-gray-400 text-sm mt-1">

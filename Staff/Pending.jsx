@@ -43,6 +43,42 @@ function useLiveTimeAgo(date) {
   return label;
 }
 
+const STATUS_MESSAGES = {
+  incoming: "Your report has been sent, waiting for admin approval.",
+  approved: "Admin has approved your report, waiting for estate review.",
+  pending:
+    "Estate has sent a materials request to admin, waiting for confirmation.",
+  confirmed:
+    "Admin has confirmed the materials request, waiting for procurement.",
+  procured: "Materials have been procured, waiting for technician assignment.",
+  assigned:
+    "Your work has been assigned to the right technician, it will be attended to shortly.",
+  denied: "Your report was not approved. See the reason below.",
+};
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function getFormalName(userObj) {
+  if (!userObj) return "";
+  const surname = userObj.name?.trim().split(" ").slice(-1)[0] || "";
+  const title = userObj.profession?.trim();
+  return title ? `${title} ${surname}` : surname;
+}
+
+function getStatusMessage(report) {
+  if (report.status === "completed") {
+    return report.feedback
+      ? "Your work has been completed. Thanks for your feedback!"
+      : "Your work has been completed, waiting for your feedback.";
+  }
+  return STATUS_MESSAGES[report.status] || "";
+}
+
 // ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   incoming: {
@@ -93,6 +129,14 @@ const STATUS_CONFIG = {
     bar: "bg-red-400",
     icon: "❌",
   },
+  completed: {
+    label: "Completed",
+    bg: "bg-green-100",
+    text: "text-green-700",
+    dot: "bg-green-500",
+    bar: "bg-green-400",
+    icon: "🏁",
+  },
 };
 
 const PRIORITY_CONFIG = {
@@ -100,6 +144,35 @@ const PRIORITY_CONFIG = {
   urgent: { label: "Urgent", bg: "bg-orange-500", text: "text-white" },
   routine: { label: "Routine", bg: "bg-green-500", text: "text-white" },
 };
+
+// ─── Progress helpers ─────────────────────────────────────────────────────
+const STATUS_ORDER = [
+  "incoming",
+  "approved",
+  "pending",
+  "confirmed",
+  "procured",
+  "assigned",
+  "completed",
+];
+
+function getProgressPercent(status) {
+  if (status === "denied") return 100; // full bar, but rendered red (see below)
+  const idx = STATUS_ORDER.indexOf(status);
+  if (idx === -1) return 0;
+  return (idx / (STATUS_ORDER.length - 1)) * 100;
+}
+
+// Interpolates from red-500 (#EF4444) to green-500 (#22C55E)
+function getProgressColor(percent) {
+  const red = { r: 239, g: 68, b: 68 };
+  const green = { r: 34, g: 197, b: 94 };
+  const t = Math.max(0, Math.min(100, percent)) / 100;
+  const r = Math.round(red.r + (green.r - red.r) * t);
+  const g = Math.round(red.g + (green.g - red.g) * t);
+  const b = Math.round(red.b + (green.b - red.b) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 // ─── Report Card ──────────────────────────────────────────────────────────────
 function ReportCard({
@@ -156,6 +229,39 @@ function ReportCard({
             </span>
           </div>
         </div>
+
+        {/* progress bar */}
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs font-black text-gray-400 uppercase tracking-wide">
+              Progress
+            </span>
+            <span className="text-xs font-bold text-gray-500">
+              {report.status === "denied"
+                ? "Denied"
+                : `${Math.round(getProgressPercent(report.status))}%`}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${getProgressPercent(report.status)}%`,
+                backgroundColor:
+                  report.status === "denied"
+                    ? "#EF4444"
+                    : getProgressColor(getProgressPercent(report.status)),
+              }}
+            />
+          </div>
+        </div>
+
+        {/* status detail message */}
+        {getStatusMessage(report) && (
+          <p className="text-xs text-gray-500 leading-relaxed mb-4 -mt-2">
+            {getStatusMessage(report)}
+          </p>
+        )}
 
         {/* description */}
         <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-3">
@@ -439,6 +545,12 @@ export default function Pending() {
   const pendingReports = (
     <div className="min-h-screen bg-white py-24 px-4 md:px-8 lg:px-16">
       {/* ── Page header ──────────────────────────────────────────── */}
+
+      {/* ── Welcome message ──────────────────────────────────────── */}
+      <p className="text-gray-500 font-semibold mb-4">
+        {getGreeting()}, {getFormalName(user)} 👋
+      </p>
+
       <div className="mb-8">
         <span
           className="inline-block text-xs font-black tracking-[.2em] uppercase px-3 py-1.5 rounded-full text-white mb-3"
