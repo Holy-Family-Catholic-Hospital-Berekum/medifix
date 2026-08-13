@@ -5,7 +5,13 @@ export default function SlideInRight({
   sidePopup,
   completedRedirect,
   assignedRedirect,
+  rejectedRedirect,
+  acceptedRedirect,
   completedWithFeedback,
+  newAssignedCount,
+  newRejectedCount,
+  newAcceptedCount,
+  newCompletedCount,
   dashboardRedirect,
   theme = {},
 }) {
@@ -69,12 +75,44 @@ export default function SlideInRight({
       {assignedRedirect && (
         <NavLink to={`${assignedRedirect}`} className={navClass}>
           Assigned
+          {newAssignedCount > 0 && (
+            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
+              {newAssignedCount}
+            </span>
+          )}
+        </NavLink>
+      )}
+
+      {rejectedRedirect && (
+        <NavLink to={`${rejectedRedirect}`} className={navClass}>
+          Rejected
+          {newRejectedCount > 0 && (
+            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
+              {newRejectedCount}
+            </span>
+          )}
+        </NavLink>
+      )}
+
+      {acceptedRedirect && (
+        <NavLink to={`${acceptedRedirect}`} className={navClass}>
+          In Progress
+          {newAcceptedCount > 0 && (
+            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
+              {newAcceptedCount}
+            </span>
+          )}
         </NavLink>
       )}
 
       <NavLink to={`${completedRedirect}`} end className={navClass}>
         <span className="flex items-center justify-center gap-2">
           Completed
+          {newCompletedCount > 0 && (
+            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
+              {newCompletedCount}
+            </span>
+          )}
           {completedWithFeedback > 0 && (
             <span
               className={`${feedbackBadge} text-xs font-black px-2 py-0.5 rounded-full`}

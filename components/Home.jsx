@@ -1,4 +1,4 @@
-import { markOverdueReports } from "../src/utils";
+import { markOverdueReports, markReportViewed } from "../src/utils";
 import NavBar from "./navBar";
 import { useState, useEffect } from "react";
 import SlideInRight from "../components/slideInRight";
@@ -75,6 +75,18 @@ function timeAgo(date) {
   if (days > 0) return `${days}d ago`;
   if (hours > 0) return `${hours}h ago`;
   return `${mins}m ago`;
+}
+
+// Live-updating version of timeAgo — refreshes once a minute so
+// "Work started Xd ago" doesn't go stale on a card left open.
+function useLiveTimeAgo(date) {
+  const [label, setLabel] = useState(() => timeAgo(date));
+  useEffect(() => {
+    setLabel(timeAgo(date));
+    const id = setInterval(() => setLabel(timeAgo(date)), 60_000);
+    return () => clearInterval(id);
+  }, [date]);
+  return label;
 }
 
 function Preloader({ theme }) {
@@ -1038,10 +1050,49 @@ export const THEMES = {
   },
 };
 
+// ─── Pagination controls ───────────────────────────────────────────────────
+const PAGE_SIZE = 9;
+
+const paginate = (arr, page, pageSize = PAGE_SIZE) =>
+  arr.slice((page - 1) * pageSize, page * pageSize);
+
+const PaginationControls = ({ page, totalPages, onChange, theme }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-3 pb-4">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onChange(page - 1)}
+        className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110`}
+      >
+        <span className="material-symbols-outlined text-sm">chevron_left</span>
+        Prev
+      </button>
+      <span
+        className={`text-xs font-mono font-semibold tracking-wide ${theme.sectionCountText}`}
+      >
+        {page} / {totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+        className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110`}
+      >
+        Next
+        <span className="material-symbols-outlined text-sm">chevron_right</span>
+      </button>
+    </div>
+  );
+};
+
 // ─── Main Home component ──────────────────────────────────────────────────────
 export default function Home({
   completedRedirect,
   assignedRedirect,
+  rejectedRedirect,
+  acceptedRedirect,
   title1,
   title2,
   reportDate1,
@@ -1062,6 +1113,8 @@ export default function Home({
   const [reports, setReports] = useState([]);
   const [currentReportId, setCurrentReportId] = useState(null);
   const [reportsLoading, setReportsLoading] = useState(true);
+  const [firstPage, setFirstPage] = useState(1);
+  const [secondPage, setSecondPage] = useState(1);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -1071,6 +1124,47 @@ export default function Home({
 
   const handleClose = () => {
     setTimeout(() => SetShowReportsHiddenOnMobile(false), 300);
+  };
+
+  const isNewForUser = (report) =>
+    !!user?.ID && report.lastViewedStatus?.[user.ID] !== report.status;
+
+  const newAssignedCount = reports.filter(
+    (r) => r.status === "assigned" && isNewForUser(r),
+  ).length;
+  const newRejectedCount = reports.filter(
+    (r) => r.status === "rejected" && isNewForUser(r),
+  ).length;
+  const newAcceptedCount = reports.filter(
+    (r) => r.status === "accepted" && isNewForUser(r),
+  ).length;
+  const newCompletedCount = reports.filter(
+    (r) => r.status === "completed" && isNewForUser(r),
+  ).length;
+
+  const totalNewCount =
+    newAssignedCount + newRejectedCount + newAcceptedCount + newCompletedCount;
+
+  const displayReportDetails = (report) => {
+    setCurrentReportId(report.id);
+    setDisplayDetails(true);
+
+    if (isNewForUser(report)) {
+      markReportViewed(report.id, user.ID, report.status);
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === report.id
+            ? {
+                ...r,
+                lastViewedStatus: {
+                  ...(r.lastViewedStatus || {}),
+                  [user.ID]: report.status,
+                },
+              }
+            : r,
+        ),
+      );
+    }
   };
 
   useEffect(() => {
@@ -1086,6 +1180,28 @@ export default function Home({
     });
     return () => unsubscribe();
   }, []);
+
+  // ─── Status messages — explains what's currently happening at each stage ────
+  const STATUS_MESSAGES = {
+    incoming: "Waiting for admin review.",
+    approved: "Approved by admin — waiting for the Estate Manager review.",
+    pending: "Material request sent to admin — awaiting approval.",
+    confirmed: "Material request approved — awaiting procurement.",
+    procured: "Materials procured — waiting for technician assignment.",
+    assigned: "Assigned to a technician — awaiting their response.",
+    rejected:
+      "Technician declined this job — waiting for Estate Manager reassignment.",
+    accepted: "Technician accepted the job and is currently working on it.",
+  };
+
+  function getStatusMessage(report) {
+    if (report.status === "completed") {
+      return report.feedback
+        ? "Completed — feedback received."
+        : "Job completed — waiting for feedback";
+    }
+    return STATUS_MESSAGES[report.status] || "";
+  }
 
   const getAllAlerts = () => {
     const allAlerts = [];
@@ -1111,13 +1227,17 @@ export default function Home({
         (a[key]?.toDate?.() ?? new Date(0)),
     );
 
+  // Each section is sorted by its OWN relevant date field, most recent first.
+  // Previously both sections were sorted by "dateSent", which meant the
+  // completed section wasn't ordered by completion date. Sorting by
+  // reportDate1 / reportDate2 respectively fixes that.
   const firstReports = sortByDate(
     reports.filter((r) =>
       Array.isArray(firstReportsStatus)
         ? firstReportsStatus.includes(r.status)
         : r.status === firstReportsStatus,
     ),
-    "dateSent",
+    reportDate1,
   );
   const secondReports = sortByDate(
     reports.filter((r) =>
@@ -1125,13 +1245,31 @@ export default function Home({
         ? secondReportsStatus.includes(r.status)
         : r.status === secondReportsStatus,
     ),
-    "dateSent",
+    reportDate2,
   );
 
-  const displayReportDetails = (id) => {
-    setCurrentReportId(id);
-    setDisplayDetails(true);
-  };
+  // Reset to page 1 whenever the underlying data set changes size
+  // (e.g. filters change, or new reports come in over the snapshot listener).
+  useEffect(() => {
+    setFirstPage(1);
+  }, [firstReports.length]);
+
+  useEffect(() => {
+    setSecondPage(1);
+  }, [secondReports.length]);
+
+  const firstTotalPages = Math.max(
+    1,
+    Math.ceil(firstReports.length / PAGE_SIZE),
+  );
+  const secondTotalPages = Math.max(
+    1,
+    Math.ceil(secondReports.length / PAGE_SIZE),
+  );
+
+  const paginatedFirstReports = paginate(firstReports, firstPage);
+  const paginatedSecondReports = paginate(secondReports, secondPage);
+
   const currentReport = reports.filter((r) => r.id === currentReportId);
 
   const hasFeedback = (report) =>
@@ -1140,10 +1278,24 @@ export default function Home({
     (r) => r.status === "completed" && hasFeedback(r),
   ).length;
 
+  // New: counts driving the "Rejected" (estate) and "Accepted" (worker)
+  // sidebar nav badges. Computed from the full `reports` set already loaded
+  // for this user, so no extra query is needed.
+  const rejectedCount = reports.filter((r) => r.status === "rejected").length;
+  const acceptedCount = reports.filter((r) => r.status === "accepted").length;
+
   const PRIORITY_BG = {
     emergency: "bg-red-500",
     urgent: "bg-yellow-400",
     routine: "bg-green-500",
+  };
+
+  const WorkStartedLabel = ({ dateAccepted, className }) => {
+    const label = useLiveTimeAgo(dateAccepted);
+    if (!label) return null;
+    return (
+      <p className={`text-[12px] italic ${className}`}>Work started {label}</p>
+    );
   };
 
   // ─── Report Card ───────────────────────────────────────────────────────────
@@ -1159,9 +1311,15 @@ export default function Home({
             💬 Feedback
           </span>
         )}
+
+        {isNewForUser(report) && (
+          <span className="absolute -top-1 -left-1 bg-sky-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce z-10 tracking-wide">
+            🆕 New
+          </span>
+        )}
         <div
           className={`relative group select-none border ${cfg.border} ${cfg.glow} ${theme.cardBg} flex flex-col gap-3 cursor-pointer transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 rounded-2xl w-full max-w-[250px] md:max-w-[280px] p-4 overflow-hidden`}
-          onClick={() => displayReportDetails(report.id)}
+          onClick={() => displayReportDetails(report)}
         >
           {/* Top gradient line */}
           <div
@@ -1193,6 +1351,27 @@ export default function Home({
 
           <div className="h-px bg-white/5" />
 
+          <div className="h-px bg-white/5" />
+
+          {getStatusMessage(report) && (
+            <p
+              className={`text-[12px] leading-relaxed font-bold -mt-1 ${theme.cardDateLabel} `}
+            >
+              {getStatusMessage(report)}
+            </p>
+          )}
+
+          {report.status === "accepted" && report.dateAccepted && (
+            <WorkStartedLabel
+              dateAccepted={report.dateAccepted}
+              className={theme.cardStatusText}
+            />
+          )}
+
+          {/* Date */}
+
+          {/* Date */}
+          <div className="flex items-center gap-2"></div>
           {/* Date */}
           <div className="flex items-center gap-2">
             <span
@@ -1234,10 +1413,10 @@ export default function Home({
     );
   };
 
-  const firstReportsCard = firstReports.map((r) => (
+  const firstReportsCard = paginatedFirstReports.map((r) => (
     <ReportCard key={r.id} report={r} reportDate={reportDate1} />
   ));
-  const secondReportsCard = secondReports.map((r) => (
+  const secondReportsCard = paginatedSecondReports.map((r) => (
     <div
       className={`z-[60] w-full max-w-[250px] md:max-w-[300px] justify-center md:flex ${showReportsHiddenOnMobile ? "flex" : "hidden"}`}
       key={r.id}
@@ -1327,10 +1506,18 @@ export default function Home({
       <SlideInRight
         sidePopup={sidePopup}
         assignedRedirect={assignedRedirect}
+        rejectedRedirect={rejectedRedirect}
+        acceptedRedirect={acceptedRedirect}
+        rejectedCount={rejectedCount}
+        acceptedCount={acceptedCount}
         completedRedirect={completedRedirect}
         completedWithFeedback={completedWithFeedback}
         dashboardRedirect={dashboardRedirect}
         theme={theme}
+        newAssignedCount={newAssignedCount}
+        newRejectedCount={newRejectedCount}
+        newAcceptedCount={newAcceptedCount}
+        newCompletedCount={newCompletedCount}
       />
 
       {/* Mobile side toggle */}
@@ -1396,7 +1583,58 @@ export default function Home({
                   <span
                     className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
-                  Assigned
+                  {role === "admin" ? "In Progress" : "Assigned"}
+                  {newAssignedCount > 0 && (
+                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                      {newAssignedCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          )}
+
+          {rejectedRedirect && (
+            <NavLink
+              to={rejectedRedirect}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                  />
+                  Rejected
+                  {newRejectedCount > 0 && (
+                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                      {newRejectedCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          )}
+
+          {acceptedRedirect && (
+            <NavLink
+              to={acceptedRedirect}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                  />
+                  In Progress
+                  {newAcceptedCount > 0 && (
+                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                      {newAcceptedCount}
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
@@ -1415,6 +1653,11 @@ export default function Home({
                   className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                 />
                 Completed
+                {newCompletedCount > 0 && (
+                  <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                    {newCompletedCount}
+                  </span>
+                )}
                 {completedWithFeedback > 0 && (
                   <span
                     className={`ml-auto ${theme.feedbackBadge} text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums`}
@@ -1437,9 +1680,17 @@ export default function Home({
           {reportsLoading ? (
             <Preloader theme={theme} />
           ) : firstReports.length > 0 ? (
-            <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-6 justify-center w-full flex-wrap py-4 px-4">
-              {firstReportsCard}
-            </div>
+            <>
+              <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-6 justify-center w-full flex-wrap py-4 px-4">
+                {firstReportsCard}
+              </div>
+              <PaginationControls
+                page={firstPage}
+                totalPages={firstTotalPages}
+                onChange={setFirstPage}
+                theme={theme}
+              />
+            </>
           ) : (
             <EmptyState />
           )}
@@ -1458,8 +1709,16 @@ export default function Home({
                   <Preloader theme={theme} />
                 </div>
               ) : secondReports.length > 0 ? (
-                <div className="hidden md:flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-6 justify-center w-full flex-wrap py-4 px-4">
-                  {secondReportsCard}
+                <div className="hidden md:flex md:flex-col items-center w-full">
+                  <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-6 justify-center w-full flex-wrap py-4 px-4">
+                    {secondReportsCard}
+                  </div>
+                  <PaginationControls
+                    page={secondPage}
+                    totalPages={secondTotalPages}
+                    onChange={setSecondPage}
+                    theme={theme}
+                  />
                 </div>
               ) : (
                 <div className="hidden md:flex">

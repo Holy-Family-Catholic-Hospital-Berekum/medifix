@@ -11,14 +11,16 @@ import EstateHome from "../Estate-manager/estateHome";
 import EstateAssigned from "../Estate-manager/estateAssigned";
 import EstateCompleted from "../Estate-manager/estateCompleted";
 import Dashboard from "../components/Dashboard";
+import Rejected from "../Estate-manager/estateRejected";
+import EstateInProgress from "../Estate-manager/estateInProgress";
 
 import AdminHome from "../Admin/adminHome";
-import AdminAssigned from "../Admin/adminAssigned";
+import AdminInProgress from "../Admin/adminInProgress";
 import AdminCompleted from "../Admin/adminCompleted";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
-
+import WorkerInProgress from "../Worker/workerInProgress";
 import ProcurementHome from "../Procurement/procurementHome";
 import ProcurementCompleted from "../Procurement/procurementCompleted";
 
@@ -30,7 +32,7 @@ export default function App() {
       <Route path="/" element={<SignUp />} />
 
       <Route
-        path="/adminHome"
+        path="/ah"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <AdminHome />
@@ -48,7 +50,7 @@ export default function App() {
       />
 
       <Route
-        path="/estateHome"
+        path="/eh"
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
             <EstateHome />
@@ -57,7 +59,7 @@ export default function App() {
       />
 
       <Route
-        path="/procurementHome"
+        path="/ph"
         element={
           <ProtectedRoute allowedRoles={["procurement"]}>
             <ProcurementHome />
@@ -66,7 +68,7 @@ export default function App() {
       />
 
       <Route
-        path="/procurementCompleted"
+        path="/pc"
         element={
           <ProtectedRoute allowedRoles={["procurement"]}>
             <ProcurementCompleted />
@@ -75,13 +77,10 @@ export default function App() {
       />
 
       <Route
-        path="/procurementDashboard"
+        path="/pd"
         element={
           <ProtectedRoute allowedRoles={["procurement"]}>
-            <Dashboard
-              homeRedirect="/procurementHome"
-              dashboardRedirect="/procurementDashboard"
-            />
+            <Dashboard homeRedirect="/ph" dashboardRedirect="/pd" />
           </ProtectedRoute>
         }
       />
@@ -94,7 +93,7 @@ export default function App() {
         }
       />
       <Route
-        path="/workerHome"
+        path="/wh"
         element={
           <ProtectedRoute allowedRoles={["worker"]}>
             <WorkerHome />
@@ -103,15 +102,15 @@ export default function App() {
       />
 
       <Route
-        path="/adminAssigned"
+        path="/aip"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminAssigned />
+            <AdminInProgress />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/adminCompleted"
+        path="/ac"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <AdminCompleted />
@@ -120,19 +119,16 @@ export default function App() {
       />
 
       <Route
-        path="/adminDashboard"
+        path="/ad"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
-            <Dashboard
-              homeRedirect="/adminHome"
-              dashboardRedirect="/adminDashboard"
-            />
+            <Dashboard homeRedirect="/ah" dashboardRedirect="/ad" />
           </ProtectedRoute>
         }
       />
 
       <Route
-        path="/estateAssigned"
+        path="/ea"
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
             <EstateAssigned />
@@ -140,7 +136,23 @@ export default function App() {
         }
       />
       <Route
-        path="/estateCompleted"
+        path="/er"
+        element={
+          <ProtectedRoute allowedRoles={["estate"]}>
+            <Rejected />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/eip"
+        element={
+          <ProtectedRoute allowedRoles={["estate"]}>
+            <EstateInProgress />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/ec"
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
             <EstateCompleted />
@@ -148,22 +160,27 @@ export default function App() {
         }
       />
       <Route
-        path="/estateDashboard"
+        path="/ed"
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
-            <Dashboard
-              homeRedirect="/estateHome"
-              dashboardRedirect="/estateDashboard"
-            />
+            <Dashboard homeRedirect="/eh" dashboardRedirect="/ed" />
           </ProtectedRoute>
         }
       />
 
       <Route
-        path="/workerCompleted"
+        path="/wc"
         element={
           <ProtectedRoute allowedRoles={["worker"]}>
             <WorkerCompleted />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/wa"
+        element={
+          <ProtectedRoute allowedRoles={["worker"]}>
+            <WorkerInProgress />
           </ProtectedRoute>
         }
       />

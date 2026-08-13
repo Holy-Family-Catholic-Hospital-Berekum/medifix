@@ -10,17 +10,19 @@ export default function Assigned() {
       secColor={"bg-blue-500"}
       titleBgColor={"bg-yellow-500"}
       reportCardHoverColor={"hover:bg-blue-600"}
-      reportDate1="dateAssigned"
+      reportDate1="dateSent"
       titleBorderColor={"border-yellow-300"}
       navBarColor="bg-yellow-300"
       slideInBgColor="bg-yellow-300"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-      completedRedirect={"/estateCompleted"}
-      assignedRedirect={"/estateAssigned"}
+      completedRedirect={"/ec"}
+      assignedRedirect={"/ea"}
+      rejectedRedirect={"/er"}
+      acceptedRedirect={"/eip"}
       logoBGColor="md:bg-blue-500"
-      homeRedirect="/estateHome"
-      dashboardRedirect={"/estateDashboard"}
+      homeRedirect="/eh"
+      dashboardRedirect={"/ed"}
       role={"estate"}
     />
   );

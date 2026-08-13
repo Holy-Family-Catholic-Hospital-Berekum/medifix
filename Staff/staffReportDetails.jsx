@@ -147,6 +147,63 @@ export default function StaffReportDetails({
           </div>
         )}
 
+        {/* location */}
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-xl whitespace-nowrap">Location:</h2>
+          <p className="text-blue-100 md:text-lg">{report.location}</p>
+        </div>
+
+        {/* before / after images */}
+        {(report.image || report.completionImage) && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-lg md:text-xl">Photos:</h2>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 flex flex-col gap-2">
+                <span className="text-xs font-bold text-orange-100 uppercase tracking-wide">
+                  Before
+                </span>
+                {report.image ? (
+                  <img
+                    src={report.image}
+                    alt="Reported issue"
+                    className="w-full max-h-64 object-contain rounded-xl border border-white/20 bg-black/10 cursor-pointer"
+                    onClick={() => window.open(report.image, "_blank")}
+                  />
+                ) : (
+                  <div className="w-full h-32 flex items-center justify-center rounded-xl border border-dashed border-white/30 text-orange-100 text-xs">
+                    No image attached
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 flex flex-col gap-2">
+                <span className="text-xs font-bold text-orange-100 uppercase tracking-wide">
+                  After
+                </span>
+                {report.completionImage ? (
+                  <img
+                    src={report.completionImage}
+                    alt="Completed work"
+                    className="w-full max-h-64 object-contain rounded-xl border border-white/20 bg-black/10 cursor-pointer"
+                    onClick={() =>
+                      window.open(report.completionImage, "_blank")
+                    }
+                  />
+                ) : (
+                  <div className="w-full h-32 flex items-center justify-center rounded-xl border border-dashed border-white/30 text-orange-100 text-xs">
+                    {report.status === "completed"
+                      ? "No completion photo"
+                      : "Not completed yet"}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* date sent */}
+        <div className="flex items-center gap-2"></div>
+
         {/* existing feedback (read-only once submitted) */}
         {report.feedback && (
           <div className="flex gap-2">

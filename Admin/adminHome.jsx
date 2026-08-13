@@ -13,17 +13,17 @@ export default function AdminHome() {
       titleBgColor={"bg-red-300"}
       reportCardHoverColor={"hover:bg-green-700"}
       reportDate1="dateSent"
-      reportDate2="dateCostAdded"
+      reportDate2="dateSent"
       titleBorderColor={"border-red-300"}
       navBarColor="bg-green-300"
       slideInBgColor="bg-green-300"
       reportDetailsBgColor="bg-green-300"
       reportsHiddenOnMobileTitle="Pending Confirmation"
-      completedRedirect={"/adminCompleted"}
-      assignedRedirect={"/adminAssigned"}
+      completedRedirect={"/ac"}
+      assignedRedirect={"/aip"}
       logoBGColor="md:bg-green-500"
-      homeRedirect="/adminHome"
-      dashboardRedirect={"/adminDashboard"}
+      homeRedirect="/ah"
+      dashboardRedirect={"/ad"}
       role={"admin"}
     />
   );

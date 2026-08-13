@@ -579,11 +579,11 @@ export default function SignUp() {
       setLoginPassword("");
       const routes = {
         staff: "/Home",
-        worker: "/workerHome",
-        admin: "/adminHome",
-        estate: "/estateHome",
+        worker: "/wh",
+        admin: "/ah",
+        estate: "/eh",
         manager: "/manager",
-        procurement: "/procurementHome",
+        procurement: "/ph",
       };
       setTimeout(() => navigate(routes[userData.role] || "/"), 300);
     } catch (error) {

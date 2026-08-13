@@ -10,6 +10,7 @@ import {
   where,
   deleteDoc,
 } from "firebase/firestore";
+
 import { db } from "../src/firebase";
 import {
   formatDate,
@@ -25,9 +26,38 @@ import {
   canUserMarkProcured,
   getTotalCost,
   createAlert,
+  canUserAcceptOrRejectJob, // add this
 } from "../src/utils";
 
 const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
+
+// How long we'll wait for a completion-photo upload before giving up and
+// showing an explicit error, instead of spinning forever.
+
+// ADD this (same pattern as ReportForm's compressImage):
+const compressImageToBase64 = (file) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxWidth = 800;
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.6));
+      };
+    };
+  });
+};
 
 // Reusable, UX-friendly "call" button — bigger tap target, icon, clear affordance
 function PhoneCallButton({ phoneNumber, label }) {
@@ -201,6 +231,62 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
   );
 }
 
+// New: lets a worker take a photo with the device camera or pick one from
+// their gallery, and shows a live preview before submission.
+function CompletionImageUploader({ preview, onChange }) {
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) onChange(file);
+    // allow re-selecting the same file
+    e.target.value = "";
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-gray-700">
+        Photo of Completed Work
+      </label>
+
+      {preview && (
+        <img
+          src={preview}
+          alt="Completed work preview"
+          className="w-full max-h-64 object-contain rounded-lg border border-gray-300"
+        />
+      )}
+
+      <div className="flex gap-2">
+        <label className="flex-1 cursor-pointer text-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded py-2 px-3 text-sm font-medium text-gray-700">
+          {preview ? "Retake Photo" : "Take Photo"}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
+        <label className="flex-1 cursor-pointer text-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded py-2 px-3 text-sm font-medium text-gray-700">
+          Upload from Gallery
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
+      </div>
+
+      {!preview && (
+        <p className="text-xs text-gray-400">
+          A photo of the completed work is required before you can mark this job
+          as completed.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ReportDetailsContainer({
   displayDetails,
   setDisplayDetails,
@@ -223,6 +309,12 @@ export default function ReportDetailsContainer({
 
   const [actualCost, setActualCost] = useState("");
 
+  // New: completion-photo state for the worker's "mark as completed" flow
+  const [completionImage, setCompletionImage] = useState(null);
+  const [completionImagePreview, setCompletionImagePreview] = useState(null);
+
+  const [uploadError, setUploadError] = useState("");
+  const [maintenanceCost, setMaintenanceCost] = useState("");
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   useEffect(() => {
@@ -238,6 +330,23 @@ export default function ReportDetailsContainer({
       return () => clearTimeout(t);
     }
   }, [displayDetails]);
+
+  // Reset the completion-photo picker whenever the panel closes so a stale
+  // photo doesn't carry over to the next report opened.
+  useEffect(() => {
+    if (!displayDetails) {
+      setCompletionImage(null);
+      setCompletionImagePreview(null);
+      setUploadError("");
+    }
+  }, [displayDetails]);
+
+  // Revoke the object URL used for the preview whenever it changes/unmounts
+  useEffect(() => {
+    return () => {
+      if (completionImagePreview) URL.revokeObjectURL(completionImagePreview);
+    };
+  }, [completionImagePreview]);
 
   useEffect(() => {
     const loadWorkers = async () => {
@@ -279,6 +388,10 @@ export default function ReportDetailsContainer({
   const report = currentReport[0];
 
   const assignedWorker = workers.find((w) => w.ID === report.assignedTo);
+
+  // New: is the current user the worker this job is assigned to?
+  const isAssignedWorker =
+    user?.role === "worker" && report?.assignedTo === user?.ID;
 
   const handleApprove = async () => {
     if (!canUserApprove(user, report)) return;
@@ -527,19 +640,115 @@ export default function ReportDetailsContainer({
     }
   };
 
-  const handleCompleteWork = async () => {
-    if (!canUserComplete(user, report)) return;
+  const handleAcceptJob = async () => {
+    if (!canUserAcceptOrRejectJob(user, report)) return;
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
+        status: "accepted",
+        dateAccepted: serverTimestamp(),
+        alerts: arrayUnion(
+          createAlert(
+            "Job accepted by worker",
+            report.assignedTo,
+            "estate",
+            report.status,
+          ),
+        ),
+      });
+      alert("Job accepted!");
+      setDisplayDetails(false);
+    } catch (error) {
+      console.error("Error accepting job:", error);
+      alert("Failed to accept job");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectJob = async () => {
+    if (!canUserAcceptOrRejectJob(user, report)) return;
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        status: "rejected",
+        dateRejected: serverTimestamp(),
+        alerts: arrayUnion(
+          createAlert(
+            "Job rejected by worker",
+            report.assignedTo,
+            "estate",
+            report.status,
+          ),
+        ),
+      });
+      alert("Job rejected.");
+      setDisplayDetails(false);
+    } catch (error) {
+      console.error("Error rejecting job:", error);
+      alert("Failed to reject job");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitMaintenanceCost = async () => {
+    if (!canUserSubmitCost(user, report)) return;
+    const cost = parseFloat(maintenanceCost);
+    if (isNaN(cost) || cost < 0) {
+      alert("Please enter a valid cost");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        maintenanceCost: cost,
+        dateMaintenanceCostAdded: serverTimestamp(),
+      });
+      alert("Maintenance cost submitted!");
+      setMaintenanceCost("");
+      setDisplayDetails(false);
+    } catch (error) {
+      console.error("Error submitting cost:", error);
+      alert("Failed to submit cost");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // New: capture the chosen file + generate a preview
+  const handleCompletionImageChange = (file) => {
+    if (completionImagePreview) URL.revokeObjectURL(completionImagePreview);
+    setCompletionImage(file);
+    setCompletionImagePreview(URL.createObjectURL(file));
+    setUploadError("");
+  };
+
+  const handleCompleteWork = async () => {
+    if (!canUserComplete(user, report)) return;
+    if (!completionImage) {
+      alert("Please take or upload a completion photo before marking as done");
+      return;
+    }
+
+    setLoading(true);
+    setUploadError("");
+
+    try {
+      const base64Image = await compressImageToBase64(completionImage);
+
+      await updateDoc(doc(db, "reports", report.id), {
         status: "completed",
         dateCompleted: serverTimestamp(),
+        completionImage: base64Image,
       });
+
       alert("Work marked as completed!");
       setDisplayDetails(false);
     } catch (error) {
       console.error("Error completing work:", error);
-      alert("Failed to complete work");
+      const msg = error.message || "Failed to complete work";
+      setUploadError(msg);
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -649,6 +858,20 @@ export default function ReportDetailsContainer({
           report.alerts.find(
             (a) => a.sentTo === user?.ID && a.type === "incoming",
           ) || null
+        );
+
+      // New: surface the worker's note/reason once they've accepted or rejected
+      case "accepted":
+      case "rejected":
+        return (
+          [...report.alerts]
+            .filter(
+              (a) =>
+                a.sentBy === "worker" &&
+                a.sentTo === "estate" &&
+                a.type === "assigned",
+            )
+            .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null
         );
 
       default:
@@ -816,6 +1039,43 @@ export default function ReportDetailsContainer({
           </p>
         </div>
       )}
+      {/* New: Date Accepted / Date Rejected */}
+      {report.dateRejected && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Rejected:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateRejected)}
+          </p>
+        </div>
+      )}
+      {report.dateReAssigned && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Re-Assigned:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateReAssigned)}
+          </p>
+        </div>
+      )}
+      {report.dateAccepted && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Accepted:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateAccepted)}
+          </p>
+        </div>
+      )}
 
       {report.assignedTo && ["admin", "estate"].includes(user?.role) && (
         <div className="flex items-center gap-2">
@@ -918,7 +1178,9 @@ export default function ReportDetailsContainer({
               ? "Denial Reason:"
               : report.status === "costDenied"
                 ? "Denial Note:"
-                : "Note:"}
+                : report.status === "rejected"
+                  ? "Rejection Reason:"
+                  : "Note:"}
           </h2>
           <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {relevantAlert.content}
@@ -949,6 +1211,23 @@ export default function ReportDetailsContainer({
           <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {report.feedback}
           </p>
+        </div>
+      )}
+
+      {/* New: read-only view of the completion photo once the job is done */}
+      {report.completionImage && (
+        <div className="flex flex-col gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Completion Photo:
+          </h2>
+          <img
+            src={report.completionImage}
+            alt="Completed work"
+            className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
+            onClick={() => window.open(report.completionImage, "_blank")}
+          />
         </div>
       )}
 
@@ -1230,14 +1509,63 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
+      {/* WORKER ACTIONS - Accept / Reject */}
+      {canUserAcceptOrRejectJob(user, report) && (
+        <div className="bg-white rounded-lg p-5 space-y-3">
+          <h3 className="font-bold text-gray-800">
+            Worker Actions — Respond to Assignment
+          </h3>
+          {report.instructions && (
+            <div className="bg-gray-50 rounded p-3 text-sm text-gray-700">
+              <span className="font-semibold">Instructions: </span>
+              {report.instructions}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={handleAcceptJob}
+              disabled={loading}
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
+            >
+              {loading ? "Processing..." : "Accept Job"}
+            </button>
+            <button
+              onClick={handleRejectJob}
+              disabled={loading}
+              className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-1"
+            >
+              {loading ? "Processing..." : "Reject Job"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* WORKER ACTIONS - Complete Work */}
       {canUserComplete(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
-          <h3 className="font-bold text-gray-800">Worker Actions</h3>
+        <div className="bg-white rounded-lg p-5 space-y-4">
+          <h3 className="font-bold text-gray-800">
+            Worker Actions — Complete Work
+          </h3>
+
+          <CompletionImageUploader
+            preview={completionImagePreview}
+            onChange={handleCompletionImageChange}
+          />
+
+          {uploadError && (
+            <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
+              ⚠ {uploadError}
+            </p>
+          )}
+
           <button
             onClick={handleCompleteWork}
-            disabled={loading}
-            className="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded w-full"
+            disabled={loading || !completionImage}
+            className={`font-bold py-2 px-4 rounded w-full text-white transition ${
+              loading || !completionImage
+                ? "bg-green-300 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-800 cursor-pointer"
+            }`}
           >
             {loading ? "Processing..." : "Mark Work as Completed"}
           </button>

@@ -10,6 +10,7 @@ import {
   where,
   getDocs,
   writeBatch,
+  updateDoc,
   doc,
   limit,
 } from "firebase/firestore";
@@ -28,6 +29,7 @@ export async function markOverdueReports(user) {
       "confirmed",
       "procured",
       "assigned",
+      "accepted",
       "costDenied",
     ];
 
@@ -61,6 +63,17 @@ export async function markOverdueReports(user) {
     console.log(`Marked ${overdueReports.length} report(s) as overdue.`);
   } catch (err) {
     console.error("markOverdueReports failed:", err);
+  }
+}
+
+export async function markReportViewed(reportId, userId, status) {
+  if (!reportId || !userId || !status) return;
+  try {
+    await updateDoc(doc(db, "reports", reportId), {
+      [`lastViewedStatus.${userId}`]: status,
+    });
+  } catch (err) {
+    console.error("markReportViewed failed:", err);
   }
 }
 // Utility functions for the maintenance app
@@ -354,6 +367,8 @@ export const generatePDFReport = (
     ["Confirmed", report.dateConfirmed],
     ["Procured", report.dateProcured],
     ["Assigned", report.dateAssigned],
+    ["Accepted", report.dateAccepted],
+    ["Rejected", report.dateRejected],
     ["Completed", report.dateCompleted],
   ].forEach(([label, date]) => {
     if (date) addLine(`${label}: ${formatDate(date)}`, 10);
@@ -658,6 +673,8 @@ export const getStatusColor = (status) => {
     confirmed: "bg-green-400 text-white",
     procured: "bg-teal-500 text-white",
     assigned: "bg-purple-400 text-white",
+    accepted: "bg-cyan-500 text-white",
+    rejected: "bg-rose-600 text-white",
     completed: "bg-green-600 text-white",
     denied: "bg-red-600 text-white",
     costDenied: "bg-red-400 text-white",
@@ -685,10 +702,12 @@ export const canUserMarkProcured = (user, report) => {
   return user?.role === "procurement" && report?.status === "confirmed";
 };
 
+// Estate can (re)assign while approved/procured, and can reassign to a
+// different worker if the current assignee rejected the job.
 export const canUserAssignWorker = (user, report) => {
   return (
     user?.role === "estate" &&
-    ["approved", "procured", "assigned"].includes(report?.status)
+    ["approved", "procured", "assigned", "rejected"].includes(report?.status)
   );
 };
 
@@ -700,10 +719,21 @@ export const canUserSubmitCost = (user, report) => {
   );
 };
 
-export const canUserComplete = (user, report) => {
+// New: worker may accept or reject a job only while it's freshly assigned
+// and not yet actioned.
+export const canUserAcceptOrRejectJob = (user, report) => {
   return (
     user?.role === "worker" &&
     report?.status === "assigned" &&
+    report?.assignedTo === user?.ID
+  );
+};
+
+// Completing work now requires the worker to have accepted the job first.
+export const canUserComplete = (user, report) => {
+  return (
+    user?.role === "worker" &&
+    report?.status === "accepted" &&
     report?.assignedTo === user?.ID
   );
 };
@@ -723,7 +753,7 @@ export const canUserDownloadPDF = (user, report) => {
   return (
     hasMaterials &&
     ((user?.role === "estate" &&
-      ["confirmed", "procured", "assigned", "completed"].includes(
+      ["confirmed", "procured", "assigned", "accepted", "completed"].includes(
         report?.status,
       )) ||
       (user?.role === "procurement" &&

@@ -12,19 +12,21 @@ export default function EstateHome() {
       secColor="bg-blue-500"
       titleBgColor="bg-yellow-500"
       reportCardHoverColor="hover:bg-blue-600"
-      reportDate1="dateApproved"
-      reportDate2="dateProcured"
+      reportDate1="dateSent"
+      reportDate2="dateSent"
       titleBorderColor="border-yellow-300"
       navBarColor="bg-yellow-300"
       slideInBgColor="bg-yellow-300"
       reportDetailsBgColor="bg-green-300"
       reportsHiddenOnMobileTitle="Procured Reports"
       specificReportsPage={false}
-      completedRedirect="/estateCompleted"
-      assignedRedirect="/estateAssigned"
+      completedRedirect="/ec"
+      assignedRedirect="/ea"
+      acceptedRedirect={"/eip"}
+      rejectedRedirect="/er"
       logoBGColor="md:bg-blue-500"
-      homeRedirect="/estateHome"
-      dashboardRedirect={"/estateDashboard"}
+      homeRedirect="/eh"
+      dashboardRedirect={"/ed"}
       role={"estate"}
     />
   );

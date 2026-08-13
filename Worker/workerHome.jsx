@@ -16,9 +16,10 @@ export default function WorkerHome() {
       slideInBgColor="bg-yellow-500"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-      completedRedirect={"/workerCompleted"}
+      completedRedirect={"/wc"}
+      acceptedRedirect={"/wa"}
       logoBGColor="md:bg-yellow-500"
-      homeRedirect="/workerHome"
+      homeRedirect="/wh"
       role={"worker"}
     />
   );

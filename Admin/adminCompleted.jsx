@@ -15,11 +15,11 @@ export default function Completed() {
       slideInBgColor="bg-green-300"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-      completedRedirect={"/adminCompleted"}
-      assignedRedirect={"/adminAssigned"}
+      completedRedirect={"/ac"}
+      assignedRedirect={"/aip"}
       logoBGColor="md:bg-green-500"
-      homeRedirect="/adminHome"
-      dashboardRedirect={"/adminDashboard"}
+      homeRedirect="/ah"
+      dashboardRedirect={"/ad"}
       role={"admin"}
     />
   );

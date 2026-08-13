@@ -16,10 +16,10 @@ export default function Completed() {
       slideInBgColor="bg-yellow-300"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-      completedRedirect={"/procurementCompleted"}
+      completedRedirect={"/pc"}
       logoBGColor="md:bg-blue-500"
-      homeRedirect="/procurementHome"
-      dashboardRedirect={"/procurementDashboard"}
+      homeRedirect="/ph"
+      dashboardRedirect={"/pd"}
       role={"procurement"}
     />
   );

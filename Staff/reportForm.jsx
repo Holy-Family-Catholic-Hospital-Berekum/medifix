@@ -201,6 +201,8 @@ export default function ReportForm({ formPopup, onClose }) {
         dateConfirmed: null,
         dateProcured: null,
         dateAssigned: null,
+        dateRejected: null,
+        dateAccepted: null,
         dateCompleted: null,
         image: imageBase64,
 
