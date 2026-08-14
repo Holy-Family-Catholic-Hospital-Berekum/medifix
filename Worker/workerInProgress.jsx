@@ -20,6 +20,7 @@ export default function WorkerInProgress() {
       acceptedRedirect={"/wa"}
       reopenedRedirect={"/wro"}
       logoBGColor="md:bg-yellow-500"
+      closedRedirect={"/wcl"}
       homeRedirect="/wh"
       role={"worker"}
     />

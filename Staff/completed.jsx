@@ -45,19 +45,6 @@ function getCategoryIcon(category = "") {
   return key ? CATEGORY_ICONS[key] : "🛠️";
 }
 
-// A closed report reached that state one of two ways: the staff member was
-// satisfied and gave feedback (feedback is set), or they reopened it and
-// later closed it out themselves (no feedback, just a reopen/close cycle).
-function wasResolvedWithFeedback(report) {
-  return !!report.feedback;
-}
-
-// Prefer the date the report was actually closed; fall back to the
-// completion date for anything that predates dateClosed being tracked.
-function getClosedDate(report) {
-  return report.dateClosed ?? report.dateCompleted;
-}
-
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
@@ -79,9 +66,8 @@ function SkeletonCard() {
 }
 
 // ─── Report Card ──────────────────────────────────────────────────────────────
-function HistoryCard({ report, onClick }) {
+function HistoryCard({ report, onClick, needsFeedback }) {
   const icon = getCategoryIcon(report.category);
-  const resolvedWithFeedback = wasResolvedWithFeedback(report);
 
   const priorityColor =
     report.priorityLevel === "emergency"
@@ -95,13 +81,13 @@ function HistoryCard({ report, onClick }) {
       onClick={onClick}
       className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden select-none"
     >
-      {/* top accent bar — green if resolved with feedback, amber if closed after reopening */}
+      {/* top accent bar — orange if needs feedback, green if done */}
       <div
         style={{
           height: 3,
-          background: resolvedWithFeedback
-            ? "linear-gradient(90deg, #22c55e, #86efac)"
-            : "linear-gradient(90deg, #f59e0b, #fcd34d)",
+          background: needsFeedback
+            ? `linear-gradient(90deg, ${ORANGE}, #ffb347)`
+            : "linear-gradient(90deg, #22c55e, #86efac)",
         }}
       />
 
@@ -142,19 +128,25 @@ function HistoryCard({ report, onClick }) {
 
         {/* date */}
         <p className="text-xs text-gray-400 mb-3">
-          🗓 Closed {formatDate(getClosedDate(report))}
+          🗓 Completed {formatDate(report.dateCompleted)}
         </p>
 
-        {/* resolution badge */}
-        {resolvedWithFeedback ? (
-          <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium bg-green-50 text-green-600">
-            <span>✓</span>
-            <span>Resolved with feedback</span>
+        {/* feedback banner — only shows if feedback not yet given */}
+        {needsFeedback ? (
+          <div
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
+            style={{ background: "#11ee74", color: ORANGE }}
+          >
+            <span>💬</span>
+            <span>Feedback?</span>
+            <span className="ml-auto text-blue-100 font-normal">
+              Tap to review →
+            </span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium bg-amber-50 text-amber-600">
-            <span>🔁</span>
-            <span>Closed after reopening</span>
+          <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium bg-green-50 text-green-600">
+            <span>✓</span>
+            <span>Feedback given</span>
           </div>
         )}
       </div>
@@ -163,7 +155,7 @@ function HistoryCard({ report, onClick }) {
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
-export default function History() {
+export default function StaffCompleted() {
   const [sidePopup, setSidePopup] = useState(false);
   const [userData, setUserData] = useState(null);
   const [reports, setReports] = useState([]);
@@ -188,15 +180,15 @@ export default function History() {
               query(
                 collection(db, "reports"),
                 where("reporterId", "==", profile.ID),
-                where("status", "==", "closed"),
+                where("status", "==", "completed"),
               ),
             );
             const data = snap.docs
               .map((d) => ({ id: d.id, ...d.data() }))
               .sort(
                 (a, b) =>
-                  (getClosedDate(b)?.toDate?.() ?? new Date(0)) -
-                  (getClosedDate(a)?.toDate?.() ?? new Date(0)),
+                  (b.dateCompleted?.toDate?.() ?? new Date(0)) -
+                  (a.dateCompleted?.toDate?.() ?? new Date(0)),
               );
             setReports(data);
           }
@@ -214,23 +206,48 @@ export default function History() {
     return unsub;
   }, []);
 
-  const resolvedCount = reports.filter(wasResolvedWithFeedback).length;
+  // A report needs feedback if the feedback field is empty/falsy
+  const needsFeedback = (r) => !r.feedback;
+
+  const pendingFeedbackCount = reports.filter(needsFeedback).length;
 
   const displayReportDetails = (id) => {
     setDisplayDetails(true);
     setCurrentReport(reports.filter((r) => r.id === id));
   };
 
-  // Closed reports are a terminal state — StaffReportDetails won't show any
-  // feedback/reopen actions for them (those only apply to "completed"), so
-  // this callback is effectively unused here. Kept as a no-op so the prop
-  // is always defined.
-  const handleFeedbackSent = () => {};
+  // When StaffReportDetails submits feedback or reopens a job it updates
+  // Firestore, but this page's `reports` list was loaded once via getDocs
+  // (not a live listener), so we also patch local state here.
+  //
+  // - Feedback submission: the report stays "completed", just patch the
+  //   `feedback` field so the banner disappears.
+  // - Reopening: the report's status moves away from "completed", so it no
+  //   longer belongs in this list at all — remove it immediately instead of
+  //   leaving a stale "completed" card until the next full page load.
+  const handleFeedbackSent = (reportId, feedbackText, newStatus) => {
+    if (newStatus && newStatus !== "completed") {
+      setReports((prev) => prev.filter((r) => r.id !== reportId));
+      setCurrentReport((prev) => prev.filter((r) => r.id !== reportId));
+      return;
+    }
+
+    setReports((prev) =>
+      prev.map((r) =>
+        r.id === reportId ? { ...r, feedback: feedbackText } : r,
+      ),
+    );
+    setCurrentReport((prev) =>
+      prev.map((r) =>
+        r.id === reportId ? { ...r, feedback: feedbackText } : r,
+      ),
+    );
+  };
 
   const filtered = reports
     .filter((r) => {
-      if (activeFilter === "feedback") return wasResolvedWithFeedback(r);
-      if (activeFilter === "reopened") return !wasResolvedWithFeedback(r);
+      if (activeFilter === "pending") return needsFeedback(r);
+      if (activeFilter === "reviewed") return !needsFeedback(r);
       return true;
     })
     .filter(
@@ -240,8 +257,8 @@ export default function History() {
         r.location?.toLowerCase().includes(searchQuery.toLowerCase()),
     )
     .sort((a, b) => {
-      const aT = getClosedDate(a)?.toDate?.() ?? new Date(0);
-      const bT = getClosedDate(b)?.toDate?.() ?? new Date(0);
+      const aT = a.dateCompleted?.toDate?.() ?? new Date(0);
+      const bT = b.dateCompleted?.toDate?.() ?? new Date(0);
       return sortOrder === "newest" ? bT - aT : aT - bT;
     });
 
@@ -257,11 +274,30 @@ export default function History() {
       )}
 
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900">History</h1>
+        <h1 className="text-3xl font-black text-gray-900">Completed Reports</h1>
         <p className="text-gray-400 text-sm mt-1">
-          Every report of yours that's been closed out.
+          All maintenance jobs completed for you.
         </p>
       </div>
+
+      {/* ── Feedback nudge banner ─────────────────────────── */}
+      {!loading && pendingFeedbackCount > 0 && (
+        <div
+          className="flex items-center gap-3 rounded-2xl px-5 py-4 mb-6 shadow-sm"
+          style={{ background: "#fff7ed", border: `1.5px solid ${ORANGE}30` }}
+        >
+          <span className="text-2xl">💬</span>
+          <div>
+            <p className="text-sm font-bold" style={{ color: ORANGE }}>
+              {pendingFeedbackCount} report
+              {pendingFeedbackCount > 1 ? "s need" : " needs"} your feedback
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Tap any card with the feedback banner to share your thoughts.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Filters + Search ─────────────────────────────── */}
       {!loading && reports.length > 0 && (
@@ -270,10 +306,10 @@ export default function History() {
           <div className="flex gap-2">
             {[
               { id: "all", label: `All (${reports.length})` },
-              { id: "feedback", label: `Resolved (${resolvedCount})` },
+              { id: "pending", label: `Feedback? (${pendingFeedbackCount})` },
               {
-                id: "reopened",
-                label: `Reopened (${reports.length - resolvedCount})`,
+                id: "reviewed",
+                label: `Done (${reports.length - pendingFeedbackCount})`,
               },
             ].map((f) => (
               <button
@@ -358,6 +394,7 @@ export default function History() {
               key={report.id}
               report={report}
               onClick={() => displayReportDetails(report.id)}
+              needsFeedback={needsFeedback(report)}
             />
           ))}
         </div>
@@ -373,10 +410,10 @@ export default function History() {
         <div className="text-center py-24">
           <div className="text-5xl mb-4">📋</div>
           <h2 className="text-lg font-bold text-gray-700 mb-1">
-            Nothing closed yet
+            No completed reports yet
           </h2>
           <p className="text-gray-400 text-sm">
-            Reports you've resolved or closed will appear here.
+            Completed jobs will appear here once work is done.
           </p>
         </div>
       )}

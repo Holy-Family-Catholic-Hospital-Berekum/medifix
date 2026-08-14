@@ -26,6 +26,7 @@ export default function EstateHome() {
       reopenedRedirect={"/ero"}
       rejectedRedirect="/er"
       logoBGColor="md:bg-blue-500"
+      closedRedirect={"/ecl"}
       homeRedirect="/eh"
       dashboardRedirect={"/ed"}
       role={"estate"}

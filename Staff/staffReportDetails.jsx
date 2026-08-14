@@ -4,9 +4,41 @@ import {
   doc,
   serverTimestamp,
   arrayUnion,
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 import { formatDate, canUserSendFeedback, createAlert } from "../src/utils";
+
+// Reusable, UX-friendly "call" button — bigger tap target, icon, clear affordance
+function PhoneCallButton({ phoneNumber, label }) {
+  if (!phoneNumber) return null;
+  return (
+    <a
+      href={`tel:${phoneNumber}`}
+      aria-label={
+        label ? `Call ${label} at ${phoneNumber}` : `Call ${phoneNumber}`
+      }
+      className="inline-flex items-center gap-2 rounded-full bg-white/90 hover:bg-white active:bg-white
+                 border border-white/40 text-orange-600 px-4 py-2 min-h-[44px] text-sm md:text-base font-semibold
+                 transition-colors duration-150 shadow-sm active:scale-[0.98]"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="w-4 h-4 md:w-5 md:h-5 shrink-0"
+        aria-hidden="true"
+      >
+        <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V20a1 1 0 01-1 1C10.4 21 3 13.6 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.58a1 1 0 01-.25 1.01l-2.2 2.2z" />
+      </svg>
+      <span>{phoneNumber}</span>
+    </a>
+  );
+}
 
 export default function StaffReportDetails({
   displayDetails,
@@ -21,6 +53,8 @@ export default function StaffReportDetails({
   const [showReopenForm, setShowReopenForm] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
   const [reopening, setReopening] = useState(false);
+  const [assignedWorker, setAssignedWorker] = useState(null);
+  const [loadingWorker, setLoadingWorker] = useState(false);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -37,6 +71,44 @@ export default function StaffReportDetails({
       return () => clearTimeout(t);
     }
   }, [displayDetails]);
+
+  // Fetch the assigned technician's contact info so it can be shown here —
+  // this component doesn't otherwise have access to the workers list.
+  useEffect(() => {
+    const assignedTo = currentReport?.[0]?.assignedTo;
+    if (!displayDetails || !assignedTo) {
+      setAssignedWorker(null);
+      setLoadingWorker(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingWorker(true);
+    const loadWorker = async () => {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, "users"),
+            where("ID", "==", assignedTo),
+            limit(1),
+          ),
+        );
+        if (!cancelled) {
+          setAssignedWorker(snap.empty ? null : snap.docs[0].data());
+        }
+      } catch (err) {
+        console.error("Failed to load assigned technician:", err);
+        if (!cancelled) setAssignedWorker(null);
+      } finally {
+        if (!cancelled) setLoadingWorker(false);
+      }
+    };
+
+    loadWorker();
+    return () => {
+      cancelled = true;
+    };
+  }, [displayDetails, currentReport]);
 
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
@@ -90,12 +162,17 @@ export default function StaffReportDetails({
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
+        status: "closed",
         feedback: feedback.trim(),
         feedbackDate: serverTimestamp(),
+        dateClosed: serverTimestamp(),
       });
 
-      // Patch parent state immediately so the banner disappears without a refresh
-      onFeedbackSent?.(report.id, feedback.trim());
+      // The report just moved from "completed" to "closed" — pass the new
+      // status along so whatever list is showing it (e.g. a "completed,
+      // awaiting feedback" page) can remove it instead of leaving a stale
+      // card around until the next refresh.
+      onFeedbackSent?.(report.id, feedback.trim(), "closed");
 
       setFeedback("");
       setDisplayDetails(false);
@@ -191,6 +268,53 @@ export default function StaffReportDetails({
             <p className="text-blue-100 md:text-lg">
               {formatDate(report.dateCompleted)}
             </p>
+          </div>
+        )}
+
+        {report.dateReopened && (
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg md:text-xl">Date Reopened:</h2>
+            <p className="text-blue-100 md:text-lg">
+              {formatDate(report.dateReopened)}
+            </p>
+          </div>
+        )}
+
+        {report.dateClosed && (
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg md:text-xl">Date Closed:</h2>
+            <p className="text-blue-100 md:text-lg">
+              {formatDate(report.dateClosed)}
+            </p>
+          </div>
+        )}
+
+        {report.assignedTo && (
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg md:text-xl whitespace-nowrap">
+              Technician:
+            </h2>
+            <div className="flex flex-col gap-1">
+              {assignedWorker?.name && (
+                <p className="text-blue-100 md:text-lg">
+                  {assignedWorker.name}
+                </p>
+              )}
+              {assignedWorker?.phoneNumber ? (
+                <PhoneCallButton
+                  phoneNumber={assignedWorker.phoneNumber}
+                  label={assignedWorker.name}
+                />
+              ) : loadingWorker ? (
+                <p className="text-orange-100 text-sm italic">
+                  Loading technician…
+                </p>
+              ) : (
+                <p className="text-orange-100 text-sm italic">
+                  No contact number on file
+                </p>
+              )}
+            </div>
           </div>
         )}
 

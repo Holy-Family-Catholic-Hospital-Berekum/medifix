@@ -66,8 +66,12 @@ export default function StaffSlideInRight({ sidePopup }) {
           📋 Pending Requests
         </NavLink>
 
-        <NavLink to="/History" className={navClass}>
+        <NavLink to="/Completed" className={navClass}>
           ✅ Completed Jobs
+        </NavLink>
+
+        <NavLink to="/History" className={navClass}>
+          📚 History
         </NavLink>
 
         <button

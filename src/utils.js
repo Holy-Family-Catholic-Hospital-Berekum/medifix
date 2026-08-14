@@ -677,6 +677,7 @@ export const getStatusColor = (status) => {
     rejected: "bg-rose-600 text-white",
     reopened: "bg-amber-500 text-white",
     completed: "bg-green-600 text-white",
+    closed: "bg-slate-500 text-white", // ← add this
     denied: "bg-red-600 text-white",
     costDenied: "bg-red-400 text-white",
   };
@@ -717,7 +718,7 @@ export const canUserAssignWorker = (user, report) => {
 export const canUserSubmitCost = (user, report) => {
   return (
     user?.role === "estate" &&
-    report?.status === "completed" &&
+    ["completed", "closed"].includes(report?.status) &&
     (report?.maintenanceCost === null || report?.maintenanceCost === undefined)
   );
 };
@@ -767,17 +768,25 @@ export const canUserSendFeedback = (user, report) => {
 };
 
 export const canUserDownloadPDF = (user, report) => {
-  const hasMaterials =
-    Array.isArray(report?.materials) && report.materials.length > 0;
-  return (
-    hasMaterials &&
-    ((user?.role === "estate" &&
-      ["confirmed", "procured", "assigned", "accepted", "completed"].includes(
-        report?.status,
-      )) ||
-      (user?.role === "procurement" &&
-        ["confirmed", "procured", "completed"].includes(report?.status)))
-  );
+  const TERMINAL = ["completed", "closed"];
+
+  if (user?.role === "admin") return true;
+
+  if (user?.role === "estate") {
+    return [
+      "confirmed",
+      "procured",
+      "assigned",
+      "accepted",
+      ...TERMINAL,
+    ].includes(report?.status);
+  }
+
+  if (user?.role === "procurement") {
+    return ["confirmed", "procured", ...TERMINAL].includes(report?.status);
+  }
+
+  return false;
 };
 
 export const getTotalCost = (report) => {

@@ -8,10 +8,13 @@ import {
   getDocs,
   limit,
   deleteDoc,
+  updateDoc,
+  serverTimestamp,
+  arrayUnion,
   doc,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
-import { formatDate } from "../src/utils";
+import { formatDate, createAlert } from "../src/utils";
 
 const ORANGE = "#FF8825";
 
@@ -41,6 +44,43 @@ function useLiveTimeAgo(date) {
     return () => clearInterval(id);
   }, [date]);
   return label;
+}
+
+// Converts any of the date shapes we store (Firestore Timestamp, JS Date,
+// ISO string) into a plain JS Date, or null if there's nothing usable.
+function toDate(value) {
+  if (!value) return null;
+  if (value?.toDate) return value.toDate();
+  if (value instanceof Date) return value;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// A report can pick up new "activity" dates well after it was first sent
+// (approved, reassigned, reopened, etc). Sorting purely by dateSent leaves
+// recently-reopened or recently-updated reports buried under old ones, so
+// instead we take whichever tracked date is the most recent.
+const ACTIVITY_DATE_FIELDS = [
+  "dateReopened",
+  "dateRejected",
+  "dateAccepted",
+  "dateCompleted",
+  "dateAssigned",
+  "dateProcured",
+  "dateConfirmed",
+  "dateCostDenied",
+  "dateCostAdded",
+  "dateApproved",
+  "dateSent",
+];
+
+function getLastActivityDate(report) {
+  let latest = null;
+  for (const field of ACTIVITY_DATE_FIELDS) {
+    const d = toDate(report?.[field]);
+    if (d && (!latest || d > latest)) latest = d;
+  }
+  return latest ?? new Date(0);
 }
 
 const STATUS_MESSAGES = {
@@ -147,6 +187,14 @@ const STATUS_CONFIG = {
     bar: "bg-amber-400",
     icon: "🔁",
   },
+  closed: {
+    label: "Closed",
+    bg: "bg-gray-100",
+    text: "text-gray-700",
+    dot: "bg-gray-500",
+    bar: "bg-gray-400",
+    icon: "📁",
+  },
 };
 
 const PRIORITY_CONFIG = {
@@ -167,7 +215,8 @@ const STATUS_ORDER = [
 ];
 
 function getProgressPercent(status) {
-  if (status === "denied" || status === "reopened") return 100;
+  if (status === "denied" || status === "reopened" || status === "closed")
+    return 100;
   const idx = STATUS_ORDER.indexOf(status);
   if (idx === -1) return 0;
   return (idx / (STATUS_ORDER.length - 1)) * 100;
@@ -192,6 +241,7 @@ function ReportCard({
   user,
   getDenialNote,
   onCancelReport,
+  onCloseReport,
 }) {
   const overdueLabel = useLiveTimeAgo(report.dateDue);
   const denialNote = getDenialNote(report);
@@ -207,6 +257,10 @@ function ReportCard({
     user?.role === "staff" &&
     report?.reporterId === user?.ID &&
     report?.status === "incoming";
+  const canClose =
+    user?.role === "staff" &&
+    report?.reporterId === user?.ID &&
+    report?.status === "reopened";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
@@ -252,7 +306,9 @@ function ReportCard({
                 ? "Denied"
                 : report.status === "reopened"
                   ? "Reopened"
-                  : `${Math.round(getProgressPercent(report.status))}%`}
+                  : report.status === "closed"
+                    ? "Closed"
+                    : `${Math.round(getProgressPercent(report.status))}%`}
             </span>
           </div>
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -265,7 +321,9 @@ function ReportCard({
                     ? "#EF4444"
                     : report.status === "reopened"
                       ? "#F59E0B"
-                      : getProgressColor(getProgressPercent(report.status)),
+                      : report.status === "closed"
+                        ? "#6B7280"
+                        : getProgressColor(getProgressPercent(report.status)),
               }}
             />
           </div>
@@ -422,6 +480,22 @@ function ReportCard({
             </button>
           </div>
         )}
+
+        {/* Staff can close a report they previously reopened once they're
+            satisfied it's been sorted out some other way (e.g. handled
+            outside the app), without waiting on the Estate Manager. */}
+        {canClose && (
+          <div className="border-t border-gray-100 pt-4 mt-4">
+            <button
+              type="button"
+              onClick={() => onCloseReport?.(report)}
+              className="w-full rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90"
+              style={{ backgroundColor: "#16a34a" }}
+            >
+              Close Report
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -487,11 +561,7 @@ export default function Pending() {
       async (snap) => {
         const data = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
-          .sort(
-            (a, b) =>
-              (b.dateSent?.toDate?.() ?? new Date(0)) -
-              (a.dateSent?.toDate?.() ?? new Date(0)),
-          );
+          .sort((a, b) => getLastActivityDate(b) - getLastActivityDate(a));
         setReports(data);
         setLoading(false);
 
@@ -545,6 +615,45 @@ export default function Pending() {
     } catch (error) {
       console.error("Error cancelling report:", error);
       alert("Failed to cancel report. Please try again.");
+    }
+  };
+
+  // Staff closing a report they reopened. This is a distinct outcome from
+  // "completed" — it just means the staff member is done with it without
+  // going through another feedback cycle. The onSnapshot listener above
+  // will drop it from this list automatically once its status is no longer
+  // one of the ones in the query's "in" filter.
+  const handleCloseReport = async (report) => {
+    if (
+      !report?.id ||
+      report.status !== "reopened" ||
+      user?.role !== "staff" ||
+      report?.reporterId !== user?.ID
+    )
+      return;
+
+    const confirmed = window.confirm(
+      "Close this report? This marks it as resolved and moves it out of your open reports.",
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        status: "closed",
+        dateClosed: serverTimestamp(),
+        alerts: arrayUnion(
+          createAlert(
+            "Staff closed the reopened report",
+            "staff",
+            "estate",
+            report.status,
+          ),
+        ),
+      });
+    } catch (error) {
+      console.error("Error closing report:", error);
+      alert("Failed to close report. Please try again.");
     }
   };
 
@@ -670,6 +779,7 @@ export default function Pending() {
               user={user}
               getDenialNote={getDenialNote}
               onCancelReport={handleCancelReport}
+              onCloseReport={handleCloseReport}
             />
           ))}
         </div>

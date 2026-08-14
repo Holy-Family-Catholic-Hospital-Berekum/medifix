@@ -22,6 +22,7 @@ export default function Assigned() {
       reopenedRedirect={"/ero"}
       acceptedRedirect={"/eip"}
       logoBGColor="md:bg-blue-500"
+      closedRedirect={"/ecl"}
       homeRedirect="/eh"
       dashboardRedirect={"/ed"}
       role={"estate"}

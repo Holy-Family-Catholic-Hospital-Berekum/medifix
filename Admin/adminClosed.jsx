@@ -1,29 +1,25 @@
 import Home from "../components/Home";
 
-export default function AdminHome() {
+export default function AdminClosed() {
   return (
     <Home
       bgColor="bg-green-300"
-      firstReportsStatus="incoming"
-      secondReportsStatus="pending"
+      firstReportsStatus="closed"
       primaryColor="text-green-300"
-      title1="Incoming Reports"
-      title2={"Pending Confirmation"}
-      secColor={"bg-green-500"}
-      titleBgColor={"bg-red-300"}
+      title1="Closed Works"
+      secColor="bg-green-500"
       reportCardHoverColor={"hover:bg-green-700"}
-      reportDate1="dateSent"
-      reportDate2="dateSent"
+      reportDate1="dateClosed"
       titleBorderColor={"border-red-300"}
       navBarColor="bg-green-300"
       slideInBgColor="bg-green-300"
       reportDetailsBgColor="bg-green-300"
-      reportsHiddenOnMobileTitle="Pending Confirmation"
+      specificReportsPage={true}
       completedRedirect={"/ac"}
-      acceptedRedirect={"/aip"}
-      logoBGColor="md:bg-green-500"
       reopenedRedirect={"/aro"}
+      acceptedRedirect={"/aip"}
       closedRedirect={"/acl"}
+      logoBGColor="md:bg-green-500"
       homeRedirect="/ah"
       dashboardRedirect={"/ad"}
       role={"admin"}

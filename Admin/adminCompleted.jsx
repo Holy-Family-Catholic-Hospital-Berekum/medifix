@@ -1,6 +1,6 @@
 import Home from "../components/Home";
 
-export default function Completed() {
+export default function AdminCompleted() {
   return (
     <Home
       bgColor="bg-green-300"
@@ -16,8 +16,9 @@ export default function Completed() {
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
       completedRedirect={"/ac"}
-      assignedRedirect={"/aip"}
       reopenedRedirect={"/aro"}
+      acceptedRedirect={"/aip"}
+      closedRedirect={"/acl"}
       logoBGColor="md:bg-green-500"
       homeRedirect="/ah"
       dashboardRedirect={"/ad"}

@@ -12,6 +12,9 @@ export default function SlideInRight({
   newRejectedCount,
   newAcceptedCount,
   newCompletedCount,
+  closedWithFeedback,
+  newClosedCount,
+  closedRedirect,
   dashboardRedirect,
   theme = {},
 }) {
@@ -118,6 +121,24 @@ export default function SlideInRight({
               className={`${feedbackBadge} text-xs font-black px-2 py-0.5 rounded-full`}
             >
               {completedWithFeedback}
+            </span>
+          )}
+        </span>
+      </NavLink>
+
+      <NavLink to={`${closedRedirect}`} end className={navClass}>
+        <span className="flex items-center justify-center gap-2">
+          Closed
+          {newClosedCount > 0 && (
+            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
+              {newClosedCount}
+            </span>
+          )}
+          {closedWithFeedback > 0 && (
+            <span
+              className={`${feedbackBadge} text-xs font-black px-2 py-0.5 rounded-full`}
+            >
+              {closedWithFeedback}
             </span>
           )}
         </span>

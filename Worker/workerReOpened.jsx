@@ -21,6 +21,7 @@ export default function WorkerReOpened() {
       logoBGColor="md:bg-yellow-500"
       reopenedRedirect={"/wro"}
       homeRedirect="/wh"
+      closedRedirect={"/wcl"}
       role={"worker"}
     />
   );

@@ -16,7 +16,7 @@ export default function ProcurementHome() {
       slideInBgColor="bg-yellow-500"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-      completedRedirect={"/pc"}
+      closedRedirect={"/pc"}
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/ph"
       dashboardRedirect={"/pd"}

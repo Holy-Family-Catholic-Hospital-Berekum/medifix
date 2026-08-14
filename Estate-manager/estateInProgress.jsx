@@ -24,6 +24,7 @@ export default function EstateInProgress() {
       reopenedRedirect={"/ero"}
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/eh"
+      closedRedirect={"/ecl"}
       role={"estate"}
     />
   );

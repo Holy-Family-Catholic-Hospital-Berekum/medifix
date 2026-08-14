@@ -20,6 +20,7 @@ export default function WorkerHome() {
       reopenedRedirect={"/wro"}
       acceptedRedirect={"/wa"}
       logoBGColor="md:bg-yellow-500"
+      closedRedirect={"/wcl"}
       homeRedirect="/wh"
       role={"worker"}
     />

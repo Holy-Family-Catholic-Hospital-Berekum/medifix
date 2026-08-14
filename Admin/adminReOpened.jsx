@@ -17,10 +17,11 @@ export default function AdminReOpened() {
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
       completedRedirect={"/ac"}
-      assignedRedirect={"/aip"}
+      acceptedRedirect={"/aip"}
       logoBGColor="md:bg-green-500"
       reopenedRedirect={"/aro"}
       homeRedirect="/ah"
+      closedRedirect={"/acl"}
       dashboardRedirect={"/ad"}
       role={"admin"}
     />

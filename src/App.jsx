@@ -6,6 +6,7 @@ import ProtectedRoute from "./protectedRoute";
 import History from "../Staff/History";
 import StaffHome from "../Staff/staffHome";
 import Pending from "../Staff/Pending";
+import StaffCompleted from "../Staff/completed";
 
 import EstateHome from "../Estate-manager/estateHome";
 import EstateAssigned from "../Estate-manager/estateAssigned";
@@ -14,16 +15,19 @@ import Dashboard from "../components/Dashboard";
 import Rejected from "../Estate-manager/estateRejected";
 import EstateInProgress from "../Estate-manager/estateInProgress";
 import EstateReOpened from "../Estate-manager/estateReOpened";
+import EstateClosed from "../Estate-manager/estateClosed";
 
 import AdminHome from "../Admin/adminHome";
 import AdminInProgress from "../Admin/adminInProgress";
 import AdminCompleted from "../Admin/adminCompleted";
 import AdminReOpened from "../Admin/adminReOpened";
+import AdminClosed from "../Admin/adminClosed";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
 import WorkerInProgress from "../Worker/workerInProgress";
 import WorkerReOpened from "../Worker/workerReOpened";
+import WorkerClosed from "../Worker/workerClosed";
 
 import ProcurementHome from "../Procurement/procurementHome";
 import ProcurementCompleted from "../Procurement/procurementCompleted";
@@ -123,6 +127,15 @@ export default function App() {
       />
 
       <Route
+        path="/acl"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminClosed />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/aro"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
@@ -172,6 +185,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/ecl"
+        element={
+          <ProtectedRoute allowedRoles={["estate"]}>
+            <EstateClosed />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/ero"
@@ -196,6 +217,14 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["worker"]}>
             <WorkerCompleted />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/wcl"
+        element={
+          <ProtectedRoute allowedRoles={["worker"]}>
+            <WorkerClosed />
           </ProtectedRoute>
         }
       />
@@ -232,6 +261,14 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["staff"]}>
             <History />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/Completed"
+        element={
+          <ProtectedRoute allowedRoles={["staff"]}>
+            <StaffCompleted />
           </ProtectedRoute>
         }
       />

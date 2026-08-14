@@ -23,6 +23,7 @@ export default function EstateReOpened() {
       acceptedRedirect={"/eip"}
       reopenedRedirect={"/ero"}
       logoBGColor="md:bg-yellow-500"
+      closedRedirect={"/ecl"}
       homeRedirect="/eh"
       role={"estate"}
     />

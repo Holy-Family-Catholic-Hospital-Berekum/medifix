@@ -1,6 +1,6 @@
 import Home from "../components/Home";
 
-export default function Completed() {
+export default function EstateCompleted() {
   return (
     <Home
       bgColor="bg-[#eff6ff]"
@@ -16,11 +16,12 @@ export default function Completed() {
       slideInBgColor="bg-yellow-300"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-     reopenedRedirect={"/ero"}
+      reopenedRedirect={"/ero"}
       completedRedirect={"/ec"}
       assignedRedirect={"/ea"}
       rejectedRedirect={"/er"}
       acceptedRedirect={"/eip"}
+      closedRedirect={"/ecl"}
       homeRedirect="/eh"
       dashboardRedirect={"/ed"}
       role={"estate"}

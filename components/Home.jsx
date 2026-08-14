@@ -33,9 +33,11 @@ function useCountdown(dateDue) {
   return timeLeft;
 }
 
+const TERMINAL_STATUSES = ["closed", "completed"];
+
 function Countdown({ dateDue, status, bgColor }) {
   const t = useCountdown(dateDue);
-  if (status === "completed" || !t) return null;
+  if (TERMINAL_STATUSES.includes(status) || !t) return null;
   if (t.overdue)
     return (
       <span className="text-[10px] font-black text-red-300 bg-red-950/70 border border-red-700/50 px-2 py-0.5 rounded-full tracking-wider uppercase">
@@ -151,7 +153,7 @@ const cardConfig = (status, priority, theme) => {
     cardBg = "bg-zinc-900/70",
   } = theme;
 
-  if (status !== "completed" && priority === "emergency")
+  if (!TERMINAL_STATUSES.includes(status) && priority === "emergency")
     return {
       border: cardEmergencyBorder || "border-red-600/60",
       glow: cardEmergencyGlow || "shadow-[0_0_20px_rgba(220,38,38,0.25)]",
@@ -162,7 +164,7 @@ const cardConfig = (status, priority, theme) => {
       priorityColor: cardEmergencyPriority || "text-red-400",
       cardBg,
     };
-  if (status !== "completed" && priority === "urgent")
+  if (!TERMINAL_STATUSES.includes(status) && priority === "urgent")
     return {
       border: cardUrgentBorder || "border-orange-500/50",
       glow: cardUrgentGlow || "shadow-[0_0_16px_rgba(249,115,22,0.2)]",
@@ -1102,6 +1104,7 @@ export default function Home({
   secondReportsStatus,
   reportsHiddenOnMobileTitle,
   specificReportsPage,
+  closedRedirect,
   homeRedirect,
   dashboardRedirect,
   role,
@@ -1146,12 +1149,17 @@ export default function Home({
     (r) => r.status === "completed" && isNewForUser(r),
   ).length;
 
+  const newClosedCount = reports.filter(
+    (r) => r.status === "closed" && isNewForUser(r),
+  ).length;
+
   const totalNewCount =
     newAssignedCount +
     newRejectedCount +
     newAcceptedCount +
     newReopenedCount +
-    newCompletedCount;
+    newCompletedCount +
+    newClosedCount;
 
   const displayReportDetails = (report) => {
     setCurrentReportId(report.id);
@@ -1191,7 +1199,7 @@ export default function Home({
 
   // ─── Status messages — explains what's currently happening at each stage ────
   const STATUS_MESSAGES = {
-    incoming: "Waiting for admin review.",
+    incoming: "Waiting for admin approval.",
     approved: "Approved by admin — waiting for the Estate Manager review.",
     pending: "Material request sent to admin — awaiting approval.",
     confirmed: "Material request approved — awaiting procurement.",
@@ -1201,14 +1209,13 @@ export default function Home({
       "Technician declined this job — waiting for Estate Manager reassignment.",
     accepted: "Technician accepted the job and is currently working on it.",
     reopened: "Reporter wasn't satisfied — back with the Estate Manager.",
+    closed: "Report closed.",
   };
 
   function getStatusMessage(report) {
-    if (report.status === "completed") {
-      return report.feedback
-        ? "Completed — feedback received."
-        : "Job completed — waiting for feedback";
-    }
+    if (report.status === "closed") return "Report closed by staff.";
+    if (report.status === "completed")
+      return "Work completed, waiting for staff feedback.";
     return STATUS_MESSAGES[report.status] || "";
   }
 
@@ -1287,6 +1294,10 @@ export default function Home({
     (r) => r.status === "completed" && hasFeedback(r),
   ).length;
 
+  const closedWithFeedback = reports.filter(
+    (r) => r.status === "closed" && hasFeedback(r),
+  ).length;
+
   // New: counts driving the "Rejected" (estate) and "Accepted" (worker)
   // sidebar nav badges. Computed from the full `reports` set already loaded
   // for this user, so no extra query is needed.
@@ -1335,11 +1346,9 @@ export default function Home({
           <div
             className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${cfg.accent}`}
           />
-
           <div
             className={`absolute top-0 left-0 right-0 h-16 bg-gradient-to-b ${cfg.accent} pointer-events-none rounded-t-2xl`}
           />
-
           {/* Priority row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1358,11 +1367,8 @@ export default function Home({
               {report.status}
             </span>
           </div>
-
           <div className="h-px bg-white/5" />
-
           <div className="h-px bg-white/5" />
-
           {getStatusMessage(report) && (
             <p
               className={`text-[12px] leading-relaxed font-bold -mt-1 ${theme.cardDateLabel} `}
@@ -1370,16 +1376,13 @@ export default function Home({
               {getStatusMessage(report)}
             </p>
           )}
-
           {report.status === "accepted" && report.dateAccepted && (
             <WorkStartedLabel
               dateAccepted={report.dateAccepted}
               className={theme.cardStatusText}
             />
           )}
-
           {/* Date */}
-
           {/* Date */}
           <div className="flex items-center gap-2"></div>
           {/* Date */}
@@ -1394,20 +1397,18 @@ export default function Home({
             </span>
           </div>
 
-          {/* Overdue */}
           {report.overdue && (
             <div className="flex flex-col gap-1 bg-red-950/50 border border-red-800/40 rounded-xl px-3 py-2">
               <span className="text-[10px] font-black text-red-500 tracking-widest uppercase flex items-center gap-1">
                 <span>⚠</span> Overdue
               </span>
-              {report.dateDue && report.status !== "completed" && (
+              {report.dateDue && !TERMINAL_STATUSES.includes(report.status) && (
                 <span className="text-[10px] text-yellow-400/90 font-mono">
                   Due {timeAgo(report.dateDue)}
                 </span>
               )}
             </div>
           )}
-
           {!report.overdue && (
             <Countdown
               dateDue={report.dateDue}
@@ -1415,7 +1416,6 @@ export default function Home({
               bgColor={PRIORITY_BG[report.priorityLevel] ?? "bg-green-800"}
             />
           )}
-
           {/* Hover shimmer */}
           <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bg-gradient-to-br from-white/[0.03] to-transparent" />
         </div>
@@ -1531,6 +1531,9 @@ export default function Home({
         newAcceptedCount={newAcceptedCount}
         newReopenedCount={newReopenedCount}
         newCompletedCount={newCompletedCount}
+        closedRedirect={closedRedirect}
+        newClosedCount={newClosedCount}
+        closedWithFeedback={closedWithFeedback}
       />
 
       {/* Mobile side toggle */}
@@ -1596,7 +1599,7 @@ export default function Home({
                   <span
                     className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
-                  {role === "admin" ? "In Progress" : "Assigned"}
+                  Assigned
                   {newAssignedCount > 0 && (
                     <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
                       {newAssignedCount}
@@ -1676,34 +1679,70 @@ export default function Home({
             </NavLink>
           )}
 
-          <NavLink
-            to={completedRedirect}
-            end
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span
-                  className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
-                />
-                Completed
-                {newCompletedCount > 0 && (
-                  <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
-                    {newCompletedCount}
-                  </span>
+          {/* Completed nav link — for admin, estate, worker */}
+          {completedRedirect &&
+            ["admin", "estate", "worker"].includes(role) && (
+              <NavLink
+                to={completedRedirect}
+                end
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                    />
+                    Completed
+                    {newCompletedCount > 0 && (
+                      <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                        {newCompletedCount}
+                      </span>
+                    )}
+                    {completedWithFeedback > 0 && (
+                      <span
+                        className={`ml-auto ${theme.feedbackBadge} text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums`}
+                      >
+                        {completedWithFeedback}
+                      </span>
+                    )}
+                  </>
                 )}
-                {completedWithFeedback > 0 && (
-                  <span
-                    className={`ml-auto ${theme.feedbackBadge} text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums`}
-                  >
-                    {completedWithFeedback}
-                  </span>
-                )}
-              </>
+              </NavLink>
             )}
-          </NavLink>
+
+          {/* Closed nav link */}
+          {closedRedirect && (
+            <NavLink
+              to={closedRedirect}
+              end
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                  />
+                  Closed
+                  {newClosedCount > 0 && (
+                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                      {newClosedCount}
+                    </span>
+                  )}
+                  {closedWithFeedback > 0 && (
+                    <span
+                      className={`ml-auto ${theme.feedbackBadge} text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums`}
+                    >
+                      {closedWithFeedback}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          )}
         </div>
 
         {/* Content area */}
