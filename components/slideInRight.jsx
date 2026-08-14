@@ -12,9 +12,11 @@ export default function SlideInRight({
   newRejectedCount,
   newAcceptedCount,
   newCompletedCount,
+  newReopenedCount,
   closedWithFeedback,
   newClosedCount,
   closedRedirect,
+  reopenedRedirect,
   dashboardRedirect,
   theme = {},
 }) {
@@ -103,6 +105,17 @@ export default function SlideInRight({
           {newAcceptedCount > 0 && (
             <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
               {newAcceptedCount}
+            </span>
+          )}
+        </NavLink>
+      )}
+
+      {reopenedRedirect && (
+        <NavLink to={`${reopenedRedirect}`} className={navClass}>
+          Reopened
+          {newReopenedCount > 0 && (
+            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
+              {newReopenedCount}
             </span>
           )}
         </NavLink>

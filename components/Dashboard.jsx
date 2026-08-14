@@ -14,6 +14,19 @@ import NavBar from "./navBar";
 import { THEMES } from "./Home";
 import { generateDashboardStatsPDF } from "../src/utils";
 
+// ─── status classification ────────────────────────────────────────────────
+// "Terminal" = the job is fully done and out of anyone's queue.
+// "reopened" is intentionally NOT terminal — it's back in the pipeline and
+// needs action — but it also must never show as overdue (per product
+// decision: reopened jobs don't carry a due-date countdown), so overdue
+// exclusion is a separate, slightly larger list.
+const TERMINAL_STATUSES = ["completed", "closed", "denied"];
+const OVERDUE_EXCLUDED_STATUSES = ["completed", "closed", "denied", "reopened"];
+
+const isActive = (status) => !TERMINAL_STATUSES.includes(status);
+const isOverdueEligible = (report) =>
+  report.overdue && !OVERDUE_EXCLUDED_STATUSES.includes(report.status);
+
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
   incoming: {
@@ -52,11 +65,35 @@ const STATUS_META = {
     bg: "#ede9fe",
     text: "#4c1d95",
   },
+  accepted: {
+    label: "Accepted",
+    color: "#06b6d4",
+    bg: "#cffafe",
+    text: "#155e75",
+  },
+  rejected: {
+    label: "Job Rejected",
+    color: "#f43f5e",
+    bg: "#ffe4e6",
+    text: "#881337",
+  },
   completed: {
     label: "Completed",
     color: "#22c55e",
     bg: "#dcfce7",
     text: "#14532d",
+  },
+  reopened: {
+    label: "Reopened",
+    color: "#f59e0b",
+    bg: "#fef9c3",
+    text: "#854d0e",
+  },
+  closed: {
+    label: "Closed",
+    color: "#64748b",
+    bg: "#f1f5f9",
+    text: "#334155",
   },
   denied: { label: "Denied", color: "#ef4444", bg: "#fee2e2", text: "#7f1d1d" },
   costDenied: {
@@ -162,12 +199,11 @@ function formatDate(date) {
 function buildPeriodStats(subset) {
   const total = subset.length;
   const completed = subset.filter((r) => r.status === "completed").length;
-  const overdue = subset.filter(
-    (r) => r.overdue && r.status !== "completed",
-  ).length;
-  const active = subset.filter(
-    (r) => !["completed", "denied"].includes(r.status),
-  ).length;
+  const closed = subset.filter((r) => r.status === "closed").length;
+  const reopened = subset.filter((r) => r.status === "reopened").length;
+  const rejectedJobs = subset.filter((r) => r.status === "rejected").length;
+  const overdue = subset.filter(isOverdueEligible).length;
+  const active = subset.filter((r) => isActive(r.status)).length;
 
   const byStatus = Object.fromEntries(
     Object.keys(STATUS_META).map((s) => [s, 0]),
@@ -201,7 +237,12 @@ function buildPeriodStats(subset) {
       ).toFixed(1)
     : null;
 
-  const completionRate = total ? Math.round((completed / total) * 100) : 0;
+  // "Completion rate" counts anything the reporter has confirmed done
+  // (closed) or that finished the technician's work (completed, even if
+  // still awaiting reporter confirmation) as resolved.
+  const completionRate = total
+    ? Math.round(((completed + closed) / total) * 100)
+    : 0;
 
   const getReportTotalCost = (r) =>
     (Number(r.cost) || 0) + (Number(r.maintenanceCost) || 0);
@@ -245,6 +286,9 @@ function buildPeriodStats(subset) {
   return {
     total,
     completed,
+    closed,
+    reopened,
+    rejectedJobs,
     overdue,
     active,
     byStatus,
@@ -1050,12 +1094,13 @@ export default function Dashboard({
   const stats = useMemo(() => {
     const total = reports.length;
     const completed = reports.filter((r) => r.status === "completed").length;
-    const overdue = reports.filter(
-      (r) => r.overdue && r.status !== "completed",
+    const closed = reports.filter((r) => r.status === "closed").length;
+    const reopenedCount = reports.filter((r) => r.status === "reopened").length;
+    const rejectedJobsCount = reports.filter(
+      (r) => r.status === "rejected",
     ).length;
-    const active = reports.filter(
-      (r) => !["completed", "denied"].includes(r.status),
-    ).length;
+    const overdue = reports.filter(isOverdueEligible).length;
+    const active = reports.filter((r) => isActive(r.status)).length;
 
     const byStatus = Object.fromEntries(
       Object.keys(STATUS_META).map((s) => [s, 0]),
@@ -1105,21 +1150,13 @@ export default function Dashboard({
     const monthCompleted = monthReports.filter(
       (r) => r.status === "completed",
     ).length;
-    const monthOverdue = monthReports.filter(
-      (r) => r.overdue && r.status !== "completed",
-    ).length;
-    const monthActive = monthReports.filter(
-      (r) => !["completed", "denied"].includes(r.status),
-    ).length;
+    const monthOverdue = monthReports.filter(isOverdueEligible).length;
+    const monthActive = monthReports.filter((r) => isActive(r.status)).length;
     const yearCompleted = yearReports.filter(
       (r) => r.status === "completed",
     ).length;
-    const yearOverdue = yearReports.filter(
-      (r) => r.overdue && r.status !== "completed",
-    ).length;
-    const yearActive = yearReports.filter(
-      (r) => !["completed", "denied"].includes(r.status),
-    ).length;
+    const yearOverdue = yearReports.filter(isOverdueEligible).length;
+    const yearActive = yearReports.filter((r) => isActive(r.status)).length;
 
     const trend = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
@@ -1141,12 +1178,17 @@ export default function Dashboard({
       .map((w) => {
         const assigned = reports.filter((r) => r.assignedTo === w.ID).length;
         const done = reports.filter(
-          (r) => r.assignedTo === w.ID && r.status === "completed",
+          (r) =>
+            r.assignedTo === w.ID && ["completed", "closed"].includes(r.status),
+        ).length;
+        const reworked = reports.filter(
+          (r) => r.assignedTo === w.ID && r.status === "reopened",
         ).length;
         return {
           name: w.name,
           assigned,
           done,
+          reworked,
           rate: assigned ? Math.round((done / assigned) * 100) : 0,
         };
       })
@@ -1166,7 +1208,9 @@ export default function Dashboard({
     const adminCount = users.filter((u) => u.role === "admin").length;
     const managerCount = users.filter((u) => u.role === "manager").length;
     const deactivatedCount = users.filter((u) => u.deactivated).length;
-    const completionRate = total ? Math.round((completed / total) * 100) : 0;
+    const completionRate = total
+      ? Math.round(((completed + closed) / total) * 100)
+      : 0;
 
     const getResolutionAverage = (subset) => {
       const resolved = subset.filter((r) => r.dateCompleted && r.dateSent);
@@ -1271,6 +1315,9 @@ export default function Dashboard({
     return {
       total,
       completed,
+      closed,
+      reopenedCount,
+      rejectedJobsCount,
       overdue,
       active,
       byStatus,
@@ -1319,12 +1366,8 @@ export default function Dashboard({
         total: lastYearReports.length,
         completed: lastYearReports.filter((r) => r.status === "completed")
           .length,
-        overdue: lastYearReports.filter(
-          (r) => r.overdue && r.status !== "completed",
-        ).length,
-        active: lastYearReports.filter(
-          (r) => !["completed", "denied"].includes(r.status),
-        ).length,
+        overdue: lastYearReports.filter(isOverdueEligible).length,
+        active: lastYearReports.filter((r) => isActive(r.status)).length,
         avgResolutionDays: getResolutionAverage(lastYearReports),
       },
     };
@@ -1764,6 +1807,31 @@ export default function Dashboard({
                 icon="⏱️"
                 accent="#8b5cf6"
                 sub="Days to close"
+              />
+            </div>
+
+            <SectionTitle>Job lifecycle</SectionTitle>
+            <div className="kpi-3" style={{ marginBottom: 20 }}>
+              <StatCard
+                label="Reopened"
+                value={displayStats.reopened ?? 0}
+                icon="🔁"
+                accent="#f59e0b"
+                sub="Reporter wasn't satisfied — no overdue countdown"
+              />
+              <StatCard
+                label="Closed"
+                value={displayStats.closed ?? 0}
+                icon="🔒"
+                accent="#64748b"
+                sub="Confirmed resolved by reporter"
+              />
+              <StatCard
+                label="Jobs Declined by Worker"
+                value={displayStats.rejectedJobs ?? 0}
+                icon="🙅"
+                accent="#f43f5e"
+                sub="Awaiting reassignment"
               />
             </div>
 
@@ -2257,7 +2325,7 @@ export default function Dashboard({
                           )}
                         </td>
                         <td style={{ padding: "11px 14px" }}>
-                          {r.overdue && r.status !== "completed" ? (
+                          {isOverdueEligible(r) ? (
                             <span
                               style={{
                                 color: "#ef4444",
@@ -2377,6 +2445,22 @@ export default function Dashboard({
                         }}
                       >
                         {w.name}
+                        {w.reworked > 0 && (
+                          <span
+                            style={{
+                              marginLeft: 8,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#854d0e",
+                              background: "#fef9c3",
+                              borderRadius: 5,
+                              padding: "1px 6px",
+                            }}
+                            title="Jobs the reporter reopened after this worker marked them complete"
+                          >
+                            🔁 {w.reworked} reopened
+                          </span>
+                        )}
                       </div>
                       <div
                         style={{
@@ -2587,7 +2671,7 @@ export default function Dashboard({
                               {pm.label}
                             </Badge>
                           )}
-                          {r.overdue && r.status !== "completed" && (
+                          {isOverdueEligible(r) && (
                             <Badge bg="#fee2e2" text="#991b1b">
                               ⚠ overdue
                             </Badge>
