@@ -17,6 +17,7 @@ export default function Completed() {
       specificReportsPage={true}
       completedRedirect={"/ac"}
       assignedRedirect={"/aip"}
+      reopenedRedirect={"/aro"}
       logoBGColor="md:bg-green-500"
       homeRedirect="/ah"
       dashboardRedirect={"/ad"}

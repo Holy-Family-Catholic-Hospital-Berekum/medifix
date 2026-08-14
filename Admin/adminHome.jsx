@@ -22,6 +22,7 @@ export default function AdminHome() {
       completedRedirect={"/ac"}
       assignedRedirect={"/aip"}
       logoBGColor="md:bg-green-500"
+      reopenedRedirect={"/aro"}
       homeRedirect="/ah"
       dashboardRedirect={"/ad"}
       role={"admin"}

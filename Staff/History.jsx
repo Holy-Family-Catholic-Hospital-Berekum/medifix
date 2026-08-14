@@ -216,9 +216,22 @@ export default function History() {
     setCurrentReport(reports.filter((r) => r.id === id));
   };
 
-  // When StaffReportDetails submits feedback it updates Firestore,
-  // but we also patch local state so the banner disappears immediately.
-  const handleFeedbackSent = (reportId, feedbackText) => {
+  // When StaffReportDetails submits feedback or reopens a job it updates
+  // Firestore, but this page's `reports` list was loaded once via getDocs
+  // (not a live listener), so we also patch local state here.
+  //
+  // - Feedback submission: the report stays "completed", just patch the
+  //   `feedback` field so the banner disappears.
+  // - Reopening: the report's status moves away from "completed", so it no
+  //   longer belongs in this list at all — remove it immediately instead of
+  //   leaving a stale "completed" card until the next full page load.
+  const handleFeedbackSent = (reportId, feedbackText, newStatus) => {
+    if (newStatus && newStatus !== "completed") {
+      setReports((prev) => prev.filter((r) => r.id !== reportId));
+      setCurrentReport((prev) => prev.filter((r) => r.id !== reportId));
+      return;
+    }
+
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId ? { ...r, feedback: feedbackText } : r,

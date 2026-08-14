@@ -54,6 +54,8 @@ const STATUS_MESSAGES = {
   assigned:
     "Your work has been assigned to the right technician, it will be attended to shortly.",
   denied: "Your report was not approved. See the reason below.",
+  reopened:
+    "You reopened this job — it's back with the Estate Manager for further action.",
 };
 
 function getGreeting() {
@@ -137,6 +139,14 @@ const STATUS_CONFIG = {
     bar: "bg-green-400",
     icon: "🏁",
   },
+  reopened: {
+    label: "Reopened",
+    bg: "bg-amber-100",
+    text: "text-amber-700",
+    dot: "bg-amber-500",
+    bar: "bg-amber-400",
+    icon: "🔁",
+  },
 };
 
 const PRIORITY_CONFIG = {
@@ -157,7 +167,7 @@ const STATUS_ORDER = [
 ];
 
 function getProgressPercent(status) {
-  if (status === "denied") return 100; // full bar, but rendered red (see below)
+  if (status === "denied" || status === "reopened") return 100;
   const idx = STATUS_ORDER.indexOf(status);
   if (idx === -1) return 0;
   return (idx / (STATUS_ORDER.length - 1)) * 100;
@@ -185,6 +195,7 @@ function ReportCard({
 }) {
   const overdueLabel = useLiveTimeAgo(report.dateDue);
   const denialNote = getDenialNote(report);
+  const reopenNote = report.status === "reopened" ? report.reopenReason : null;
   const assignedWorker =
     report.status === "assigned" && report.assignedTo
       ? workerMap[report.assignedTo] || null
@@ -239,7 +250,9 @@ function ReportCard({
             <span className="text-xs font-bold text-gray-500">
               {report.status === "denied"
                 ? "Denied"
-                : `${Math.round(getProgressPercent(report.status))}%`}
+                : report.status === "reopened"
+                  ? "Reopened"
+                  : `${Math.round(getProgressPercent(report.status))}%`}
             </span>
           </div>
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -250,7 +263,9 @@ function ReportCard({
                 backgroundColor:
                   report.status === "denied"
                     ? "#EF4444"
-                    : getProgressColor(getProgressPercent(report.status)),
+                    : report.status === "reopened"
+                      ? "#F59E0B"
+                      : getProgressColor(getProgressPercent(report.status)),
               }}
             />
           </div>
@@ -383,6 +398,18 @@ function ReportCard({
           </div>
         )}
 
+        {/* reopen reason */}
+        {reopenNote && (
+          <div className="border-t border-gray-100 pt-4 mt-4">
+            <p className="text-xs font-black text-amber-500 uppercase tracking-widest mb-1">
+              Why You Reopened This
+            </p>
+            <div className="bg-amber-50 rounded-xl px-3 py-2">
+              <p className="text-sm text-amber-700">{reopenNote}</p>
+            </div>
+          </div>
+        )}
+
         {canCancel && (
           <div className="border-t border-gray-100 pt-4 mt-4">
             <button
@@ -452,6 +479,7 @@ export default function Pending() {
         "confirmed",
         "assigned",
         "denied",
+        "reopened",
       ]),
     );
     const unsub = onSnapshot(
@@ -529,6 +557,7 @@ export default function Pending() {
     { key: "confirmed", label: "Confirmed" },
     { key: "assigned", label: "Assigned" },
     { key: "denied", label: "Denied" },
+    { key: "reopened", label: "Reopened" },
   ];
 
   const filtered =

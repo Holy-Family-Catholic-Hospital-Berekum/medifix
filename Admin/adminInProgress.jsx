@@ -20,6 +20,7 @@ export default function AdminInProgress() {
       assignedRedirect={"/aip"}
       logoBGColor="md:bg-green-500"
       homeRedirect="/ah"
+      reopenedRedirect={"/aro"}
       dashboardRedirect={"/ad"}
       role={"admin"}
     />

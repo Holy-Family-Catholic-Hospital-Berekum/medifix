@@ -675,6 +675,7 @@ export const getStatusColor = (status) => {
     assigned: "bg-purple-400 text-white",
     accepted: "bg-cyan-500 text-white",
     rejected: "bg-rose-600 text-white",
+    reopened: "bg-amber-500 text-white",
     completed: "bg-green-600 text-white",
     denied: "bg-red-600 text-white",
     costDenied: "bg-red-400 text-white",
@@ -693,7 +694,7 @@ export const canUserConfirmCost = (user, report) => {
 export const canUserAddCost = (user, report) => {
   return (
     user?.role === "estate" &&
-    (report?.status === "approved" || report?.status === "costDenied")
+    ["approved", "costDenied", "reopened"].includes(report?.status)
   );
 };
 
@@ -707,7 +708,9 @@ export const canUserMarkProcured = (user, report) => {
 export const canUserAssignWorker = (user, report) => {
   return (
     user?.role === "estate" &&
-    ["approved", "procured", "assigned", "rejected"].includes(report?.status)
+    ["approved", "procured", "assigned", "rejected", "reopened"].includes(
+      report?.status,
+    )
   );
 };
 
@@ -733,8 +736,24 @@ export const canUserAcceptOrRejectJob = (user, report) => {
 export const canUserComplete = (user, report) => {
   return (
     user?.role === "worker" &&
-    report?.status === "accepted" &&
+    ["accepted", "reopened"].includes(report?.status) &&
     report?.assignedTo === user?.ID
+  );
+};
+
+export const canUserReopenReport = (user, report) => {
+  return (
+    user?.role === "staff" &&
+    report?.status === "completed" &&
+    report?.reporterId === user?.ID
+  );
+};
+
+export const canUserCloseReopenedReport = (user, report) => {
+  return (
+    user?.role === "staff" &&
+    report?.status === "reopened" &&
+    report?.reporterId === user?.ID
   );
 };
 

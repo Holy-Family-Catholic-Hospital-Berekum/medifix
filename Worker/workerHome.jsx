@@ -17,6 +17,7 @@ export default function WorkerHome() {
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
       completedRedirect={"/wc"}
+      reopenedRedirect={"/wro"}
       acceptedRedirect={"/wa"}
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/wh"

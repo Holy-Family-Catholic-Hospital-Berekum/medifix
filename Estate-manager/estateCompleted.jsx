@@ -16,7 +16,7 @@ export default function Completed() {
       slideInBgColor="bg-yellow-300"
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
-     
+     reopenedRedirect={"/ero"}
       completedRedirect={"/ec"}
       assignedRedirect={"/ea"}
       rejectedRedirect={"/er"}

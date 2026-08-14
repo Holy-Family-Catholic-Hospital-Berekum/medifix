@@ -13,14 +13,18 @@ import EstateCompleted from "../Estate-manager/estateCompleted";
 import Dashboard from "../components/Dashboard";
 import Rejected from "../Estate-manager/estateRejected";
 import EstateInProgress from "../Estate-manager/estateInProgress";
+import EstateReOpened from "../Estate-manager/estateReOpened";
 
 import AdminHome from "../Admin/adminHome";
 import AdminInProgress from "../Admin/adminInProgress";
 import AdminCompleted from "../Admin/adminCompleted";
+import AdminReOpened from "../Admin/adminReOpened";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
 import WorkerInProgress from "../Worker/workerInProgress";
+import WorkerReOpened from "../Worker/workerReOpened";
+
 import ProcurementHome from "../Procurement/procurementHome";
 import ProcurementCompleted from "../Procurement/procurementCompleted";
 
@@ -119,6 +123,15 @@ export default function App() {
       />
 
       <Route
+        path="/aro"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminReOpened />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/ad"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
@@ -159,6 +172,16 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/ero"
+        element={
+          <ProtectedRoute allowedRoles={["estate"]}>
+            <EstateReOpened />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/ed"
         element={
@@ -176,6 +199,16 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/wro"
+        element={
+          <ProtectedRoute allowedRoles={["worker"]}>
+            <WorkerReOpened />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/wa"
         element={

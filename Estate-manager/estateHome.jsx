@@ -23,6 +23,7 @@ export default function EstateHome() {
       completedRedirect="/ec"
       assignedRedirect="/ea"
       acceptedRedirect={"/eip"}
+      reopenedRedirect={"/ero"}
       rejectedRedirect="/er"
       logoBGColor="md:bg-blue-500"
       homeRedirect="/eh"

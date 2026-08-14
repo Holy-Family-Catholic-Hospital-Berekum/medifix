@@ -20,6 +20,7 @@ export default function Rejected() {
       assignedRedirect={"/ea"}
       rejectedRedirect={"/er"}
       acceptedRedirect={"/eip"}
+      reopenedRedirect={"/ero"}
       logoBGColor="md:bg-blue-500"
       homeRedirect="/eh"
       dashboardRedirect={"/ed"}

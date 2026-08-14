@@ -1093,6 +1093,7 @@ export default function Home({
   assignedRedirect,
   rejectedRedirect,
   acceptedRedirect,
+  reopenedRedirect,
   title1,
   title2,
   reportDate1,
@@ -1138,12 +1139,19 @@ export default function Home({
   const newAcceptedCount = reports.filter(
     (r) => r.status === "accepted" && isNewForUser(r),
   ).length;
+  const newReopenedCount = reports.filter(
+    (r) => r.status === "reopened" && isNewForUser(r),
+  ).length;
   const newCompletedCount = reports.filter(
     (r) => r.status === "completed" && isNewForUser(r),
   ).length;
 
   const totalNewCount =
-    newAssignedCount + newRejectedCount + newAcceptedCount + newCompletedCount;
+    newAssignedCount +
+    newRejectedCount +
+    newAcceptedCount +
+    newReopenedCount +
+    newCompletedCount;
 
   const displayReportDetails = (report) => {
     setCurrentReportId(report.id);
@@ -1192,6 +1200,7 @@ export default function Home({
     rejected:
       "Technician declined this job — waiting for Estate Manager reassignment.",
     accepted: "Technician accepted the job and is currently working on it.",
+    reopened: "Reporter wasn't satisfied — back with the Estate Manager.",
   };
 
   function getStatusMessage(report) {
@@ -1283,6 +1292,7 @@ export default function Home({
   // for this user, so no extra query is needed.
   const rejectedCount = reports.filter((r) => r.status === "rejected").length;
   const acceptedCount = reports.filter((r) => r.status === "accepted").length;
+  const reopenedCount = reports.filter((r) => r.status === "reopened").length;
 
   const PRIORITY_BG = {
     emergency: "bg-red-500",
@@ -1508,8 +1518,10 @@ export default function Home({
         assignedRedirect={assignedRedirect}
         rejectedRedirect={rejectedRedirect}
         acceptedRedirect={acceptedRedirect}
+        reopenedRedirect={reopenedRedirect}
         rejectedCount={rejectedCount}
         acceptedCount={acceptedCount}
+        reopenedCount={reopenedCount}
         completedRedirect={completedRedirect}
         completedWithFeedback={completedWithFeedback}
         dashboardRedirect={dashboardRedirect}
@@ -1517,6 +1529,7 @@ export default function Home({
         newAssignedCount={newAssignedCount}
         newRejectedCount={newRejectedCount}
         newAcceptedCount={newAcceptedCount}
+        newReopenedCount={newReopenedCount}
         newCompletedCount={newCompletedCount}
       />
 
@@ -1633,6 +1646,29 @@ export default function Home({
                   {newAcceptedCount > 0 && (
                     <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
                       {newAcceptedCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          )}
+
+          {reopenedRedirect && (
+            <NavLink
+              to={reopenedRedirect}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                  />
+                  Reopened
+                  {newReopenedCount > 0 && (
+                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                      {newReopenedCount}
                     </span>
                   )}
                 </>

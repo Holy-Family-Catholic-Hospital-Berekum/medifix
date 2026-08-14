@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
-import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import {
+  updateDoc,
+  doc,
+  serverTimestamp,
+  arrayUnion,
+} from "firebase/firestore";
 import { db } from "../src/firebase";
-import { formatDate, canUserSendFeedback } from "../src/utils";
+import { formatDate, canUserSendFeedback, createAlert } from "../src/utils";
 
 export default function StaffReportDetails({
   displayDetails,
@@ -13,6 +18,9 @@ export default function StaffReportDetails({
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [showReopenForm, setShowReopenForm] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopening, setReopening] = useState(false);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -33,6 +41,45 @@ export default function StaffReportDetails({
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
   const report = currentReport[0];
+
+  const handleReopenReport = async () => {
+    if (!canUserSendFeedback(user, report)) return; // same reporter/status gate as confirming
+    if (!reopenReason.trim()) {
+      alert(
+        "Please describe what's still wrong so the Estate Manager can act on it.",
+      );
+      return;
+    }
+    const confirmed = window.confirm(
+      "This will reopen the job and send it back to the Estate Manager for reassignment. Continue?",
+    );
+    if (!confirmed) return;
+
+    setReopening(true);
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        status: "reopened",
+        dateReopened: serverTimestamp(),
+        reopenReason: reopenReason.trim(),
+        alerts: arrayUnion(
+          createAlert(reopenReason.trim(), "staff", "estate", report.status),
+        ),
+      });
+
+      // Tell the parent the report moved out of "completed" so it can drop
+      // it from the local list immediately instead of waiting for a refresh.
+      onFeedbackSent?.(report.id, null, "reopened");
+
+      setReopenReason("");
+      setShowReopenForm(false);
+      setDisplayDetails(false);
+    } catch (error) {
+      console.error("Error reopening report:", error);
+      alert("Failed to reopen report");
+    } finally {
+      setReopening(false);
+    }
+  };
 
   const handleSendFeedback = async () => {
     if (!canUserSendFeedback(user, report)) return;
@@ -216,29 +263,88 @@ export default function StaffReportDetails({
 
         {/* feedback form — only shown if feedback not yet given */}
         {canUserSendFeedback(user, report) && (
-          <div className="bg-white rounded-xl p-5 space-y-3">
+          <div className="bg-white rounded-xl p-5 space-y-4">
             <h3 className="font-bold text-gray-800">How did the work go?</h3>
             <p className="text-xs text-gray-400">
               Your feedback helps us improve maintenance quality.
             </p>
-            <textarea
-              placeholder="Describe the quality of work done…"
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-orange-300 resize-none"
-              rows="4"
-            />
-            <button
-              onClick={handleSendFeedback}
-              disabled={loading || !feedback.trim()}
-              className="w-full py-2.5 rounded-lg text-white font-bold text-sm transition"
-              style={{
-                background: loading || !feedback.trim() ? "#fdba74" : "#FF8825",
-                cursor: loading || !feedback.trim() ? "not-allowed" : "pointer",
-              }}
-            >
-              {loading ? "Submitting…" : "Submit Feedback"}
-            </button>
+
+            {!showReopenForm ? (
+              <>
+                <textarea
+                  placeholder="Describe the quality of work done…"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  className="w-full p-3 border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-orange-300 resize-none"
+                  rows="4"
+                />
+                <button
+                  onClick={handleSendFeedback}
+                  disabled={loading || !feedback.trim()}
+                  className="w-full py-2.5 rounded-lg text-white font-bold text-sm transition"
+                  style={{
+                    background:
+                      loading || !feedback.trim() ? "#fdba74" : "#FF8825",
+                    cursor:
+                      loading || !feedback.trim() ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {loading ? "Submitting…" : "✅ Resolved — Submit Feedback"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowReopenForm(true)}
+                  className="w-full py-2.5 rounded-lg border border-red-300 text-red-600 font-bold text-sm hover:bg-red-50 transition"
+                >
+                  ❌ Not satisfied — Reopen this job
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
+                  This sends the report back to the Estate Manager for further
+                  action or reassignment.
+                </p>
+                <textarea
+                  placeholder="What's still wrong with the work?"
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                  className="w-full p-3 border border-red-200 rounded-lg text-sm text-gray-700 outline-none focus:border-red-400 resize-none"
+                  rows="4"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleReopenReport}
+                    disabled={reopening || !reopenReason.trim()}
+                    className="flex-1 py-2.5 rounded-lg text-white font-bold text-sm transition"
+                    style={{
+                      background:
+                        reopening || !reopenReason.trim()
+                          ? "#fca5a5"
+                          : "#dc2626",
+                      cursor:
+                        reopening || !reopenReason.trim()
+                          ? "not-allowed"
+                          : "pointer",
+                    }}
+                  >
+                    {reopening ? "Reopening…" : "Reopen Job"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReopenForm(false);
+                      setReopenReason("");
+                    }}
+                    disabled={reopening}
+                    className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-600 font-bold text-sm hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

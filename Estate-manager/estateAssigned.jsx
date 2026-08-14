@@ -19,6 +19,7 @@ export default function Assigned() {
       completedRedirect={"/ec"}
       assignedRedirect={"/ea"}
       rejectedRedirect={"/er"}
+      reopenedRedirect={"/ero"}
       acceptedRedirect={"/eip"}
       logoBGColor="md:bg-blue-500"
       homeRedirect="/eh"

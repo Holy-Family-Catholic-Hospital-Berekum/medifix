@@ -18,6 +18,7 @@ export default function WorkerInProgress() {
       specificReportsPage={true}
       completedRedirect={"/wc"}
       acceptedRedirect={"/wa"}
+      reopenedRedirect={"/wro"}
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/wh"
       role={"worker"}
