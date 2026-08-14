@@ -13,6 +13,38 @@ import {
 import { db } from "../src/firebase";
 import { formatDate, canUserSendFeedback, createAlert } from "../src/utils";
 
+function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div
+      className="flex gap-1"
+      role="radiogroup"
+      aria-label="Technician rating"
+    >
+      {[1, 2, 3, 4, 5].map((star) => {
+        const filled = readOnly ? star <= value : star <= (hovered || value);
+        return (
+          <button
+            key={star}
+            type="button"
+            role={readOnly ? undefined : "radio"}
+            aria-checked={!readOnly && star === value}
+            disabled={readOnly}
+            onClick={() => onChange?.(star)}
+            onMouseEnter={() => setHovered(star)}
+            onMouseLeave={() => setHovered(0)}
+            className={`${size} leading-none p-0 bg-transparent border-0 select-none transition-transform ${
+              readOnly ? "cursor-default" : "cursor-pointer hover:scale-110"
+            } ${filled ? "text-yellow-400" : "text-gray-300"}`}
+          >
+            ★
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // Reusable, UX-friendly "call" button — bigger tap target, icon, clear affordance
 function PhoneCallButton({ phoneNumber, label }) {
   if (!phoneNumber) return null;
@@ -55,6 +87,7 @@ export default function StaffReportDetails({
   const [reopening, setReopening] = useState(false);
   const [assignedWorker, setAssignedWorker] = useState(null);
   const [loadingWorker, setLoadingWorker] = useState(false);
+  const [rating, setRating] = useState(0);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -62,6 +95,7 @@ export default function StaffReportDetails({
     if (displayDetails) {
       setVisible(true);
       setClosing(false);
+      setRating(0);
     } else if (visible) {
       setClosing(true);
       const t = setTimeout(() => {
@@ -159,6 +193,10 @@ export default function StaffReportDetails({
       alert("Please enter feedback");
       return;
     }
+    if (!rating) {
+      alert("Please rate the technician's work (1–5 stars)");
+      return;
+    }
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
@@ -166,15 +204,14 @@ export default function StaffReportDetails({
         feedback: feedback.trim(),
         feedbackDate: serverTimestamp(),
         dateClosed: serverTimestamp(),
+        technicianRating: rating,
+        technicianRatingDate: serverTimestamp(),
       });
 
-      // The report just moved from "completed" to "closed" — pass the new
-      // status along so whatever list is showing it (e.g. a "completed,
-      // awaiting feedback" page) can remove it instead of leaving a stale
-      // card around until the next refresh.
       onFeedbackSent?.(report.id, feedback.trim(), "closed");
 
       setFeedback("");
+      setRating(0);
       setDisplayDetails(false);
     } catch (error) {
       console.error("Error sending feedback:", error);
@@ -377,11 +414,25 @@ export default function StaffReportDetails({
 
         {/* existing feedback (read-only once submitted) */}
         {report.feedback && (
-          <div className="flex gap-2">
-            <h2 className="text-lg md:text-xl whitespace-nowrap">
-              Your Feedback:
-            </h2>
-            <p className="text-blue-100 md:text-lg">{report.feedback}</p>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <h2 className="text-lg md:text-xl whitespace-nowrap">
+                Your Feedback:
+              </h2>
+              <p className="text-blue-100 md:text-lg">{report.feedback}</p>
+            </div>
+            {report.technicianRating && (
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg md:text-xl whitespace-nowrap">
+                  Your Rating:
+                </h2>
+                <StarRating
+                  value={report.technicianRating}
+                  readOnly
+                  size="text-xl"
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -402,6 +453,16 @@ export default function StaffReportDetails({
                   className="w-full p-3 border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-orange-300 resize-none"
                   rows="4"
                 />
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    Rate the technician
+                  </p>
+                  <StarRating
+                    value={rating}
+                    onChange={setRating}
+                    size="text-2xl"
+                  />
+                </div>
                 <button
                   onClick={handleSendFeedback}
                   disabled={loading || !feedback.trim()}

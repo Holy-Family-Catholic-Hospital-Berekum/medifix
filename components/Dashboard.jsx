@@ -1014,6 +1014,7 @@ export default function Dashboard({
   const [showGenID, setShowGenID] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [downloadPeriod, setDownloadPeriod] = useState("month");
+  const [workerSort, setWorkerSort] = useState("done"); // "done" | "rating"
 
   // ── which period's stats to display on the Overview tab ──────────────────
   const [displayPeriod, setDisplayPeriod] = useState("overall");
@@ -1176,20 +1177,35 @@ export default function Dashboard({
     const workers = users.filter((u) => u.role === "worker");
     const workerStats = workers
       .map((w) => {
-        const assigned = reports.filter((r) => r.assignedTo === w.ID).length;
-        const done = reports.filter(
-          (r) =>
-            r.assignedTo === w.ID && ["completed", "closed"].includes(r.status),
+        const workerReports = reports.filter((r) => r.assignedTo === w.ID);
+        const assigned = workerReports.length;
+        const done = workerReports.filter((r) =>
+          ["completed", "closed"].includes(r.status),
         ).length;
-        const reworked = reports.filter(
-          (r) => r.assignedTo === w.ID && r.status === "reopened",
+        const reworked = workerReports.filter(
+          (r) => r.status === "reopened",
         ).length;
+
+        // Rating: only reports the reporter has actually rated carry
+        // technicianRating (set alongside feedback when they close a job).
+        const ratedReports = workerReports.filter(
+          (r) => typeof r.technicianRating === "number",
+        );
+        const ratingCount = ratedReports.length;
+        const avgRating = ratingCount
+          ? ratedReports.reduce((s, r) => s + r.technicianRating, 0) /
+            ratingCount
+          : null;
+
         return {
+          id: w.ID,
           name: w.name,
           assigned,
           done,
           reworked,
           rate: assigned ? Math.round((done / assigned) * 100) : 0,
+          avgRating,
+          ratingCount,
         };
       })
       .sort((a, b) => b.done - a.done);
@@ -1372,6 +1388,23 @@ export default function Dashboard({
       },
     };
   }, [reports, users]);
+
+  const sortedWorkerStats = useMemo(() => {
+    const list = [...stats.workerStats];
+    if (workerSort === "rating") {
+      // Unrated workers sink to the bottom regardless of raw comparison,
+      // and among rated workers we break tavg-rating ties by volume so a
+      // worker with one 5-star job doesn't outrank one with fifty 4.8s.
+      return list.sort((a, b) => {
+        if (a.avgRating == null && b.avgRating == null) return b.done - a.done;
+        if (a.avgRating == null) return 1;
+        if (b.avgRating == null) return -1;
+        if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
+        return b.ratingCount - a.ratingCount;
+      });
+    }
+    return list; // already done-sorted from the stats useMemo
+  }, [stats.workerStats, workerSort]);
 
   // Stats for whichever period is currently selected on the Overview tab
   const displayStats =
@@ -2370,9 +2403,46 @@ export default function Dashboard({
         )}
 
         {/* ══════════════════ WORKERS ══════════════════ */}
+        {/* ══════════════════ WORKERS ══════════════════ */}
         {activeTab === "workers" && (
           <>
-            <SectionTitle>Leaderboard</SectionTitle>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 10,
+              }}
+            >
+              <SectionTitle>Leaderboard</SectionTitle>
+              <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                {[
+                  ["done", "Most Completed"],
+                  ["rating", "Highest Rated"],
+                ].map(([value, label]) => {
+                  const active = workerSort === value;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setWorkerSort(value)}
+                      style={{
+                        padding: "7px 13px",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        border: `1px solid ${active ? "#f59e0b" : "#e2e8f0"}`,
+                        background: active ? "#fef3c7" : "#fff",
+                        color: active ? "#92400e" : "#6b7280",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             {stats.workerStats.length === 0 ? (
               <p
                 style={{
@@ -2387,7 +2457,7 @@ export default function Dashboard({
               <div
                 style={{ display: "flex", flexDirection: "column", gap: 10 }}
               >
-                {stats.workerStats.map((w, i) => (
+                {sortedWorkerStats.map((w, i) => (
                   <Card
                     key={i}
                     style={{
@@ -2486,7 +2556,60 @@ export default function Dashboard({
                         />
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 14, flexShrink: 0 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 14,
+                        flexShrink: 0,
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ textAlign: "center", minWidth: 54 }}>
+                        <div
+                          style={{
+                            fontSize: 9,
+                            color: "#94a3b8",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: ".05em",
+                          }}
+                        >
+                          Rating
+                        </div>
+                        {w.avgRating != null ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "baseline",
+                              gap: 3,
+                              justifyContent: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 17,
+                                fontWeight: 800,
+                                color: "#f59e0b",
+                              }}
+                            >
+                              ★ {w.avgRating.toFixed(1)}
+                            </span>
+                            <span style={{ fontSize: 10, color: "#cbd5e1" }}>
+                              ({w.ratingCount})
+                            </span>
+                          </div>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#cbd5e1",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            No ratings
+                          </span>
+                        )}
+                      </div>
                       {[
                         ["Assigned", w.assigned, "#64748b"],
                         ["Done", w.done, "#22c55e"],
