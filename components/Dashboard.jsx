@@ -1014,7 +1014,6 @@ export default function Dashboard({
   const [showGenID, setShowGenID] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [downloadPeriod, setDownloadPeriod] = useState("month");
-  const [workerSort, setWorkerSort] = useState("done"); // "done" | "rating"
 
   // ── which period's stats to display on the Overview tab ──────────────────
   const [displayPeriod, setDisplayPeriod] = useState("overall");
@@ -1175,40 +1174,75 @@ export default function Dashboard({
     });
 
     const workers = users.filter((u) => u.role === "worker");
-    const workerStats = workers
+    const workerStatsRaw = workers.map((w) => {
+      const workerReports = reports.filter((r) => r.assignedTo === w.ID);
+      const assigned = workerReports.length;
+      const done = workerReports.filter((r) =>
+        ["completed", "closed"].includes(r.status),
+      ).length;
+      const reworked = workerReports.filter(
+        (r) => r.status === "reopened",
+      ).length;
+
+      // Rating: only reports the reporter has actually rated carry
+      // technicianRating (set alongside feedback when they close a job).
+      const ratedReports = workerReports.filter(
+        (r) => typeof r.technicianRating === "number",
+      );
+      const ratingCount = ratedReports.length;
+      const ratingSum = ratedReports.reduce(
+        (s, r) => s + r.technicianRating,
+        0,
+      );
+      const avgRating = ratingCount ? ratingSum / ratingCount : null;
+
+      return {
+        id: w.ID,
+        name: w.name,
+        assigned,
+        done,
+        reworked,
+        rate: assigned ? Math.round((done / assigned) * 100) : 0,
+        avgRating,
+        ratingCount,
+        ratingSum,
+      };
+    });
+
+    // ── Bayesian-weighted rating (IMDb-style) ────────────────────────────
+    // Pulls a worker's score toward the fleet-wide average C until they've
+    // built up enough ratings (m) for their own average to be trusted.
+    // This stops a worker with one lucky 5★ outranking one with fifty
+    // solid 4.5★s — the classic small-sample-size problem with raw averages.
+    const ratedWorkers = workerStatsRaw.filter((w) => w.ratingCount > 0);
+
+    const C = ratedWorkers.length
+      ? ratedWorkers.reduce((s, w) => s + w.ratingSum, 0) /
+        ratedWorkers.reduce((s, w) => s + w.ratingCount, 0)
+      : 0; // fleet-wide average rating across every individual rating given
+
+    const m = ratedWorkers.length
+      ? ratedWorkers.reduce((s, w) => s + w.ratingCount, 0) /
+        ratedWorkers.length
+      : 0; // average number of ratings per rated worker — the confidence threshold
+
+    const workerStats = workerStatsRaw
       .map((w) => {
-        const workerReports = reports.filter((r) => r.assignedTo === w.ID);
-        const assigned = workerReports.length;
-        const done = workerReports.filter((r) =>
-          ["completed", "closed"].includes(r.status),
-        ).length;
-        const reworked = workerReports.filter(
-          (r) => r.status === "reopened",
-        ).length;
-
-        // Rating: only reports the reporter has actually rated carry
-        // technicianRating (set alongside feedback when they close a job).
-        const ratedReports = workerReports.filter(
-          (r) => typeof r.technicianRating === "number",
-        );
-        const ratingCount = ratedReports.length;
-        const avgRating = ratingCount
-          ? ratedReports.reduce((s, r) => s + r.technicianRating, 0) /
-            ratingCount
-          : null;
-
-        return {
-          id: w.ID,
-          name: w.name,
-          assigned,
-          done,
-          reworked,
-          rate: assigned ? Math.round((done / assigned) * 100) : 0,
-          avgRating,
-          ratingCount,
-        };
+        const weightedRating =
+          w.ratingCount > 0
+            ? (w.ratingCount / (w.ratingCount + m)) * w.avgRating +
+              (m / (w.ratingCount + m)) * C
+            : null; // no ratings at all → no score, not a 0 or the fleet average
+        // Performance = weighted rating expressed as a percentage of the 5-star
+        // scale, so a technician's overall standing is one number that already
+        // accounts for sample-size confidence, not just raw completion throughput.
+        const performancePct =
+          weightedRating != null
+            ? Math.round((weightedRating / 5) * 100)
+            : null;
+        return { ...w, weightedRating, performancePct };
       })
-      .sort((a, b) => b.done - a.done);
+      .sort((a, b) => b.done - a.done); // default order unchanged; ranking view sorts separately
 
     const recent = [...reports]
       .sort(
@@ -1389,22 +1423,14 @@ export default function Dashboard({
     };
   }, [reports, users]);
 
-  const sortedWorkerStats = useMemo(() => {
-    const list = [...stats.workerStats];
-    if (workerSort === "rating") {
-      // Unrated workers sink to the bottom regardless of raw comparison,
-      // and among rated workers we break tavg-rating ties by volume so a
-      // worker with one 5-star job doesn't outrank one with fifty 4.8s.
-      return list.sort((a, b) => {
-        if (a.avgRating == null && b.avgRating == null) return b.done - a.done;
-        if (a.avgRating == null) return 1;
-        if (b.avgRating == null) return -1;
-        if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
-        return b.ratingCount - a.ratingCount;
-      });
-    }
-    return list; // already done-sorted from the stats useMemo
-  }, [stats.workerStats, workerSort]);
+  const rankedWorkerStats = useMemo(() => {
+    return [...stats.workerStats].sort((a, b) => {
+      const scoreA = a.weightedRating ?? -Infinity;
+      const scoreB = b.weightedRating ?? -Infinity;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return b.done - a.done; // tie-break for unrated workers
+    });
+  }, [stats.workerStats]);
 
   // Stats for whichever period is currently selected on the Overview tab
   const displayStats =
@@ -2403,46 +2429,10 @@ export default function Dashboard({
         )}
 
         {/* ══════════════════ WORKERS ══════════════════ */}
-        {/* ══════════════════ WORKERS ══════════════════ */}
+
         {activeTab === "workers" && (
           <>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 10,
-              }}
-            >
-              <SectionTitle>Leaderboard</SectionTitle>
-              <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-                {[
-                  ["done", "Most Completed"],
-                  ["rating", "Highest Rated"],
-                ].map(([value, label]) => {
-                  const active = workerSort === value;
-                  return (
-                    <button
-                      key={value}
-                      onClick={() => setWorkerSort(value)}
-                      style={{
-                        padding: "7px 13px",
-                        borderRadius: 8,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        border: `1px solid ${active ? "#f59e0b" : "#e2e8f0"}`,
-                        background: active ? "#fef3c7" : "#fff",
-                        color: active ? "#92400e" : "#6b7280",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <SectionTitle>Leaderboard</SectionTitle>
             {stats.workerStats.length === 0 ? (
               <p
                 style={{
@@ -2457,7 +2447,7 @@ export default function Dashboard({
               <div
                 style={{ display: "flex", flexDirection: "column", gap: 10 }}
               >
-                {sortedWorkerStats.map((w, i) => (
+                {rankedWorkerStats.map((w, i) => (
                   <Card
                     key={i}
                     style={{
@@ -2564,7 +2554,7 @@ export default function Dashboard({
                         alignItems: "center",
                       }}
                     >
-                      <div style={{ textAlign: "center", minWidth: 54 }}>
+                      <div style={{ textAlign: "center", minWidth: 60 }}>
                         <div
                           style={{
                             fontSize: 9,
@@ -2576,28 +2566,31 @@ export default function Dashboard({
                         >
                           Rating
                         </div>
-                        {w.avgRating != null ? (
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "baseline",
-                              gap: 3,
-                              justifyContent: "center",
-                            }}
-                          >
-                            <span
+                        {w.weightedRating != null ? (
+                          <>
+                            <div
                               style={{
-                                fontSize: 17,
-                                fontWeight: 800,
-                                color: "#f59e0b",
+                                display: "flex",
+                                alignItems: "baseline",
+                                gap: 3,
+                                justifyContent: "center",
                               }}
                             >
-                              ★ {w.avgRating.toFixed(1)}
+                              <span
+                                style={{
+                                  fontSize: 17,
+                                  fontWeight: 800,
+                                  color: "#f59e0b",
+                                }}
+                              >
+                                ★ {w.weightedRating.toFixed(2)}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: 9, color: "#2d2f31" }}>
+                              {w.avgRating.toFixed(2)} raw · {w.ratingCount}{" "}
+                              rated
                             </span>
-                            <span style={{ fontSize: 10, color: "#cbd5e1" }}>
-                              ({w.ratingCount})
-                            </span>
-                          </div>
+                          </>
                         ) : (
                           <span
                             style={{
@@ -2614,13 +2607,17 @@ export default function Dashboard({
                         ["Assigned", w.assigned, "#64748b"],
                         ["Done", w.done, "#22c55e"],
                         [
-                          "Rate",
-                          `${w.rate}%`,
-                          w.rate >= 80
-                            ? "#22c55e"
-                            : w.rate >= 50
-                              ? "#f59e0b"
-                              : "#ef4444",
+                          "Performance",
+                          w.performancePct != null
+                            ? `${w.performancePct}%`
+                            : "—",
+                          w.performancePct == null
+                            ? "#cbd5e1"
+                            : w.performancePct >= 80
+                              ? "#22c55e"
+                              : w.performancePct >= 50
+                                ? "#f59e0b"
+                                : "#ef4444",
                         ],
                       ].map(([l, v, c]) => (
                         <div key={l} style={{ textAlign: "center" }}>
