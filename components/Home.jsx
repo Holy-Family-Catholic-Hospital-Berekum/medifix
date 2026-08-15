@@ -1,6 +1,6 @@
 import { markOverdueReports, markReportViewed } from "../src/utils";
 import NavBar from "./navBar";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import SlideInRight from "../components/slideInRight";
 import { NavLink } from "react-router";
 import ReportDetailsContainer from "./reportDetails";
@@ -9,8 +9,13 @@ import {
   collection,
   query,
   where,
+  orderBy,
+  limit,
+  startAfter,
   onSnapshot,
   doc,
+  getDocs,
+  getCountFromServer,
   arrayUnion,
   writeBatch,
 } from "firebase/firestore";
@@ -109,21 +114,13 @@ const TIME_FILTERS = [
   { value: "lastYear", label: "Last Year" },
 ];
 
-function toJsDate(value) {
-  if (!value) return null;
-  const d = value?.toDate ? value.toDate() : new Date(value);
-  return isNaN(d?.getTime?.()) ? null : d;
-}
-
-// Filters by dateSent — the one date every report always has regardless of
-// which stage it's currently in — so the same filter works consistently
-// across every section (incoming, assigned, completed, etc.)
-function isWithinTimeFilter(dateValue, filter) {
-  if (filter === "overall") return true;
-  const d = toJsDate(dateValue);
-  if (!d) return false;
+// Returns JS Date bounds ({start, end}) for a time filter, or null for
+// "overall". `end: null` means "no upper bound" (thisWeek runs to now).
+// These bounds are now pushed down into the Firestore query itself
+// (where("dateSent", ">=", start) / where("dateSent", "<", end)) instead
+// of being applied client-side after fetching everything.
+function getTimeRangeBounds(filter) {
   const now = new Date();
-
   switch (filter) {
     case "thisWeek": {
       const start = new Date(now);
@@ -131,25 +128,30 @@ function isWithinTimeFilter(dateValue, filter) {
       const diffToMonday = day === 0 ? 6 : day - 1;
       start.setDate(start.getDate() - diffToMonday);
       start.setHours(0, 0, 0, 0);
-      return d >= start;
+      return { start, end: null };
     }
-    case "thisMonth":
-      return (
-        d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-      );
+    case "thisMonth": {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      return { start, end };
+    }
     case "lastMonth": {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return (
-        d.getFullYear() === lastMonth.getFullYear() &&
-        d.getMonth() === lastMonth.getMonth()
-      );
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start, end };
     }
-    case "thisYear":
-      return d.getFullYear() === now.getFullYear();
-    case "lastYear":
-      return d.getFullYear() === now.getFullYear() - 1;
+    case "thisYear": {
+      const start = new Date(now.getFullYear(), 0, 1);
+      const end = new Date(now.getFullYear() + 1, 0, 1);
+      return { start, end };
+    }
+    case "lastYear": {
+      const start = new Date(now.getFullYear() - 1, 0, 1);
+      const end = new Date(now.getFullYear(), 0, 1);
+      return { start, end };
+    }
     default:
-      return true;
+      return null;
   }
 }
 
@@ -160,6 +162,28 @@ function matchesSearch(report, searchQuery) {
     report.category?.toLowerCase().includes(q) ||
     report.priorityLevel?.toLowerCase().includes(q)
   );
+}
+
+function toJsDate(value) {
+  if (!value) return null;
+  const d = value?.toDate ? value.toDate() : new Date(value);
+  return isNaN(d?.getTime?.()) ? null : d;
+}
+
+// Purely a DISPLAY-order helper — never used inside a Firestore query.
+// Sorts an already-fetched page of docs by the section's own relevant
+// date field (e.g. dateAccepted, dateClosed), falling back to dateSent
+// (guaranteed on every report) when that field is missing on a given
+// doc, and finally to epoch so it never throws. This restores the
+// original per-section visual ordering without requiring Firestore's
+// orderBy() to see that field on every document — see note above
+// useSectionData for why orderBy(dateField) is unsafe.
+function sortByDateFieldForDisplay(docs, dateField) {
+  return [...docs].sort((a, b) => {
+    const aDate = toJsDate(a[dateField]) || toJsDate(a.dateSent) || new Date(0);
+    const bDate = toJsDate(b[dateField]) || toJsDate(b.dateSent) || new Date(0);
+    return bDate - aDate;
+  });
 }
 
 // ─── Birthday celebration helpers ───────────────────────────────────────────
@@ -1239,9 +1263,6 @@ export const THEMES = {
 // ─── Pagination controls ───────────────────────────────────────────────────
 const PAGE_SIZE = 9;
 
-const paginate = (arr, page, pageSize = PAGE_SIZE) =>
-  arr.slice((page - 1) * pageSize, page * pageSize);
-
 const PaginationControls = ({ page, totalPages, onChange, theme }) => {
   if (totalPages <= 1) return null;
   return (
@@ -1283,6 +1304,261 @@ const chunk = (arr, size) => {
 };
 const BATCH_CHUNK_SIZE = 450;
 
+// ── Badge / "mark all as read" data is only ever needed for these six
+// statuses (the sidebar nav only shows badges for these). Each status gets
+// its own small, bounded, live query instead of the whole collection.
+const BADGE_STATUS_LIST = [
+  "assigned",
+  "rejected",
+  "accepted",
+  "reopened",
+  "completed",
+  "closed",
+];
+// Cap per status. Practically this only matters for statuses that
+// accumulate a long history (completed/closed) — the cap means an item a
+// user never opened, sitting further back than this window, stops showing
+// a "new"/"feedback" badge. That's judged an acceptable trade-off versus
+// re-reading the full historical collection on every dashboard load.
+const BADGE_FETCH_LIMIT = 150;
+
+// Bounded fallback fetch size when free-text search is active (Firestore
+// can't do substring search server-side, so we pull a generously-sized,
+// still-bounded window for the active status/time-filter and search
+// within it client-side, instead of the entire collection).
+const SEARCH_FETCH_CAP = 500;
+
+function buildBaseConstraints({ statusValue, role, userId, timeFilter }) {
+  const constraints = [];
+  if (role === "worker" && userId) {
+    constraints.push(where("assignedTo", "==", userId));
+  }
+  if (Array.isArray(statusValue)) {
+    if (statusValue.length > 0)
+      constraints.push(where("status", "in", statusValue));
+  } else if (statusValue) {
+    constraints.push(where("status", "==", statusValue));
+  }
+  const range = getTimeRangeBounds(timeFilter);
+  if (range) {
+    constraints.push(where("dateSent", ">=", range.start));
+    if (range.end) constraints.push(where("dateSent", "<", range.end));
+  }
+  return constraints;
+}
+
+// ─── Paginated section hook ─────────────────────────────────────────────────
+// Replaces "fetch the whole collection, slice client-side" with a real
+// Firestore query bounded by status (+ role, + time filter), ordered and
+// limited server-side, walked forward with startAfter cursors.
+//
+// IMPORTANT — why the query orders by `dateSent` and NOT by the section's
+// own `dateField` (e.g. dateAccepted / dateClosed / dateCompleted):
+// Firestore's orderBy() silently drops any document that doesn't have the
+// ordered field set at all. A report that was closed before that field
+// existed, or that some code path never wrote it on, would simply vanish
+// from the results — while a plain count query (no orderBy) would still
+// count it. That mismatch is exactly the "pagination says there are
+// reports, but no cards render" bug. `dateSent` is the one date every
+// report is guaranteed to have (see getTimeRangeBounds/matchesSearch
+// above), so it's the only safe field to drive the server-side order and
+// the startAfter cursor. The section's own `dateField` is still used
+// purely for on-screen sorting of the page you already fetched (see
+// sortByDateFieldForDisplay) and for the date shown on each card — it
+// just never gates which documents Firestore is allowed to return.
+//
+// NOTE on required indexes: the first time each distinct query shape runs
+// (a given status set + role, with/without a time filter), Firestore may
+// respond with a "the query requires an index" error that includes a
+// direct link to auto-create it in the console. That's expected — click
+// the link once per shape, it takes about a minute to build, and it's
+// free on Spark (composite indexes aren't billed). Ordering everything by
+// `dateSent` keeps this to a small, predictable set of shapes shared
+// across every page, instead of a new shape per reportDate field.
+function useSectionData({
+  statusValue,
+  dateField,
+  role,
+  userId,
+  searchQuery,
+  timeFilter,
+  pageSize = PAGE_SIZE,
+}) {
+  const [docsOut, setDocsOut] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const cursorCacheRef = useRef({ 1: null });
+
+  const hasStatus =
+    !!statusValue && (!Array.isArray(statusValue) || statusValue.length > 0);
+  const searchMode = hasStatus && searchQuery.trim() !== "";
+  const statusKey = JSON.stringify(statusValue);
+
+  // Reset paging whenever the query "shape" changes (status set, role/user,
+  // time filter, or switching in/out of search mode). dateField no longer
+  // affects the Firestore query itself (see note above), only display
+  // sorting, but it's kept here too in case a caller ever swaps it.
+  useEffect(() => {
+    setPage(1);
+    cursorCacheRef.current = { 1: null };
+  }, [statusKey, dateField, role, userId, timeFilter, searchMode]);
+
+  // Also reset to page 1 whenever the search text itself changes (still in
+  // search mode, but it's a new result set).
+  useEffect(() => {
+    if (searchMode) setPage(1);
+  }, [searchQuery, searchMode]);
+
+  // ── Mode A: server-side cursor pagination (no free-text search) ───────
+  useEffect(() => {
+    if (!hasStatus || searchMode) return;
+    setLoading(true);
+    const cursor = cursorCacheRef.current[page] || null;
+    const base = buildBaseConstraints({
+      statusValue,
+      role,
+      userId,
+      timeFilter,
+    });
+
+    const q = query(
+      collection(db, "reports"),
+      ...base,
+      orderBy("dateSent", "desc"),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(pageSize),
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Re-order the fetched page for display using the section's own
+        // date field (falling back to dateSent) — purely cosmetic, does
+        // not affect which documents were fetched or how paging cursors
+        // are tracked below.
+        setDocsOut(sortByDateFieldForDisplay(docs, dateField));
+        setLoading(false);
+        if (snapshot.docs.length > 0) {
+          cursorCacheRef.current[page + 1] =
+            snapshot.docs[snapshot.docs.length - 1];
+        }
+      },
+      (err) => {
+        console.error(
+          "Section query failed — this usually means a composite index is needed; check the console for a creation link:",
+          err,
+        );
+        setLoading(false);
+      },
+    );
+
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hasStatus,
+    searchMode,
+    page,
+    statusKey,
+    role,
+    userId,
+    timeFilter,
+    pageSize,
+    dateField,
+  ]);
+
+  // Accurate total count for pagination, via a cheap aggregation query
+  // (billed per ~1000 index entries scanned, not per document read). No
+  // orderBy here, so it's unaffected by the missing-field issue described
+  // above and needs no composite index beyond the base equality filters.
+  useEffect(() => {
+    if (!hasStatus || searchMode) return;
+    const base = buildBaseConstraints({
+      statusValue,
+      role,
+      userId,
+      timeFilter,
+    });
+    const q = query(collection(db, "reports"), ...base);
+    getCountFromServer(q)
+      .then((snap) => setTotalCount(snap.data().count))
+      .catch((err) => console.error("Count query failed:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasStatus, searchMode, statusKey, role, userId, timeFilter]);
+
+  // ── Mode B: bounded one-time fetch + client-side substring search ─────
+  useEffect(() => {
+    if (!hasStatus || !searchMode) return;
+    setLoading(true);
+    const base = buildBaseConstraints({
+      statusValue,
+      role,
+      userId,
+      timeFilter,
+    });
+
+    const q = query(
+      collection(db, "reports"),
+      ...base,
+      orderBy("dateSent", "desc"),
+      limit(SEARCH_FETCH_CAP),
+    );
+
+    let cancelled = false;
+    getDocs(q)
+      .then((snapshot) => {
+        if (cancelled) return;
+        const docs = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((r) => matchesSearch(r, searchQuery));
+        setDocsOut(sortByDateFieldForDisplay(docs, dateField));
+        setTotalCount(docs.length);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Search query failed:", err);
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hasStatus,
+    searchMode,
+    searchQuery,
+    statusKey,
+    role,
+    userId,
+    timeFilter,
+    dateField,
+  ]);
+
+  const displayedDocs = searchMode
+    ? docsOut.slice((page - 1) * pageSize, page * pageSize)
+    : docsOut;
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  const patchDoc = useCallback((id, patch) => {
+    setDocsOut((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    );
+  }, []);
+
+  return {
+    docs: displayedDocs,
+    loading,
+    page,
+    setPage,
+    totalPages,
+    totalCount,
+    patchDoc,
+  };
+}
+
 // ─── Main Home component ──────────────────────────────────────────────────────
 export default function Home({
   completedRedirect,
@@ -1308,20 +1584,26 @@ export default function Home({
   const [showReportsHiddenOnMobile, SetShowReportsHiddenOnMobile] =
     useState(false);
   const [displayDetails, setDisplayDetails] = useState(false);
-  const [reports, setReports] = useState([]);
   const [currentReportId, setCurrentReportId] = useState(null);
-  const [reportsLoading, setReportsLoading] = useState(true);
-  const [firstPage, setFirstPage] = useState(1);
-  const [secondPage, setSecondPage] = useState(1);
+  const [selectedReport, setSelectedReport] = useState(null);
   const [showBirthdayBanner, setShowBirthdayBanner] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState("overall");
+  const [badgeData, setBadgeData] = useState({});
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   useEffect(() => {
     markOverdueReports(user);
   }, []);
+
+  // Debounce the search box so every keystroke doesn't trigger a Firestore
+  // read while the user is still typing.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   // Show the birthday banner once per day, on the user's actual birthday
   // only. Dismissal is remembered in localStorage so it doesn't keep
@@ -1369,38 +1651,98 @@ export default function Home({
     [user?.ID],
   );
 
-  // ─── Badge counts (sidebar) — depend on the full reports set & user, not
-  // on pagination/search/timeFilter, so they're memoized separately from
-  // the section filtering below to avoid recomputing 10+ .filter() passes
-  // on every unrelated re-render (e.g. every 1s countdown tick).
+  // ─── Two bounded, server-paginated sections (replaces the old single
+  // full-collection onSnapshot + client-side slice) ──────────────────────
+  const firstSection = useSectionData({
+    statusValue: firstReportsStatus,
+    dateField: reportDate1,
+    role: user?.role,
+    userId: user?.ID,
+    searchQuery: debouncedSearchQuery,
+    timeFilter,
+  });
+
+  const secondSection = useSectionData({
+    statusValue: specificReportsPage ? null : secondReportsStatus,
+    dateField: reportDate2,
+    role: user?.role,
+    userId: user?.ID,
+    searchQuery: debouncedSearchQuery,
+    timeFilter,
+  });
+
+  const firstReports = firstSection.docs;
+  const secondReports = secondSection.docs;
+
+  // ─── Badge / "mark all as read" data — six small bounded live queries
+  // (one per badge-relevant status) instead of reading everything ───────
+  useEffect(() => {
+    if (!user?.ID) return;
+    const unsubscribers = BADGE_STATUS_LIST.map((status) => {
+      const constraints = [];
+      if (user.role === "worker") {
+        constraints.push(where("assignedTo", "==", user.ID));
+      }
+      constraints.push(where("status", "==", status));
+      constraints.push(orderBy("dateSent", "desc"));
+      constraints.push(limit(BADGE_FETCH_LIMIT));
+      const q = query(collection(db, "reports"), ...constraints);
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          setBadgeData((prev) => ({
+            ...prev,
+            [status]: snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
+          }));
+        },
+        (err) =>
+          console.error(`Badge query failed for status="${status}":`, err),
+      );
+    });
+    return () => unsubscribers.forEach((u) => u());
+  }, [user?.ID, user?.role]);
+
+  const allBadgeReports = useMemo(
+    () => Object.values(badgeData).flat(),
+    [badgeData],
+  );
+
+  // ─── Badge counts (sidebar) — sourced from the six bounded badge
+  // queries instead of the full reports collection ──────────────────────
   const badgeCounts = useMemo(() => {
-    const newAssignedCount = reports.filter(
+    const newAssignedCount = allBadgeReports.filter(
       (r) => r.status === "assigned" && isNewForUser(r),
     ).length;
-    const newRejectedCount = reports.filter(
+    const newRejectedCount = allBadgeReports.filter(
       (r) => r.status === "rejected" && isNewForUser(r),
     ).length;
-    const newAcceptedCount = reports.filter(
+    const newAcceptedCount = allBadgeReports.filter(
       (r) => r.status === "accepted" && isNewForUser(r),
     ).length;
-    const newReopenedCount = reports.filter(
+    const newReopenedCount = allBadgeReports.filter(
       (r) => r.status === "reopened" && isNewForUser(r),
     ).length;
-    const newCompletedCount = reports.filter(
+    const newCompletedCount = allBadgeReports.filter(
       (r) => r.status === "completed" && isNewForUser(r),
     ).length;
-    const newClosedCount = reports.filter(
+    const newClosedCount = allBadgeReports.filter(
       (r) => r.status === "closed" && isNewForUser(r),
     ).length;
-    const completedWithFeedback = reports.filter(
+    const completedWithFeedback = allBadgeReports.filter(
       (r) => r.status === "completed" && hasFeedback(r),
     ).length;
-    const closedWithFeedback = reports.filter(
+    const closedWithFeedback = allBadgeReports.filter(
       (r) => r.status === "closed" && hasFeedback(r),
     ).length;
-    const rejectedCount = reports.filter((r) => r.status === "rejected").length;
-    const acceptedCount = reports.filter((r) => r.status === "accepted").length;
-    const reopenedCount = reports.filter((r) => r.status === "reopened").length;
+    const rejectedCount = allBadgeReports.filter(
+      (r) => r.status === "rejected",
+    ).length;
+    const acceptedCount = allBadgeReports.filter(
+      (r) => r.status === "accepted",
+    ).length;
+    const reopenedCount = allBadgeReports.filter(
+      (r) => r.status === "reopened",
+    ).length;
 
     return {
       newAssignedCount,
@@ -1415,7 +1757,7 @@ export default function Home({
       acceptedCount,
       reopenedCount,
     };
-  }, [reports, isNewForUser, hasFeedback]);
+  }, [allBadgeReports, isNewForUser, hasFeedback]);
 
   const {
     newAssignedCount,
@@ -1433,39 +1775,50 @@ export default function Home({
 
   const displayReportDetails = (report) => {
     setCurrentReportId(report.id);
+    setSelectedReport(report);
     setDisplayDetails(true);
 
     if (isNewForUser(report)) {
       markReportViewed(report.id, user.ID, report.status);
-      setReports((prev) =>
-        prev.map((r) =>
-          r.id === report.id
-            ? {
-                ...r,
-                lastViewedStatus: {
-                  ...(r.lastViewedStatus || {}),
-                  [user.ID]: report.status,
-                },
-              }
-            : r,
-        ),
-      );
+      const patch = {
+        lastViewedStatus: {
+          ...(report.lastViewedStatus || {}),
+          [user.ID]: report.status,
+        },
+      };
+      // Optimistic local patch so the "New" badge disappears immediately —
+      // wherever this report currently lives (either section, or a badge
+      // bucket), rather than waiting on the round-trip from Firestore.
+      firstSection.patchDoc(report.id, patch);
+      secondSection.patchDoc(report.id, patch);
+      setBadgeData((prev) => {
+        const bucket = prev[report.status];
+        if (!bucket) return prev;
+        return {
+          ...prev,
+          [report.status]: bucket.map((r) =>
+            r.id === report.id ? { ...r, ...patch } : r,
+          ),
+        };
+      });
     }
   };
 
+  // Keeps the open detail panel live via a single-document listener,
+  // instead of depending on a full-collection listener to catch updates.
   useEffect(() => {
-    const reportsQuery =
-      user?.role === "worker"
-        ? query(collection(db, "reports"), where("assignedTo", "==", user.ID))
-        : query(collection(db, "reports"));
-
-    const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setReports(data);
-      setReportsLoading(false);
-    });
+    if (!displayDetails || !currentReportId) return;
+    const unsubscribe = onSnapshot(
+      doc(db, "reports", currentReportId),
+      (snap) => {
+        if (snap.exists()) setSelectedReport({ id: snap.id, ...snap.data() });
+      },
+      (err) => console.error("Report detail listener failed:", err),
+    );
     return () => unsubscribe();
-  }, []);
+  }, [displayDetails, currentReportId]);
+
+  const currentReport = selectedReport ? [selectedReport] : [];
 
   // ─── Status messages — explains what's currently happening at each stage ────
   const STATUS_MESSAGES = {
@@ -1489,102 +1842,8 @@ export default function Home({
     return STATUS_MESSAGES[report.status] || "";
   }
 
-  const getAllAlerts = () => {
-    const allAlerts = [];
-    reports.forEach((report) => {
-      if (!report.alerts || !Array.isArray(report.alerts)) return;
-      report.alerts.forEach((alert) => {
-        if (alert.sentTo === user?.role || alert.sentTo === user?.ID) {
-          allAlerts.push({
-            ...alert,
-            reportId: report.id,
-            reportCategory: report.category,
-          });
-        }
-      });
-    });
-    return allAlerts.sort((a, b) => new Date(b.date) - new Date(a.date));
-  };
-
-  const sortByDate = (arr, key) =>
-    [...arr].sort(
-      (a, b) =>
-        (b[key]?.toDate?.() ?? new Date(0)) -
-        (a[key]?.toDate?.() ?? new Date(0)),
-    );
-
-  // Each section is sorted by its OWN relevant date field, most recent first,
-  // then narrowed by the search box (category / priority) and the time-range
-  // filter (based on dateSent, since that's the one date every report
-  // always has regardless of its current stage). Memoized so this filter +
-  // sort pass (over the full reports array) only re-runs when the inputs
-  // that actually affect it change — not on every render (e.g. countdown
-  // ticks, mark-as-read state patches to unrelated reports).
-  const firstReports = useMemo(
-    () =>
-      sortByDate(
-        reports.filter(
-          (r) =>
-            (Array.isArray(firstReportsStatus)
-              ? firstReportsStatus.includes(r.status)
-              : r.status === firstReportsStatus) &&
-            matchesSearch(r, searchQuery) &&
-            isWithinTimeFilter(r.dateSent, timeFilter),
-        ),
-        reportDate1,
-      ),
-    [reports, firstReportsStatus, searchQuery, timeFilter, reportDate1],
-  );
-
-  const secondReports = useMemo(
-    () =>
-      sortByDate(
-        reports.filter(
-          (r) =>
-            (Array.isArray(secondReportsStatus)
-              ? secondReportsStatus.includes(r.status)
-              : r.status === secondReportsStatus) &&
-            matchesSearch(r, searchQuery) &&
-            isWithinTimeFilter(r.dateSent, timeFilter),
-        ),
-        reportDate2,
-      ),
-    [reports, secondReportsStatus, searchQuery, timeFilter, reportDate2],
-  );
-
   const hasActiveFilters =
     searchQuery.trim() !== "" || timeFilter !== "overall";
-
-  // Reset to page 1 whenever the underlying data set changes size
-  // (e.g. filters change, or new reports come in over the snapshot listener),
-  // and also whenever the search/time filter itself changes (in case the
-  // result count happens to stay the same across the change).
-  useEffect(() => {
-    setFirstPage(1);
-  }, [firstReports.length]);
-
-  useEffect(() => {
-    setSecondPage(1);
-  }, [secondReports.length]);
-
-  useEffect(() => {
-    setFirstPage(1);
-    setSecondPage(1);
-  }, [searchQuery, timeFilter]);
-
-  const firstTotalPages = Math.max(
-    1,
-    Math.ceil(firstReports.length / PAGE_SIZE),
-  );
-  const secondTotalPages = Math.max(
-    1,
-    Math.ceil(secondReports.length / PAGE_SIZE),
-  );
-
-  const paginatedFirstReports = paginate(firstReports, firstPage);
-  const paginatedSecondReports = paginate(secondReports, secondPage);
-
-  const currentReport = reports.filter((r) => r.id === currentReportId);
 
   // Statuses that belong to *this* page (e.g. just "closed", or
   // "incoming"+"pending" on the two-section home). Second section is
@@ -1598,36 +1857,35 @@ export default function Home({
   }, [firstReportsStatus, secondReportsStatus, specificReportsPage]);
 
   // Unread counts scoped to this page only — drives whether the
-  // "Mark all as read" button shows up at all.
+  // "Mark all as read" button shows up at all. Sourced from the bounded
+  // badge data (pageStatuses, when this toolbar is shown, is always a
+  // subset of BADGE_STATUS_LIST).
   const { pageNewCount, pageFeedbackCount } = useMemo(() => {
+    const relevant = allBadgeReports.filter((r) =>
+      pageStatuses.includes(r.status),
+    );
     return {
-      pageNewCount: reports.filter(
-        (r) => pageStatuses.includes(r.status) && isNewForUser(r),
-      ).length,
-      pageFeedbackCount: reports.filter(
-        (r) => pageStatuses.includes(r.status) && hasFeedback(r),
-      ).length,
+      pageNewCount: relevant.filter((r) => isNewForUser(r)).length,
+      pageFeedbackCount: relevant.filter((r) => hasFeedback(r)).length,
     };
-  }, [reports, pageStatuses, isNewForUser, hasFeedback]);
+  }, [allBadgeReports, pageStatuses, isNewForUser, hasFeedback]);
 
   const hasUnreadItems = pageNewCount > 0 || pageFeedbackCount > 0;
 
-  // Clears every "🆕 New" and "💬 Feedback" badge across ALL of this user's
-  // reports (not just what's currently visible/filtered/paginated), so
-  // switching filters afterward doesn't reveal badges that were "missed".
-  // Two separate batches are used because the Firestore rules only allow a
-  // report update to touch lastViewedStatus OR feedbackViewedBy in a single
-  // write, never both together. Each batch is further chunked to stay under
-  // Firestore's 500-operation-per-batch hard limit, regardless of how many
-  // reports need marking.
+  // Clears every "🆕 New" and "💬 Feedback" badge across this user's
+  // reports for the statuses shown on this page (bounded to the badge
+  // data's fetch window — see BADGE_FETCH_LIMIT). Two separate batches are
+  // used because the Firestore rules only allow a report update to touch
+  // lastViewedStatus OR feedbackViewedBy in a single write, never both
+  // together. Each batch is further chunked to stay under Firestore's
+  // 500-operation-per-batch hard limit.
   const handleMarkAllAsRead = useCallback(async () => {
     if (!user?.ID) return;
-    const toMarkNew = reports.filter(
-      (r) => pageStatuses.includes(r.status) && isNewForUser(r),
+    const relevant = allBadgeReports.filter((r) =>
+      pageStatuses.includes(r.status),
     );
-    const toMarkFeedback = reports.filter(
-      (r) => pageStatuses.includes(r.status) && hasFeedback(r),
-    );
+    const toMarkNew = relevant.filter((r) => isNewForUser(r));
+    const toMarkFeedback = relevant.filter((r) => hasFeedback(r));
     if (toMarkNew.length === 0 && toMarkFeedback.length === 0) return;
 
     try {
@@ -1651,34 +1909,53 @@ export default function Home({
         await feedbackBatch.commit();
       }
 
-      // Patch local state immediately so badges disappear without waiting
-      // on the snapshot listener round-trip.
-      setReports((prev) =>
-        prev.map((r) => {
-          if (!pageStatuses.includes(r.status)) return r;
-          let updated = r;
-          if (isNewForUser(r)) {
-            updated = {
-              ...updated,
-              lastViewedStatus: {
-                ...(updated.lastViewedStatus || {}),
-                [user.ID]: updated.status,
-              },
-            };
-          }
-          if (hasFeedback(r)) {
-            updated = {
-              ...updated,
-              feedbackViewedBy: [...(updated.feedbackViewedBy || []), user.ID],
-            };
-          }
-          return updated;
-        }),
-      );
+      // Optimistic local patch so badges disappear without waiting on the
+      // snapshot listeners' round trip — applied to badge data AND to
+      // whichever visible section cards happen to hold the same reports
+      // (a card's own "New"/"Feedback" indicator reads straight off the
+      // report doc, not off badgeData).
+      const patchForReport = (r) => {
+        const patch = {};
+        if (isNewForUser(r)) {
+          patch.lastViewedStatus = {
+            ...(r.lastViewedStatus || {}),
+            [user.ID]: r.status,
+          };
+        }
+        if (hasFeedback(r)) {
+          patch.feedbackViewedBy = [...(r.feedbackViewedBy || []), user.ID];
+        }
+        return patch;
+      };
+
+      setBadgeData((prev) => {
+        const next = {};
+        for (const [status, docsForStatus] of Object.entries(prev)) {
+          next[status] = docsForStatus.map((r) =>
+            pageStatuses.includes(r.status)
+              ? { ...r, ...patchForReport(r) }
+              : r,
+          );
+        }
+        return next;
+      });
+
+      relevant.forEach((r) => {
+        const patch = patchForReport(r);
+        firstSection.patchDoc(r.id, patch);
+        secondSection.patchDoc(r.id, patch);
+      });
     } catch (err) {
       console.error("Failed to mark all as read:", err);
     }
-  }, [reports, pageStatuses, user?.ID, isNewForUser, hasFeedback]);
+  }, [
+    allBadgeReports,
+    pageStatuses,
+    user?.ID,
+    isNewForUser,
+    hasFeedback,
+    firstSection,
+  ]);
 
   const PRIORITY_BG = {
     emergency: "bg-red-500",
@@ -1758,9 +2035,6 @@ export default function Home({
             />
           )}
           {/* Date */}
-          {/* Date */}
-          <div className="flex items-center gap-2"></div>
-          {/* Date */}
           <div className="flex items-center gap-2">
             <span
               className={`text-[10px] ${theme.cardDateLabel} uppercase tracking-wider font-semibold`}
@@ -1798,10 +2072,10 @@ export default function Home({
     );
   };
 
-  const firstReportsCard = paginatedFirstReports.map((r) => (
+  const firstReportsCard = firstReports.map((r) => (
     <ReportCard key={r.id} report={r} reportDate={reportDate1} />
   ));
-  const secondReportsCard = paginatedSecondReports.map((r) => (
+  const secondReportsCard = secondReports.map((r) => (
     <div
       className={`z-[60] w-full max-w-[250px] md:max-w-[300px] justify-center md:flex ${showReportsHiddenOnMobile ? "flex" : "hidden"}`}
       key={r.id}
@@ -1830,7 +2104,7 @@ export default function Home({
           </h1>
         </div>
       </div>
-      {count !== undefined && !reportsLoading && (
+      {count !== undefined && (
         <span
           className={`ml-auto flex items-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} px-3 py-1 rounded-full`}
         >
@@ -2192,20 +2466,23 @@ export default function Home({
 
           {/* First reports section */}
           <div className={`w-full py-6 border-b ${theme.sectionDivider}`}>
-            <SectionHeader title={title1} count={firstReports.length} />
+            <SectionHeader
+              title={title1}
+              count={firstSection.loading ? undefined : firstSection.totalCount}
+            />
           </div>
 
-          {reportsLoading ? (
+          {firstSection.loading ? (
             <Preloader theme={theme} />
-          ) : firstReports.length > 0 ? (
+          ) : firstSection.totalCount > 0 ? (
             <>
               <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-6 justify-center w-full flex-wrap py-4 px-4">
                 {firstReportsCard}
               </div>
               <PaginationControls
-                page={firstPage}
-                totalPages={firstTotalPages}
-                onChange={setFirstPage}
+                page={firstSection.page}
+                totalPages={firstSection.totalPages}
+                onChange={firstSection.setPage}
                 theme={theme}
               />
             </>
@@ -2219,22 +2496,27 @@ export default function Home({
               <div
                 className={`w-full py-6 border-y ${theme.sectionDivider} hidden md:block`}
               >
-                <SectionHeader title={title2} count={secondReports.length} />
+                <SectionHeader
+                  title={title2}
+                  count={
+                    secondSection.loading ? undefined : secondSection.totalCount
+                  }
+                />
               </div>
 
-              {reportsLoading ? (
+              {secondSection.loading ? (
                 <div className="hidden md:flex">
                   <Preloader theme={theme} />
                 </div>
-              ) : secondReports.length > 0 ? (
+              ) : secondSection.totalCount > 0 ? (
                 <div className="hidden md:flex md:flex-col items-center w-full">
                   <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-6 justify-center w-full flex-wrap py-4 px-4">
                     {secondReportsCard}
                   </div>
                   <PaginationControls
-                    page={secondPage}
-                    totalPages={secondTotalPages}
-                    onChange={setSecondPage}
+                    page={secondSection.page}
+                    totalPages={secondSection.totalPages}
+                    onChange={secondSection.setPage}
                     theme={theme}
                   />
                 </div>

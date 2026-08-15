@@ -25,6 +25,7 @@ export default function EstateReOpened() {
       logoBGColor="md:bg-yellow-500"
       closedRedirect={"/ecl"}
       homeRedirect="/eh"
+      dashboardRedirect={"/ed"}
       role={"estate"}
     />
   );

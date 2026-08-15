@@ -7,6 +7,8 @@ import {
   getDocs,
   collection,
   query,
+  getDoc,
+  setDoc,
   where,
   deleteDoc,
 } from "firebase/firestore";
@@ -383,6 +385,31 @@ export default function ReportDetailsContainer({
     }
   }, [displayDetails, currentReport]);
 
+  // Images live in a separate reportImages/{reportId} doc so list-view
+  // snapshots on `reports` never download photo payloads — they're only
+  // fetched here, once, when this detail panel opens.
+  const [reportImagesData, setReportImagesData] = useState(null);
+
+  useEffect(() => {
+    if (!displayDetails || !currentReport || currentReport.length === 0) {
+      setReportImagesData(null);
+      return;
+    }
+    const reportId = currentReport[0].id;
+    let cancelled = false;
+    getDoc(doc(db, "reportImages", reportId))
+      .then((snap) => {
+        if (!cancelled) setReportImagesData(snap.exists() ? snap.data() : {});
+      })
+      .catch((err) => {
+        console.error("Failed to load report images:", err);
+        if (!cancelled) setReportImagesData({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [displayDetails, currentReport]);
+
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
   const report = currentReport[0];
@@ -736,10 +763,20 @@ export default function ReportDetailsContainer({
     try {
       const base64Image = await compressImageToBase64(completionImage);
 
+      // Write the photo FIRST, while the report is still 'accepted' or
+      // 'reopened' — the reportImages security rule checks the report's
+      // current status, so this must happen before the report itself
+      // flips to 'completed' below. setDoc+merge handles both "no
+      // before-photo doc exists yet" and "doc already has one" in one call.
+      await setDoc(
+        doc(db, "reportImages", report.id),
+        { completionImage: base64Image },
+        { merge: true },
+      );
+
       await updateDoc(doc(db, "reports", report.id), {
         status: "completed",
         dateCompleted: serverTimestamp(),
-        completionImage: base64Image,
       });
 
       alert("Work marked as completed!");
@@ -771,6 +808,14 @@ export default function ReportDetailsContainer({
 
     setLoading(true);
     try {
+      // Clean up the orphaned image doc first — the rule needs the report
+      // to still exist (to check ownership/status), so it must be deleted
+      // before the report itself.
+      try {
+        await deleteDoc(doc(db, "reportImages", report.id));
+      } catch (imgError) {
+        console.warn("No report image to delete (or delete failed):", imgError);
+      }
       await deleteDoc(doc(db, "reports", report.id));
       alert("Report cancelled and removed successfully.");
       setDisplayDetails(false);
@@ -892,6 +937,19 @@ export default function ReportDetailsContainer({
         </p>
       </div>
 
+      {report.reportsThisMonth != null && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Reports This Month:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {report.reportsThisMonth}
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <h2
           className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
@@ -959,7 +1017,7 @@ export default function ReportDetailsContainer({
         </p>
       </div>
 
-      {report.image && (
+      {reportImagesData?.image && (
         <div className="flex flex-col gap-2">
           <h2
             className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
@@ -967,10 +1025,10 @@ export default function ReportDetailsContainer({
             Attached Image:
           </h2>
           <img
-            src={report.image}
+            src={reportImagesData.image}
             alt="Report attachment"
             className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
-            onClick={() => window.open(report.image, "_blank")}
+            onClick={() => window.open(reportImagesData.image, "_blank")}
           />
         </div>
       )}
@@ -1215,7 +1273,7 @@ export default function ReportDetailsContainer({
       )}
 
       {/* New: read-only view of the completion photo once the job is done */}
-      {report.completionImage && (
+      {reportImagesData?.completionImage && (
         <div className="flex flex-col gap-2">
           <h2
             className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
@@ -1223,10 +1281,12 @@ export default function ReportDetailsContainer({
             Completion Photo:
           </h2>
           <img
-            src={report.completionImage}
+            src={reportImagesData.completionImage}
             alt="Completed work"
             className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
-            onClick={() => window.open(report.completionImage, "_blank")}
+            onClick={() =>
+              window.open(reportImagesData.completionImage, "_blank")
+            }
           />
         </div>
       )}

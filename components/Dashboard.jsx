@@ -1,12 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { nanoid } from "nanoid";
 import {
   collection,
-  onSnapshot,
   doc,
   updateDoc,
   deleteDoc,
   setDoc,
+  getDocs,
+  query,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db } from "../src/firebase";
@@ -26,6 +29,29 @@ const OVERDUE_EXCLUDED_STATUSES = ["completed", "closed", "denied", "reopened"];
 const isActive = (status) => !TERMINAL_STATUSES.includes(status);
 const isOverdueEligible = (report) =>
   report.overdue && !OVERDUE_EXCLUDED_STATUSES.includes(report.status);
+
+// ─── data-volume caps ───────────────────────────────────────────────────────
+// The dashboard used to hold a LIVE, UNBOUNDED listener on the entire
+// `reports` and `users` collections. That meant every dashboard load (and
+// every subsequent write anywhere in the app, since it was live) re-read
+// every document ever created — cost and load time that only ever grow,
+// with no ceiling. This is a real-time-analytics dashboard, not a page that
+// needs to reflect every write within milliseconds, so it's switched to a
+// bounded, explicitly-refreshed fetch instead (see loadReports/loadUsers
+// below). Adjust these caps to your real data volume; they're meant to be
+// generous, not a hard product constraint.
+const DASHBOARD_REPORTS_CAP = 5000;
+const DASHBOARD_USERS_CAP = 5000;
+
+// ─── table pagination ────────────────────────────────────────────────────────
+// Purely client-side paging over the already-fetched (bounded) arrays above
+// — this just controls how many rows render in the Reports/Users tables at
+// once, so a large data set doesn't render hundreds of DOM rows in one go.
+const REPORTS_PAGE_SIZE = 20;
+const USERS_PAGE_SIZE = 20;
+
+const paginate = (arr, page, pageSize) =>
+  arr.slice((page - 1) * pageSize, page * pageSize);
 
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -180,7 +206,8 @@ function timeAgo(date) {
   const day = Math.floor(diff / 86400000);
   if (day > 0) return `${day}d ago`;
   if (h > 0) return `${h}h ago`;
-  return `${m}m ago`;
+  if (m > 0) return `${m}m ago`;
+  return "just now";
 }
 
 function formatDate(date) {
@@ -382,6 +409,80 @@ function PeriodSelect({ value, onChange }) {
         </option>
       ))}
     </select>
+  );
+}
+
+// Simple prev/next + "page X of Y" control, styled to match the rest of
+// this file's inline-style primitives. Renders nothing when there's only
+// one page, so it never adds visual clutter for small data sets.
+function PaginationControls({
+  page,
+  totalPages,
+  onChange,
+  totalItems,
+  pageSize,
+}) {
+  if (totalPages <= 1) return null;
+
+  const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: 10,
+        padding: "14px 4px 4px",
+      }}
+    >
+      <span style={{ fontSize: 12, color: "#94a3b8" }}>
+        Showing {start}–{end} of {totalItems}
+      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "1px solid #e2e8f0",
+            background: "#fff",
+            color: "#374151",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: page <= 1 ? "not-allowed" : "pointer",
+            opacity: page <= 1 ? 0.4 : 1,
+          }}
+        >
+          ← Prev
+        </button>
+        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+          Page {page} / {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onChange(page + 1)}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "1px solid #e2e8f0",
+            background: "#fff",
+            color: "#374151",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: page >= totalPages ? "not-allowed" : "pointer",
+            opacity: page >= totalPages ? 0.4 : 1,
+          }}
+        >
+          Next →
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -645,6 +746,33 @@ function THead({ cols }) {
         ))}
       </tr>
     </thead>
+  );
+}
+
+// Small inline banner used for "data may be incomplete" / "failed to load"
+// states — deliberately quiet so it doesn't compete with the KPI cards, but
+// visible enough that a real backend problem never looks identical to
+// "there's genuinely nothing here yet."
+function InlineNotice({ tone = "info", children }) {
+  const palette =
+    tone === "error"
+      ? { bg: "#fef2f2", border: "#fecaca", text: "#991b1b" }
+      : { bg: "#fffbeb", border: "#fde68a", text: "#92400e" };
+  return (
+    <div
+      style={{
+        background: palette.bg,
+        border: `1px solid ${palette.border}`,
+        borderRadius: 10,
+        padding: "10px 14px",
+        marginBottom: 16,
+        fontSize: 12.5,
+        color: palette.text,
+        lineHeight: 1.5,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -1005,7 +1133,20 @@ export default function Dashboard({
   // ── all hooks first — no early returns before this block ─────────────────
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  // Split loading/error/truncation state per collection so a failure or
+  // partial load in one doesn't silently masquerade as the other, and so
+  // the page doesn't hang forever if a listener callback never fires (the
+  // old onSnapshot error handler never called setLoading(false) on error).
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [reportsError, setReportsError] = useState(false);
+  const [usersError, setUsersError] = useState(false);
+  const [reportsTruncated, setReportsTruncated] = useState(false);
+  const [usersTruncated, setUsersTruncated] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   const [activeTab, setActiveTab] = useState("overview");
   const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState(null);
@@ -1014,6 +1155,10 @@ export default function Dashboard({
   const [showGenID, setShowGenID] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [downloadPeriod, setDownloadPeriod] = useState("month");
+
+  // ── table pagination state ────────────────────────────────────────────────
+  const [reportsPage, setReportsPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
 
   // ── which period's stats to display on the Overview tab ──────────────────
   const [displayPeriod, setDisplayPeriod] = useState("overall");
@@ -1066,29 +1211,72 @@ export default function Dashboard({
             ? "/procurementDashboard"
             : "/");
 
-  // ── Firestore subscriptions ───────────────────────────────────────────────
-  useEffect(() => {
+  // ── Bounded, explicitly-refreshed data loads ──────────────────────────────
+  // Replaces the old unbounded onSnapshot(collection(db, "reports")) /
+  // onSnapshot(collection(db, "users")) listeners. Those stayed live forever
+  // and re-downloaded the ENTIRE collection on every write anywhere in the
+  // app — cost and load time that only grow, with no ceiling. A dashboard of
+  // aggregate stats doesn't need millisecond-fresh data, so this fetches a
+  // bounded, most-recent window once per mount/refresh instead, with a
+  // manual "Refresh" control (rendered further down) for anyone who wants
+  // up-to-the-second numbers.
+  const loadReports = useCallback(async () => {
     if (!hasAccess) return;
-    const unsub = onSnapshot(
-      collection(db, "reports"),
-      (snap) => {
-        setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Firestore reports error:", error);
-      },
-    );
-    return unsub;
+    setReportsLoading(true);
+    setReportsError(false);
+    try {
+      const q = query(
+        collection(db, "reports"),
+        orderBy("dateSent", "desc"),
+        limit(DASHBOARD_REPORTS_CAP),
+      );
+      const snap = await getDocs(q);
+      setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setReportsTruncated(snap.docs.length === DASHBOARD_REPORTS_CAP);
+    } catch (error) {
+      console.error("Firestore reports error:", error);
+      setReportsError(true);
+    } finally {
+      setReportsLoading(false);
+    }
+  }, [hasAccess]);
+
+  const loadUsers = useCallback(async () => {
+    if (!hasAccess) return;
+    setUsersLoading(true);
+    setUsersError(false);
+    try {
+      const q = query(
+        collection(db, "users"),
+        orderBy("createdAt", "desc"),
+        limit(DASHBOARD_USERS_CAP),
+      );
+      const snap = await getDocs(q);
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setUsersTruncated(snap.docs.length === DASHBOARD_USERS_CAP);
+    } catch (error) {
+      console.error("Firestore users error:", error);
+      setUsersError(true);
+    } finally {
+      setUsersLoading(false);
+    }
   }, [hasAccess]);
 
   useEffect(() => {
-    if (!hasAccess) return;
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [hasAccess]);
+    loadReports();
+  }, [loadReports, refreshKey]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers, refreshKey]);
+
+  useEffect(() => {
+    if (!reportsLoading && !usersLoading && !reportsError && !usersError) {
+      setLastRefreshed(new Date());
+    }
+  }, [reportsLoading, usersLoading, reportsError, usersError]);
+
+  const handleRefresh = () => setRefreshKey((k) => k + 1);
 
   // ── derived stats ─────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1257,6 +1445,9 @@ export default function Dashboard({
     const estateCount = users.filter((u) => u.role === "estate").length;
     const adminCount = users.filter((u) => u.role === "admin").length;
     const managerCount = users.filter((u) => u.role === "manager").length;
+    const procurementCount = users.filter(
+      (u) => u.role === "procurement",
+    ).length;
     const deactivatedCount = users.filter((u) => u.deactivated).length;
     const completionRate = total
       ? Math.round(((completed + closed) / total) * 100)
@@ -1350,10 +1541,6 @@ export default function Dashboard({
         costByPriority[r.priorityLevel] += getReportTotalCost(r);
     });
 
-    const procurementCount = users.filter(
-      (u) => u.role === "procurement",
-    ).length;
-
     // ── Period breakdowns (drives Overview display select + PDF download) ─
     const periodStats = {
       overall: buildPeriodStats(reports),
@@ -1381,6 +1568,7 @@ export default function Dashboard({
       estateCount,
       adminCount,
       managerCount,
+      procurementCount,
       deactivatedCount,
       completionRate,
       avgResolutionDays,
@@ -1394,9 +1582,6 @@ export default function Dashboard({
       costByPriority,
       totalMaterialsCost,
       totalMaintenanceCost,
-      estateCount,
-      procurementCount,
-      adminCount,
       periodStats,
       monthStats: {
         total: monthReports.length,
@@ -1436,6 +1621,33 @@ export default function Dashboard({
   const displayStats =
     stats.periodStats[displayPeriod] ?? stats.periodStats.overall;
 
+  // ── Reports tab: sorted (newest first) + paginated ────────────────────────
+  const sortedReports = useMemo(
+    () =>
+      [...reports].sort(
+        (a, b) =>
+          (b.dateSent?.toDate?.() ?? new Date(0)) -
+          (a.dateSent?.toDate?.() ?? new Date(0)),
+      ),
+    [reports],
+  );
+
+  const reportsTotalPages = Math.max(
+    1,
+    Math.ceil(sortedReports.length / REPORTS_PAGE_SIZE),
+  );
+  const paginatedReports = useMemo(
+    () => paginate(sortedReports, reportsPage, REPORTS_PAGE_SIZE),
+    [sortedReports, reportsPage],
+  );
+
+  // Reset to page 1 whenever the underlying report set changes size (e.g.
+  // a manual refresh pulls in new data), so pagination never gets stuck
+  // past the end of a shorter list.
+  useEffect(() => {
+    setReportsPage(1);
+  }, [reports.length]);
+
   const filteredUsers = useMemo(() => {
     let list = isManager ? users.filter((u) => u.role !== "admin") : users;
     return list
@@ -1453,6 +1665,23 @@ export default function Dashboard({
       );
   }, [users, userFilter, userSearch, isManager]);
 
+  const usersTotalPages = Math.max(
+    1,
+    Math.ceil(filteredUsers.length / USERS_PAGE_SIZE),
+  );
+  const paginatedUsers = useMemo(
+    () => paginate(filteredUsers, usersPage, USERS_PAGE_SIZE),
+    [filteredUsers, usersPage],
+  );
+
+  // Reset to page 1 whenever the filtered result set changes — either the
+  // search/filter inputs changed, or the underlying data set changed size
+  // (e.g. a refresh), in case the filtered count happens to stay the same
+  // across a data change.
+  useEffect(() => {
+    setUsersPage(1);
+  }, [userFilter, userSearch, filteredUsers.length]);
+
   // ── toast helper ──────────────────────────────────────────────────────────
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -1469,13 +1698,34 @@ export default function Dashboard({
     setShowDownloadMenu(false);
   };
 
-  // ── user action helpers ───────────────────────────────────────────────────
-  const canActOnUser = (u) => {
-    if (u.id === user?.uid) return false;
-    if (isAdmin) return true;
-    if (isManager) return u.role !== "admin";
-    return false;
-  };
+  // ── user identity & action helpers ─────────────────────────────────────────
+  // IMPORTANT FIX: the previous version compared `u.id === user?.uid`.
+  // `u.id` is the Firestore DOCUMENT id (from `{ id: d.id, ...d.data() }`),
+  // while `user?.uid` reads a field that doesn't appear to exist anywhere
+  // else in this codebase — the rest of the app (ReportForm, ReportDetails,
+  // History) consistently identifies "me" via `user.ID` (a custom field).
+  // That mismatch meant this comparison NEVER matched, so admins/managers
+  // could deactivate or permanently delete their own account with one
+  // click, and the "(you)" label never rendered.
+  //
+  // This checks both possible identity fields defensively, since it's not
+  // possible to confirm from this file alone which one your signup flow
+  // uses as the Firestore document id. Please verify by logging in and
+  // confirming your own row is correctly excluded from actions.
+  const isSelf = useCallback(
+    (u) => (!!user?.id && u.id === user.id) || (!!user?.ID && u.ID === user.ID),
+    [user?.id, user?.ID],
+  );
+
+  const canActOnUser = useCallback(
+    (u) => {
+      if (isSelf(u)) return false;
+      if (isAdmin) return true;
+      if (isManager) return u.role !== "admin";
+      return false;
+    },
+    [isSelf, isAdmin, isManager],
+  );
 
   const toggleDeactivate = (u) => {
     if (!canActOnUser(u)) return;
@@ -1489,6 +1739,11 @@ export default function Dashboard({
           await updateDoc(doc(db, "users", u.id), {
             deactivated: !u.deactivated,
           });
+          setUsers((prev) =>
+            prev.map((row) =>
+              row.id === u.id ? { ...row, deactivated: !u.deactivated } : row,
+            ),
+          );
           showToast(
             `Account ${u.deactivated ? "reactivated" : "deactivated"}.`,
           );
@@ -1508,6 +1763,7 @@ export default function Dashboard({
         setConfirm(null);
         try {
           await deleteDoc(doc(db, "users", u.id));
+          setUsers((prev) => prev.filter((row) => row.id !== u.id));
           showToast(`${u.name} deleted.`);
         } catch {
           showToast("Failed to delete user.", "error");
@@ -1530,7 +1786,18 @@ export default function Dashboard({
   // ── access guard — after all hooks ────────────────────────────────────────
   if (!hasAccess) return <AccessDenied role={role} />;
 
-  if (loading)
+  // Only show the full-page blocking spinner on the very first load, when
+  // there's nothing on screen yet. A manual refresh (or any subsequent
+  // load) shows a small inline "Refreshing…" indicator instead — see the
+  // header below — so the whole dashboard doesn't flash and reset every
+  // time someone clicks Refresh.
+  const initialLoading =
+    (reportsLoading || usersLoading) &&
+    reports.length === 0 &&
+    users.length === 0;
+  const isRefreshing = (reportsLoading || usersLoading) && !initialLoading;
+
+  if (initialLoading)
     return (
       <div
         style={{
@@ -1750,14 +2017,113 @@ export default function Dashboard({
               )}
             </div>
           </div>
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>
-            {new Date().toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}
-          </span>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 6,
+            }}
+          >
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>
+              {new Date().toLocaleDateString("en-GB", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
+            </span>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11,
+                fontWeight: 700,
+                color: isRefreshing ? "#cbd5e1" : "#64748b",
+                background: "none",
+                border: "1px solid #e2e8f0",
+                borderRadius: 999,
+                padding: "5px 12px",
+                cursor: isRefreshing ? "not-allowed" : "pointer",
+              }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{
+                  fontSize: 14,
+                  animation: isRefreshing ? "spin 1s linear infinite" : "none",
+                }}
+              >
+                refresh
+              </span>
+              {isRefreshing
+                ? "Refreshing…"
+                : lastRefreshed
+                  ? `Refreshed ${timeAgo(lastRefreshed)}`
+                  : "Refresh"}
+            </button>
+          </div>
         </div>
+
+        {/* ── data-health notices ──────────────────────────────────── */}
+        {reportsError && (
+          <InlineNotice tone="error">
+            Couldn't load reports data — the numbers below may be stale or
+            incomplete.{" "}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              style={{
+                border: "none",
+                background: "none",
+                color: "inherit",
+                fontWeight: 700,
+                textDecoration: "underline",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Try again
+            </button>
+          </InlineNotice>
+        )}
+        {usersError && (
+          <InlineNotice tone="error">
+            Couldn't load user data — worker names, ratings, and the Users tab
+            may be incomplete.{" "}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              style={{
+                border: "none",
+                background: "none",
+                color: "inherit",
+                fontWeight: 700,
+                textDecoration: "underline",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Try again
+            </button>
+          </InlineNotice>
+        )}
+        {!reportsError && reportsTruncated && (
+          <InlineNotice tone="info">
+            Showing the most recent {DASHBOARD_REPORTS_CAP.toLocaleString()}{" "}
+            reports. "Overall" totals and trends reflect this window, not full
+            historical data.
+          </InlineNotice>
+        )}
+        {!usersError && usersTruncated && (
+          <InlineNotice tone="info">
+            Showing the most recent {DASHBOARD_USERS_CAP.toLocaleString()}{" "}
+            users.
+          </InlineNotice>
+        )}
 
         {/* ── tab bar ──────────────────────────────────────────────── */}
         <div
@@ -2336,84 +2702,85 @@ export default function Dashboard({
                 ]}
               />
               <tbody>
-                {[...reports]
-                  .sort(
-                    (a, b) =>
-                      (b.dateSent?.toDate?.() ?? new Date(0)) -
-                      (a.dateSent?.toDate?.() ?? new Date(0)),
-                  )
-                  .map((r, i) => {
-                    const sm = STATUS_META[r.status];
-                    const pm = PRIORITY_META[r.priorityLevel];
-                    return (
-                      <tr
-                        key={r.id}
+                {paginatedReports.map((r, i) => {
+                  const sm = STATUS_META[r.status];
+                  const pm = PRIORITY_META[r.priorityLevel];
+                  return (
+                    <tr
+                      key={r.id}
+                      style={{
+                        borderBottom: "1px solid #f1f5f9",
+                        background: i % 2 ? "#fafafa" : "#fff",
+                      }}
+                    >
+                      <td
                         style={{
-                          borderBottom: "1px solid #f1f5f9",
-                          background: i % 2 ? "#fafafa" : "#fff",
+                          padding: "11px 14px",
+                          fontWeight: 600,
+                          color: "#0f172a",
                         }}
                       >
-                        <td
-                          style={{
-                            padding: "11px 14px",
-                            fontWeight: 600,
-                            color: "#0f172a",
-                          }}
-                        >
-                          {r.reporter}
-                        </td>
-                        <td style={{ padding: "11px 14px", color: "#64748b" }}>
-                          {r.category}
-                        </td>
-                        <td style={{ padding: "11px 14px" }}>
-                          {pm ? (
-                            <Badge bg={pm.bg} text={pm.text}>
-                              {pm.label}
-                            </Badge>
-                          ) : (
-                            r.priorityLevel
-                          )}
-                        </td>
-                        <td style={{ padding: "11px 14px" }}>
-                          {sm ? (
-                            <Badge bg={sm.bg} text={sm.text}>
-                              {sm.label}
-                            </Badge>
-                          ) : (
-                            r.status
-                          )}
-                        </td>
-                        <td style={{ padding: "11px 14px" }}>
-                          {isOverdueEligible(r) ? (
-                            <span
-                              style={{
-                                color: "#ef4444",
-                                fontWeight: 700,
-                                fontSize: 12,
-                              }}
-                            >
-                              ⚠ Yes
-                            </span>
-                          ) : (
-                            <span style={{ color: "#22c55e", fontSize: 12 }}>
-                              No
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          style={{
-                            padding: "11px 14px",
-                            color: "#94a3b8",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {timeAgo(r.dateSent)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        {r.reporter}
+                      </td>
+                      <td style={{ padding: "11px 14px", color: "#64748b" }}>
+                        {r.category}
+                      </td>
+                      <td style={{ padding: "11px 14px" }}>
+                        {pm ? (
+                          <Badge bg={pm.bg} text={pm.text}>
+                            {pm.label}
+                          </Badge>
+                        ) : (
+                          r.priorityLevel
+                        )}
+                      </td>
+                      <td style={{ padding: "11px 14px" }}>
+                        {sm ? (
+                          <Badge bg={sm.bg} text={sm.text}>
+                            {sm.label}
+                          </Badge>
+                        ) : (
+                          r.status
+                        )}
+                      </td>
+                      <td style={{ padding: "11px 14px" }}>
+                        {isOverdueEligible(r) ? (
+                          <span
+                            style={{
+                              color: "#ef4444",
+                              fontWeight: 700,
+                              fontSize: 12,
+                            }}
+                          >
+                            ⚠ Yes
+                          </span>
+                        ) : (
+                          <span style={{ color: "#22c55e", fontSize: 12 }}>
+                            No
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "11px 14px",
+                          color: "#94a3b8",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {timeAgo(r.dateSent)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </TableWrap>
+            <PaginationControls
+              page={reportsPage}
+              totalPages={reportsTotalPages}
+              onChange={setReportsPage}
+              totalItems={sortedReports.length}
+              pageSize={REPORTS_PAGE_SIZE}
+            />
             {reports.length === 0 && (
               <p
                 style={{
@@ -3026,9 +3393,9 @@ export default function Dashboard({
                 ]}
               />
               <tbody>
-                {filteredUsers.map((u, i) => {
+                {paginatedUsers.map((u, i) => {
                   const rm = ROLE_META[u.role];
-                  const isSelf = u.id === user?.uid;
+                  const self = isSelf(u);
                   const canAct = canActOnUser(u);
                   const rowBg = u.deactivated
                     ? "#fafafa"
@@ -3078,7 +3445,7 @@ export default function Dashboard({
                             }}
                           >
                             {u.name}
-                            {isSelf && (
+                            {self && (
                               <span
                                 style={{
                                   marginLeft: 5,
@@ -3185,24 +3552,22 @@ export default function Dashboard({
                             </button>
 
                             {/* Reset Password — admin and IT manager */}
-                            {canActOnUser(u) && (
-                              <button
-                                className="act-btn"
-                                onClick={() => setResetTarget(u)}
-                                style={{
-                                  padding: "4px 10px",
-                                  borderRadius: 6,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                  border: "1px solid #fed7aa",
-                                  background: "#fed7aa",
-                                  color: "#9a3412",
-                                }}
-                              >
-                                Reset Pw
-                              </button>
-                            )}
+                            <button
+                              className="act-btn"
+                              onClick={() => setResetTarget(u)}
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                border: "1px solid #fed7aa",
+                                background: "#fed7aa",
+                                color: "#9a3412",
+                              }}
+                            >
+                              Reset Pw
+                            </button>
 
                             {/* Delete */}
                             <button
@@ -3222,7 +3587,7 @@ export default function Dashboard({
                               Delete
                             </button>
                           </div>
-                        ) : isSelf ? (
+                        ) : self ? (
                           <span
                             style={{
                               fontSize: 11,
@@ -3243,6 +3608,13 @@ export default function Dashboard({
                 })}
               </tbody>
             </TableWrap>
+            <PaginationControls
+              page={usersPage}
+              totalPages={usersTotalPages}
+              onChange={setUsersPage}
+              totalItems={filteredUsers.length}
+              pageSize={USERS_PAGE_SIZE}
+            />
 
             {filteredUsers.length === 0 && (
               <p
@@ -3257,20 +3629,6 @@ export default function Dashboard({
                   : "No users yet."}
               </p>
             )}
-            <p
-              style={{
-                fontSize: 12,
-                color: "#94a3b8",
-                margin: "10px 0 0",
-                textAlign: "right",
-              }}
-            >
-              Showing {filteredUsers.length} of{" "}
-              {isManager
-                ? users.filter((u) => u.role !== "admin").length
-                : users.length}{" "}
-              users
-            </p>
           </>
         )}
       </div>

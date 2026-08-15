@@ -4,12 +4,18 @@ import {
   addDoc,
   serverTimestamp,
   query,
+  doc,
+  setDoc,
   where,
-  getDocs,
+  getCountFromServer,
   updateDoc,
   arrayUnion,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
+
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB — guards against reading a huge
+// original photo fully into memory via FileReader before any compression
+// has happened.
 
 export default function ReportForm({ formPopup, onClose }) {
   const [closing, setClosing] = useState(false);
@@ -25,10 +31,13 @@ export default function ReportForm({ formPopup, onClose }) {
   const [formData, setFormData] = useState({
     category: "Plumbing",
     priorityLevel: "routine",
-    location: currentUser.location,
+    // currentUser can be undefined on first render (e.g. before localStorage
+    // resolves), so fall back to "" — starting this as undefined would make
+    // the location input silently flip from uncontrolled to controlled once
+    // currentUser loads, which React warns about.
+    location: currentUser?.location ?? "",
     reportDescription: "",
     costDescription: "",
-    ID: "",
   });
 
   // ✅ When formPopup goes false, play slide-down before hiding
@@ -40,19 +49,38 @@ export default function ReportForm({ formPopup, onClose }) {
     }
   }, [formPopup]);
 
+  // Revoke the current preview's object URL whenever it changes or the
+  // component unmounts, so blob references don't accumulate in memory
+  // across image swaps / repeated form opens within the same session.
+  useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
   // Validate user is staff
   if (currentUser && currentUser.role !== "staff") {
     return null; // Only staff can see and use this form
   }
 
   const compressImage = (file) => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
+      reader.onerror = () =>
+        reject(new Error("Could not read the image file."));
       reader.readAsDataURL(file);
 
       reader.onload = (event) => {
         const img = new Image();
+
+        // Without this, a corrupt/unsupported file leaves the promise
+        // pending forever — the submit button would spin indefinitely with
+        // no error shown.
+        img.onerror = () =>
+          reject(
+            new Error("Could not process the image. Please try another photo."),
+          );
 
         img.src = event.target.result;
 
@@ -103,11 +131,29 @@ export default function ReportForm({ formPopup, onClose }) {
       return;
     }
 
+    // Reject oversized originals before FileReader loads the whole thing
+    // into memory — compression happens after this point, so an
+    // uncapped file here means holding a huge base64 string in RAM for no
+    // reason.
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("Image is too large. Please choose a photo under 15MB.");
+      return;
+    }
+
+    setError("");
+
+    // Revoke the previous preview (if replacing an existing selection)
+    // before creating the new one, so we never leak the old blob URL.
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+
     setImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
-    const preview = URL.createObjectURL(file);
-
-    setImagePreview(preview);
+  const handleRemoveImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImage(null);
+    setImagePreview("");
   };
 
   const calculateDueDate = (priorityLevel) => {
@@ -151,7 +197,24 @@ export default function ReportForm({ formPopup, onClose }) {
       setLoading(true);
 
       // Get the count of reports this month for this reporter.
-      // Use a single-field query to avoid requiring a composite Firestore index.
+      //
+      // Bounded to the current month via a `dateSent >=` clause in the
+      // query itself, rather than fetching this reporter's ENTIRE report
+      // history and filtering client-side. The old approach re-read every
+      // report that reporter had ever submitted on every single new
+      // submission — cost and latency that grew without bound the longer
+      // someone used the app. This reads only this month's reports for
+      // them, which stays small and roughly constant over time regardless
+      // of their lifetime report count.
+      //
+      // Uses getCountFromServer rather than getDocs — this is billed as a
+      // single lightweight aggregation read and never transfers the
+      // matching documents themselves, just the count.
+      //
+      // Requires a composite index on reports: (reporterId ASC, dateSent
+      // ASC). Firestore will show a direct link to auto-create it the
+      // first time this runs if it doesn't exist yet, or predeclare it in
+      // firestore.indexes.json and run `firebase deploy --only firestore:indexes`.
       const thisMonth = new Date();
       thisMonth.setDate(1);
       thisMonth.setHours(0, 0, 0, 0);
@@ -159,31 +222,25 @@ export default function ReportForm({ formPopup, onClose }) {
       const reporterReportsQuery = query(
         collection(db, "reports"),
         where("reporterId", "==", currentUser.ID),
+        where("dateSent", ">=", thisMonth),
       );
-      const reporterReportsSnapshot = await getDocs(reporterReportsQuery);
-      const reportsThisMonthCount =
-        reporterReportsSnapshot.docs
-          .map((doc) => {
-            const data = doc.data();
-            const dateSent = data.dateSent;
-            let sentDate = null;
-
-            if (dateSent?.toDate) {
-              sentDate = dateSent.toDate();
-            } else if (dateSent instanceof Date) {
-              sentDate = dateSent;
-            } else if (typeof dateSent === "string") {
-              sentDate = new Date(dateSent);
-            }
-
-            return sentDate;
-          })
-          .filter((sentDate) => sentDate && sentDate >= thisMonth).length + 1;
+      const countSnapshot = await getCountFromServer(reporterReportsQuery);
+      const reportsThisMonthCount = countSnapshot.data().count + 1;
 
       let imageBase64 = "";
 
       if (image) {
-        imageBase64 = await compressImage(image);
+        try {
+          imageBase64 = await compressImage(image);
+        } catch (imgProcessError) {
+          console.error("Error processing image:", imgProcessError);
+          setError(
+            imgProcessError.message ||
+              "Failed to process the attached image. Please try a different photo or remove it.",
+          );
+          setLoading(false);
+          return;
+        }
       }
 
       // Create the report document
@@ -204,7 +261,6 @@ export default function ReportForm({ formPopup, onClose }) {
         dateRejected: null,
         dateAccepted: null,
         dateCompleted: null,
-        image: imageBase64,
 
         dateDue: calculateDueDate(formData.priorityLevel),
 
@@ -237,8 +293,35 @@ export default function ReportForm({ formPopup, onClose }) {
       // Add report to Firestore
       const docRef = await addDoc(collection(db, "reports"), reportData);
 
+      // Photos live in a separate reportImages/{reportId} doc, not on the
+      // report itself — this keeps list-view snapshots (which pull every
+      // visible report on every load) free of image payloads. Only written
+      // if the staff member actually attached a photo.
+      //
+      // If this write fails, the report itself has already been created
+      // successfully — we don't roll that back, since the photo was always
+      // optional. Instead we track the failure and surface it in the
+      // final success message so the user knows to re-attach it later
+      // rather than assuming it went through.
+      let imageSaveFailed = false;
+      if (imageBase64) {
+        try {
+          await setDoc(doc(db, "reportImages", docRef.id), {
+            image: imageBase64,
+          });
+        } catch (imgError) {
+          console.error("Failed to save report image:", imgError);
+          imageSaveFailed = true;
+        }
+      }
+
       // Success
-      alert("Report submitted successfully!");
+      alert(
+        imageSaveFailed
+          ? "Report submitted successfully, but the attached photo failed to save. You can add it later from the report details."
+          : "Report submitted successfully!",
+      );
+      handleRemoveImage();
       setFormData({
         category: "Plumbing",
         priorityLevel: "routine",
@@ -246,8 +329,6 @@ export default function ReportForm({ formPopup, onClose }) {
         reportDescription: "",
         costDescription: "",
       });
-      setImage(null);
-      setImagePreview("");
       onClose();
     } catch (err) {
       console.error("Error submitting report:", err);
@@ -437,10 +518,7 @@ export default function ReportForm({ formPopup, onClose }) {
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      setImage(null);
-                      setImagePreview("");
-                    }}
+                    onClick={handleRemoveImage}
                     className="mt-2 text-red-500 text-sm"
                   >
                     Remove image

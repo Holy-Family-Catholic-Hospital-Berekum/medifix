@@ -4,6 +4,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
 import { db, auth } from "../src/firebase";
@@ -89,7 +90,7 @@ const CSS = `
     inset: -40px;
     z-index: 0;
     pointer-events: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='620' height='260'><text x='-60' y='90' font-family='DM Sans, sans-serif' font-size='22' font-weight='700' letter-spacing='1' fill='white' fill-opacity='0.10' transform='rotate(-16 310 130)'>Holy%20Family%20Catholic%20Hospital,%20Berekum</text><text x='260' y='230' font-family='DM Sans, sans-serif' font-size='22' font-weight='700' letter-spacing='1' fill='white' fill-opacity='0.10' transform='rotate(-16 310 130)'>Holy%20Family%20Catholic%20Hospital,%20Berekum</text></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='620' height='260'><text x='-60' y='90' font-family='DM Sans, sans-serif' font-size='22' font-weight='700' letter-spacing='1' fill='white' fill-opacity='0.10' transform='rotate(-16 310 130)'>Holy Family Catholic Hospital, Berekum</text><text x='260' y='230' font-family='DM Sans, sans-serif' font-size='22' font-weight='700' letter-spacing='1' fill='white' fill-opacity='0.10' transform='rotate(-16 310 130)'>Holy Family Catholic Hospital, Berekum</text></svg>");
     background-repeat: repeat;
     animation: watermark-drift 60s linear infinite;
   }
@@ -298,6 +299,14 @@ const CSS = `
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 30_000; // 30 seconds
 const STORAGE_KEY = "phix_login_attempts";
+const VALID_REG_TYPES = [
+  "staff",
+  "worker",
+  "estate",
+  "admin",
+  "manager",
+  "procurement",
+];
 
 export default function SignUp() {
   const [mode, setMode] = useState("login");
@@ -461,39 +470,72 @@ export default function SignUp() {
     }, 280);
   };
 
+  // Best-effort release of a claimed registration ID — used when signup
+  // fails *after* the ID was already atomically claimed (e.g. the Auth
+  // account creation or the users/{uid} write fails), so a legitimate ID
+  // doesn't get permanently burned by a failed attempt.
+  const releaseRegistrationId = async (regId) => {
+    try {
+      await updateDoc(doc(db, "registrationIDs", regId), { used: false });
+    } catch (e) {
+      console.error("Failed to release registration ID after rollback:", e);
+    }
+  };
+
   // ── sign up ──────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!canProceed || loading) return;
     setLoading(true);
     let createdUser = null;
+    let claimedRegId = null;
+
     try {
-      const regDocRef = doc(db, "registrationIDs", id.trim());
-      const regSnap = await getDoc(regDocRef);
-      if (!regSnap.exists()) {
-        alert(
-          "Invalid registration ID. Please request one from the Admin or IT Manager.",
-        );
+      const trimmedId = id.trim();
+      const regDocRef = doc(db, "registrationIDs", trimmedId);
+
+      // Atomically check-and-claim the registration ID inside a
+      // transaction, so two submissions of the same ID arriving at nearly
+      // the same time can't both read "unused" and both succeed. The
+      // transaction body must be free of side effects other than reads/
+      // writes against Firestore — validation and the eventual role value
+      // are handled via the outer `regType` variable and thrown sentinel
+      // errors, since transaction functions in the modular SDK may be
+      // retried by the SDK on contention.
+      let regType;
+      try {
+        await runTransaction(db, async (tx) => {
+          const regSnap = await tx.get(regDocRef);
+          if (!regSnap.exists()) {
+            throw new Error("REG_NOT_FOUND");
+          }
+          const regData = regSnap.data();
+          if (regData.used === true) {
+            throw new Error("REG_ALREADY_USED");
+          }
+          const type = regData.type?.toLowerCase();
+          if (!VALID_REG_TYPES.includes(type)) {
+            throw new Error("REG_INVALID_TYPE");
+          }
+          regType = type;
+          tx.update(regDocRef, { used: true });
+        });
+      } catch (txError) {
+        if (txError.message === "REG_NOT_FOUND") {
+          alert(
+            "Invalid registration ID. Please request one from the Admin or IT Manager.",
+          );
+        } else if (txError.message === "REG_ALREADY_USED") {
+          alert("This registration ID has already been used.");
+        } else if (txError.message === "REG_INVALID_TYPE") {
+          alert("Invalid registration ID type. Contact the IT Manager.");
+        } else {
+          console.error("Registration ID claim failed:", txError);
+          alert("Unable to verify registration ID. Please try again later.");
+        }
         return;
       }
-      const regData = regSnap.data();
-      const type = regData.type?.toLowerCase();
-      if (regData.used === true) {
-        alert("This registration ID has already been used.");
-        return;
-      }
-      if (
-        ![
-          "staff",
-          "worker",
-          "estate",
-          "admin",
-          "manager",
-          "procurement",
-        ].includes(type)
-      ) {
-        alert("Invalid registration ID type. Contact the IT Manager.");
-        return;
-      }
+      claimedRegId = trimmedId;
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
@@ -507,17 +549,16 @@ export default function SignUp() {
           email: email.trim(),
           location: location.trim(),
           profession: profession.trim(),
-          ID: id.trim(),
+          ID: trimmedId,
           phoneNumber: phoneNumber.trim(),
           // Stored as "YYYY-MM-DD" (native <input type="date"> format) so
           // it sorts/compares easily. Used later to detect and celebrate
           // birthdays in-app.
           birthdate: birthdate.trim(),
-          role: type,
+          role: regType,
           deactivated: false,
           createdAt: serverTimestamp(),
         });
-        await updateDoc(regDocRef, { used: true });
         alert("Account created successfully!");
         resetForm();
         switchMode("login");
@@ -530,10 +571,17 @@ export default function SignUp() {
             console.error(e);
           }
         }
+        await releaseRegistrationId(claimedRegId);
         alert("Unable to create account. Please try again later.");
       }
     } catch (outerError) {
       console.error("Sign up failed:", outerError);
+      // The registration ID was already claimed above but Auth account
+      // creation itself failed (e.g. email already in use) — release it
+      // so it's still usable.
+      if (claimedRegId) {
+        await releaseRegistrationId(claimedRegId);
+      }
       if (outerError.code === "auth/email-already-in-use")
         alert("Email already in use. Please use a different email.");
       else if (outerError.code === "auth/weak-password")
@@ -759,12 +807,21 @@ export default function SignUp() {
                         }
                       />
                       {field.type === "password" && (
-                        <span
+                        <button
+                          type="button"
                           className="material-symbols-outlined phix-eye"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                          }}
                           onClick={() => setShowPassword((p) => !p)}
+                          aria-label={
+                            showPassword ? "Hide password" : "Show password"
+                          }
                         >
                           {showPassword ? "visibility_off" : "visibility"}
-                        </span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -865,12 +922,17 @@ export default function SignUp() {
                       placeholder="Your password"
                       disabled={isLockedOut}
                     />
-                    <span
+                    <button
+                      type="button"
                       className="material-symbols-outlined phix-eye"
+                      style={{ background: "none", border: "none", padding: 0 }}
                       onClick={() => setShowPassword((p) => !p)}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
                     >
                       {showPassword ? "visibility_off" : "visibility"}
-                    </span>
+                    </button>
                   </div>
                 </div>
               </div>

@@ -25,6 +25,7 @@ export default function EstateInProgress() {
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/eh"
       closedRedirect={"/ecl"}
+      dashboardRedirect={"/ed"}
       role={"estate"}
     />
   );

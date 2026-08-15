@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   updateDoc,
   doc,
+  getDoc,
   serverTimestamp,
   arrayUnion,
   collection,
@@ -139,6 +140,31 @@ export default function StaffReportDetails({
     };
 
     loadWorker();
+    return () => {
+      cancelled = true;
+    };
+  }, [displayDetails, currentReport]);
+
+  // Images live in a separate reportImages/{reportId} doc so list-view
+  // snapshots on `reports` never download photo payloads — they're only
+  // fetched here, once, when this detail panel opens.
+  const [reportImagesData, setReportImagesData] = useState(null);
+
+  useEffect(() => {
+    const reportId = currentReport?.[0]?.id;
+    if (!displayDetails || !reportId) {
+      setReportImagesData(null);
+      return;
+    }
+    let cancelled = false;
+    getDoc(doc(db, "reportImages", reportId))
+      .then((snap) => {
+        if (!cancelled) setReportImagesData(snap.exists() ? snap.data() : {});
+      })
+      .catch((err) => {
+        console.error("Failed to load report images:", err);
+        if (!cancelled) setReportImagesData({});
+      });
     return () => {
       cancelled = true;
     };
@@ -362,7 +388,7 @@ export default function StaffReportDetails({
         </div>
 
         {/* before / after images */}
-        {(report.image || report.completionImage) && (
+        {(reportImagesData?.image || reportImagesData?.completionImage) && (
           <div className="flex flex-col gap-3">
             <h2 className="text-lg md:text-xl">Photos:</h2>
             <div className="flex flex-col md:flex-row gap-4">
@@ -370,12 +396,14 @@ export default function StaffReportDetails({
                 <span className="text-xs font-bold text-orange-100 uppercase tracking-wide">
                   Before
                 </span>
-                {report.image ? (
+                {reportImagesData?.image ? (
                   <img
-                    src={report.image}
+                    src={reportImagesData.image}
                     alt="Reported issue"
                     className="w-full max-h-64 object-contain rounded-xl border border-white/20 bg-black/10 cursor-pointer"
-                    onClick={() => window.open(report.image, "_blank")}
+                    onClick={() =>
+                      window.open(reportImagesData.image, "_blank")
+                    }
                   />
                 ) : (
                   <div className="w-full h-32 flex items-center justify-center rounded-xl border border-dashed border-white/30 text-orange-100 text-xs">
@@ -388,13 +416,13 @@ export default function StaffReportDetails({
                 <span className="text-xs font-bold text-orange-100 uppercase tracking-wide">
                   After
                 </span>
-                {report.completionImage ? (
+                {reportImagesData?.completionImage ? (
                   <img
-                    src={report.completionImage}
+                    src={reportImagesData.completionImage}
                     alt="Completed work"
                     className="w-full max-h-64 object-contain rounded-xl border border-white/20 bg-black/10 cursor-pointer"
                     onClick={() =>
-                      window.open(report.completionImage, "_blank")
+                      window.open(reportImagesData.completionImage, "_blank")
                     }
                   />
                 ) : (

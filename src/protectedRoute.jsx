@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -10,45 +10,73 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          // Always fetch fresh role from Firestore — never trust localStorage
-          const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+    let unsubscribeUserDoc = null;
 
-          if (userSnap.exists()) {
-            const freshData = userSnap.data();
-            setUser(freshData);
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      // Auth state changed — drop any previous per-user doc listener
+      // before attaching a new one (or none, if signed out).
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+        unsubscribeUserDoc = null;
+      }
 
-            // Keep localStorage in sync so other parts of the app
-            // that still read it get the fresh data
-            localStorage.setItem(
-              "user",
-              JSON.stringify({
-                data: freshData,
-                timestamp: Date.now(),
-              }),
-            );
-          } else {
-            // User doc doesn't exist in Firestore — sign out
-            await auth.signOut();
-            localStorage.removeItem("user");
-            setUser(null);
-          }
-        } catch (err) {
-          console.error("Failed to fetch user profile:", err);
-          await auth.signOut();
-          localStorage.removeItem("user");
-          setUser(null);
-        }
-      } else {
+      if (!firebaseUser) {
         localStorage.removeItem("user");
         setUser(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      // Live listener instead of a one-time getDoc: this is what makes
+      // deactivation take effect immediately for a user who's already
+      // sitting on a page, not just on next login/navigation. Fresh data
+      // from Firestore is still the source of truth — localStorage is
+      // only ever a cache kept in sync from what this listener receives,
+      // never trusted on its own.
+      unsubscribeUserDoc = onSnapshot(
+        doc(db, "users", firebaseUser.uid),
+        (userSnap) => {
+          if (!userSnap.exists()) {
+            auth.signOut().catch((err) => console.error(err));
+            localStorage.removeItem("user");
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+
+          const freshData = userSnap.data();
+
+          if (freshData.deactivated === true) {
+            auth.signOut().catch((err) => console.error(err));
+            localStorage.removeItem("user");
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+
+          setUser(freshData);
+          // Keep localStorage in sync so other parts of the app that
+          // still read it get the fresh data.
+          localStorage.setItem(
+            "user",
+            JSON.stringify({ data: freshData, timestamp: Date.now() }),
+          );
+          setLoading(false);
+        },
+        (err) => {
+          console.error("Failed to listen to user profile:", err);
+          auth.signOut().catch((e) => console.error(e));
+          localStorage.removeItem("user");
+          setUser(null);
+          setLoading(false);
+        },
+      );
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeUserDoc) unsubscribeUserDoc();
+    };
   }, []);
 
   useEffect(() => {

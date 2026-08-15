@@ -168,6 +168,11 @@ export default function History() {
   const [userData, setUserData] = useState(null);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Distinguishes "we checked and there's genuinely nothing" from "the
+  // fetch failed" — without this, a network blip or a not-yet-built
+  // composite index silently renders the same friendly empty state as a
+  // brand-new user with zero history, hiding real failures in production.
+  const [loadError, setLoadError] = useState(false);
   const [displayDetails, setDisplayDetails] = useState(false);
   const [currentReport, setCurrentReport] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -179,6 +184,7 @@ export default function History() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (authUser) => {
       if (authUser) {
+        setLoadError(false);
         try {
           const userSnap = await getDoc(doc(db, "users", authUser.uid));
           if (userSnap.exists()) {
@@ -202,6 +208,7 @@ export default function History() {
           }
         } catch (e) {
           console.error(e);
+          setLoadError(true);
         } finally {
           setLoading(false);
         }
@@ -264,7 +271,7 @@ export default function History() {
       </div>
 
       {/* ── Filters + Search ─────────────────────────────── */}
-      {!loading && reports.length > 0 && (
+      {!loading && !loadError && reports.length > 0 && (
         <div className="flex flex-wrap gap-3 mb-6 items-center">
           {/* filter pills */}
           <div className="flex gap-2">
@@ -350,6 +357,23 @@ export default function History() {
           <p className="text-gray-500 font-medium">
             Please log in to view your history.
           </p>
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-24">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-lg font-bold text-gray-700 mb-1">
+            Couldn't load your history
+          </h2>
+          <p className="text-gray-400 text-sm mb-4">
+            Something went wrong. Please check your connection and try again.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs font-bold px-4 py-2 rounded-full text-white"
+            style={{ background: ORANGE }}
+          >
+            Retry
+          </button>
         </div>
       ) : filtered.length > 0 ? (
         <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
