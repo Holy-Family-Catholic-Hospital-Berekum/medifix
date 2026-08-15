@@ -1,11 +1,19 @@
 import { markOverdueReports, markReportViewed } from "../src/utils";
 import NavBar from "./navBar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import SlideInRight from "../components/slideInRight";
 import { NavLink } from "react-router";
 import ReportDetailsContainer from "./reportDetails";
 import ReportsHiddenOnMobile from "./reportsHiddenOnMobile";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  arrayUnion,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "../src/firebase";
 
 // ─── Countdown hook ──────────────────────────────────────────────────────────
@@ -89,6 +97,182 @@ function useLiveTimeAgo(date) {
     return () => clearInterval(id);
   }, [date]);
   return label;
+}
+
+// ─── Search & time-filter helpers ───────────────────────────────────────────
+const TIME_FILTERS = [
+  { value: "overall", label: "Overall" },
+  { value: "thisWeek", label: "This Week" },
+  { value: "thisMonth", label: "This Month" },
+  { value: "lastMonth", label: "Last Month" },
+  { value: "thisYear", label: "This Year" },
+  { value: "lastYear", label: "Last Year" },
+];
+
+function toJsDate(value) {
+  if (!value) return null;
+  const d = value?.toDate ? value.toDate() : new Date(value);
+  return isNaN(d?.getTime?.()) ? null : d;
+}
+
+// Filters by dateSent — the one date every report always has regardless of
+// which stage it's currently in — so the same filter works consistently
+// across every section (incoming, assigned, completed, etc.)
+function isWithinTimeFilter(dateValue, filter) {
+  if (filter === "overall") return true;
+  const d = toJsDate(dateValue);
+  if (!d) return false;
+  const now = new Date();
+
+  switch (filter) {
+    case "thisWeek": {
+      const start = new Date(now);
+      const day = start.getDay();
+      const diffToMonday = day === 0 ? 6 : day - 1;
+      start.setDate(start.getDate() - diffToMonday);
+      start.setHours(0, 0, 0, 0);
+      return d >= start;
+    }
+    case "thisMonth":
+      return (
+        d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+      );
+    case "lastMonth": {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return (
+        d.getFullYear() === lastMonth.getFullYear() &&
+        d.getMonth() === lastMonth.getMonth()
+      );
+    }
+    case "thisYear":
+      return d.getFullYear() === now.getFullYear();
+    case "lastYear":
+      return d.getFullYear() === now.getFullYear() - 1;
+    default:
+      return true;
+  }
+}
+
+function matchesSearch(report, searchQuery) {
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    report.category?.toLowerCase().includes(q) ||
+    report.priorityLevel?.toLowerCase().includes(q)
+  );
+}
+
+// ─── Birthday celebration helpers ───────────────────────────────────────────
+// birthdate is stored as "YYYY-MM-DD" (see SignUp.jsx). Only month/day need
+// to match today — the year is irrelevant.
+function isBirthdayToday(birthdate) {
+  if (!birthdate || typeof birthdate !== "string") return false;
+  const parts = birthdate.split("-").map(Number);
+  if (parts.length !== 3) return false;
+  const [, month, day] = parts;
+  if (!month || !day) return false;
+  const today = new Date();
+  return month === today.getMonth() + 1 && day === today.getDate();
+}
+
+function getFirstName(userObj) {
+  return userObj?.name?.trim().split(" ")[0] || "there";
+}
+
+function BirthdayBanner({ name, onDismiss }) {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setEntered(true), 10);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="fixed top-0 inset-x-0 z-[120] flex justify-center px-4 pt-4 pointer-events-none">
+      <div
+        className={`pointer-events-auto relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl border border-white/30 bg-gradient-to-r from-pink-500 via-fuchsia-500 to-orange-400 text-white px-5 py-4 flex items-center gap-3 transition-all duration-500 ${
+          entered ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
+        }`}
+      >
+        <span className="text-3xl animate-bounce">🎉</span>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-sm md:text-base leading-tight">
+            Happy Birthday, {name}! 🎂
+          </p>
+          <p className="text-xs md:text-sm text-white/85 mt-0.5">
+            Wishing you a fantastic day — from all of us here.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-white/80 hover:text-white text-lg font-bold px-1 flex-shrink-0"
+          aria-label="Dismiss birthday message"
+        >
+          ✕
+        </button>
+        <span className="absolute -top-2 left-8 text-base animate-pulse pointer-events-none">
+          ✨
+        </span>
+        <span className="absolute -bottom-2 right-12 text-base animate-pulse [animation-delay:0.3s] pointer-events-none">
+          🎈
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const CONFETTI_COLORS = [
+  "#f43f5e",
+  "#fb923c",
+  "#facc15",
+  "#4ade80",
+  "#38bdf8",
+  "#a78bfa",
+  "#f472b6",
+];
+
+// Falls from just under the navbar for as long as it's mounted. Home
+// unmounts it after 10s via a timeout, independent of the banner's
+// dismiss state, so refreshing on your birthday always re-triggers it.
+function BirthdayConfetti() {
+  const [pieces] = useState(() =>
+    Array.from({ length: 70 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 1.5,
+      duration: 3 + Math.random() * 2.5,
+      width: 6 + Math.random() * 6,
+      height: 10 + Math.random() * 8,
+      color:
+        CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      drift: (Math.random() - 0.5) * 200,
+    })),
+  );
+
+  return (
+    <div className="fixed top-16 md:top-20 inset-x-0 bottom-0 z-[90] overflow-hidden pointer-events-none">
+      <style>{`
+        @keyframes confetti-fall {
+          0% { transform: translateY(-20px) translateX(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
+        }
+      `}</style>
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="absolute top-0 rounded-sm"
+          style={{
+            left: `${p.left}%`,
+            width: p.width,
+            height: p.height,
+            backgroundColor: p.color,
+            animation: `confetti-fall ${p.duration}s ease-in ${p.delay}s forwards`,
+            "--drift": `${p.drift}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 function Preloader({ theme }) {
@@ -1089,6 +1273,16 @@ const PaginationControls = ({ page, totalPages, onChange, theme }) => {
   );
 };
 
+// Splits an array into chunks of at most `size` — used to keep Firestore
+// writeBatch calls under its hard 500-operation limit regardless of how
+// many reports need to be marked at once.
+const chunk = (arr, size) => {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+};
+const BATCH_CHUNK_SIZE = 450;
+
 // ─── Main Home component ──────────────────────────────────────────────────────
 export default function Home({
   completedRedirect,
@@ -1119,6 +1313,9 @@ export default function Home({
   const [reportsLoading, setReportsLoading] = useState(true);
   const [firstPage, setFirstPage] = useState(1);
   const [secondPage, setSecondPage] = useState(1);
+  const [showBirthdayBanner, setShowBirthdayBanner] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [timeFilter, setTimeFilter] = useState("overall");
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -1126,40 +1323,113 @@ export default function Home({
     markOverdueReports(user);
   }, []);
 
+  // Show the birthday banner once per day, on the user's actual birthday
+  // only. Dismissal is remembered in localStorage so it doesn't keep
+  // popping back up on every navigation/refresh for the rest of the day,
+  // but it'll return next year.
+  useEffect(() => {
+    if (!user?.birthdate || !isBirthdayToday(user.birthdate)) return;
+    const todayKey = new Date().toISOString().split("T")[0];
+    const dismissKey = `birthdayDismissed:${user.ID || user.email}:${todayKey}`;
+    if (localStorage.getItem(dismissKey)) return;
+    setShowBirthdayBanner(true);
+  }, []);
+
+  const dismissBirthdayBanner = () => {
+    setShowBirthdayBanner(false);
+    const todayKey = new Date().toISOString().split("T")[0];
+    const dismissKey = `birthdayDismissed:${user?.ID || user?.email}:${todayKey}`;
+    localStorage.setItem(dismissKey, "1");
+  };
+
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  // Confetti runs for exactly 10s from mount/refresh, regardless of
+  // whether the banner has been dismissed for the day — so it replays
+  // every time the page opens/refreshes on the birthday.
+  useEffect(() => {
+    if (!user?.birthdate || !isBirthdayToday(user.birthdate)) return;
+    setShowConfetti(true);
+    const t = setTimeout(() => setShowConfetti(false), 10000);
+    return () => clearTimeout(t);
+  }, []);
+
   const handleClose = () => {
     setTimeout(() => SetShowReportsHiddenOnMobile(false), 300);
   };
 
-  const isNewForUser = (report) =>
-    !!user?.ID && report.lastViewedStatus?.[user.ID] !== report.status;
+  const isNewForUser = useCallback(
+    (report) =>
+      !!user?.ID && report.lastViewedStatus?.[user.ID] !== report.status,
+    [user?.ID],
+  );
 
-  const newAssignedCount = reports.filter(
-    (r) => r.status === "assigned" && isNewForUser(r),
-  ).length;
-  const newRejectedCount = reports.filter(
-    (r) => r.status === "rejected" && isNewForUser(r),
-  ).length;
-  const newAcceptedCount = reports.filter(
-    (r) => r.status === "accepted" && isNewForUser(r),
-  ).length;
-  const newReopenedCount = reports.filter(
-    (r) => r.status === "reopened" && isNewForUser(r),
-  ).length;
-  const newCompletedCount = reports.filter(
-    (r) => r.status === "completed" && isNewForUser(r),
-  ).length;
+  const hasFeedback = useCallback(
+    (report) => report.feedback && !report.feedbackViewedBy?.includes(user?.ID),
+    [user?.ID],
+  );
 
-  const newClosedCount = reports.filter(
-    (r) => r.status === "closed" && isNewForUser(r),
-  ).length;
+  // ─── Badge counts (sidebar) — depend on the full reports set & user, not
+  // on pagination/search/timeFilter, so they're memoized separately from
+  // the section filtering below to avoid recomputing 10+ .filter() passes
+  // on every unrelated re-render (e.g. every 1s countdown tick).
+  const badgeCounts = useMemo(() => {
+    const newAssignedCount = reports.filter(
+      (r) => r.status === "assigned" && isNewForUser(r),
+    ).length;
+    const newRejectedCount = reports.filter(
+      (r) => r.status === "rejected" && isNewForUser(r),
+    ).length;
+    const newAcceptedCount = reports.filter(
+      (r) => r.status === "accepted" && isNewForUser(r),
+    ).length;
+    const newReopenedCount = reports.filter(
+      (r) => r.status === "reopened" && isNewForUser(r),
+    ).length;
+    const newCompletedCount = reports.filter(
+      (r) => r.status === "completed" && isNewForUser(r),
+    ).length;
+    const newClosedCount = reports.filter(
+      (r) => r.status === "closed" && isNewForUser(r),
+    ).length;
+    const completedWithFeedback = reports.filter(
+      (r) => r.status === "completed" && hasFeedback(r),
+    ).length;
+    const closedWithFeedback = reports.filter(
+      (r) => r.status === "closed" && hasFeedback(r),
+    ).length;
+    const rejectedCount = reports.filter((r) => r.status === "rejected").length;
+    const acceptedCount = reports.filter((r) => r.status === "accepted").length;
+    const reopenedCount = reports.filter((r) => r.status === "reopened").length;
 
-  const totalNewCount =
-    newAssignedCount +
-    newRejectedCount +
-    newAcceptedCount +
-    newReopenedCount +
-    newCompletedCount +
-    newClosedCount;
+    return {
+      newAssignedCount,
+      newRejectedCount,
+      newAcceptedCount,
+      newReopenedCount,
+      newCompletedCount,
+      newClosedCount,
+      completedWithFeedback,
+      closedWithFeedback,
+      rejectedCount,
+      acceptedCount,
+      reopenedCount,
+    };
+  }, [reports, isNewForUser, hasFeedback]);
+
+  const {
+    newAssignedCount,
+    newRejectedCount,
+    newAcceptedCount,
+    newReopenedCount,
+    newCompletedCount,
+    newClosedCount,
+    completedWithFeedback,
+    closedWithFeedback,
+    rejectedCount,
+    acceptedCount,
+    reopenedCount,
+  } = badgeCounts;
 
   const displayReportDetails = (report) => {
     setCurrentReportId(report.id);
@@ -1243,29 +1513,52 @@ export default function Home({
         (a[key]?.toDate?.() ?? new Date(0)),
     );
 
-  // Each section is sorted by its OWN relevant date field, most recent first.
-  // Previously both sections were sorted by "dateSent", which meant the
-  // completed section wasn't ordered by completion date. Sorting by
-  // reportDate1 / reportDate2 respectively fixes that.
-  const firstReports = sortByDate(
-    reports.filter((r) =>
-      Array.isArray(firstReportsStatus)
-        ? firstReportsStatus.includes(r.status)
-        : r.status === firstReportsStatus,
-    ),
-    reportDate1,
-  );
-  const secondReports = sortByDate(
-    reports.filter((r) =>
-      Array.isArray(secondReportsStatus)
-        ? secondReportsStatus.includes(r.status)
-        : r.status === secondReportsStatus,
-    ),
-    reportDate2,
+  // Each section is sorted by its OWN relevant date field, most recent first,
+  // then narrowed by the search box (category / priority) and the time-range
+  // filter (based on dateSent, since that's the one date every report
+  // always has regardless of its current stage). Memoized so this filter +
+  // sort pass (over the full reports array) only re-runs when the inputs
+  // that actually affect it change — not on every render (e.g. countdown
+  // ticks, mark-as-read state patches to unrelated reports).
+  const firstReports = useMemo(
+    () =>
+      sortByDate(
+        reports.filter(
+          (r) =>
+            (Array.isArray(firstReportsStatus)
+              ? firstReportsStatus.includes(r.status)
+              : r.status === firstReportsStatus) &&
+            matchesSearch(r, searchQuery) &&
+            isWithinTimeFilter(r.dateSent, timeFilter),
+        ),
+        reportDate1,
+      ),
+    [reports, firstReportsStatus, searchQuery, timeFilter, reportDate1],
   );
 
+  const secondReports = useMemo(
+    () =>
+      sortByDate(
+        reports.filter(
+          (r) =>
+            (Array.isArray(secondReportsStatus)
+              ? secondReportsStatus.includes(r.status)
+              : r.status === secondReportsStatus) &&
+            matchesSearch(r, searchQuery) &&
+            isWithinTimeFilter(r.dateSent, timeFilter),
+        ),
+        reportDate2,
+      ),
+    [reports, secondReportsStatus, searchQuery, timeFilter, reportDate2],
+  );
+
+  const hasActiveFilters =
+    searchQuery.trim() !== "" || timeFilter !== "overall";
+
   // Reset to page 1 whenever the underlying data set changes size
-  // (e.g. filters change, or new reports come in over the snapshot listener).
+  // (e.g. filters change, or new reports come in over the snapshot listener),
+  // and also whenever the search/time filter itself changes (in case the
+  // result count happens to stay the same across the change).
   useEffect(() => {
     setFirstPage(1);
   }, [firstReports.length]);
@@ -1273,6 +1566,11 @@ export default function Home({
   useEffect(() => {
     setSecondPage(1);
   }, [secondReports.length]);
+
+  useEffect(() => {
+    setFirstPage(1);
+    setSecondPage(1);
+  }, [searchQuery, timeFilter]);
 
   const firstTotalPages = Math.max(
     1,
@@ -1288,22 +1586,99 @@ export default function Home({
 
   const currentReport = reports.filter((r) => r.id === currentReportId);
 
-  const hasFeedback = (report) =>
-    report.feedback && !report.feedbackViewedBy?.includes(user?.ID);
-  const completedWithFeedback = reports.filter(
-    (r) => r.status === "completed" && hasFeedback(r),
-  ).length;
+  // Statuses that belong to *this* page (e.g. just "closed", or
+  // "incoming"+"pending" on the two-section home). Second section is
+  // excluded on specificReportsPage since only firstReportsStatus is shown.
+  const pageStatuses = useMemo(() => {
+    const toStatusArray = (s) => (Array.isArray(s) ? s : s ? [s] : []);
+    return [
+      ...toStatusArray(firstReportsStatus),
+      ...(specificReportsPage ? [] : toStatusArray(secondReportsStatus)),
+    ];
+  }, [firstReportsStatus, secondReportsStatus, specificReportsPage]);
 
-  const closedWithFeedback = reports.filter(
-    (r) => r.status === "closed" && hasFeedback(r),
-  ).length;
+  // Unread counts scoped to this page only — drives whether the
+  // "Mark all as read" button shows up at all.
+  const { pageNewCount, pageFeedbackCount } = useMemo(() => {
+    return {
+      pageNewCount: reports.filter(
+        (r) => pageStatuses.includes(r.status) && isNewForUser(r),
+      ).length,
+      pageFeedbackCount: reports.filter(
+        (r) => pageStatuses.includes(r.status) && hasFeedback(r),
+      ).length,
+    };
+  }, [reports, pageStatuses, isNewForUser, hasFeedback]);
 
-  // New: counts driving the "Rejected" (estate) and "Accepted" (worker)
-  // sidebar nav badges. Computed from the full `reports` set already loaded
-  // for this user, so no extra query is needed.
-  const rejectedCount = reports.filter((r) => r.status === "rejected").length;
-  const acceptedCount = reports.filter((r) => r.status === "accepted").length;
-  const reopenedCount = reports.filter((r) => r.status === "reopened").length;
+  const hasUnreadItems = pageNewCount > 0 || pageFeedbackCount > 0;
+
+  // Clears every "🆕 New" and "💬 Feedback" badge across ALL of this user's
+  // reports (not just what's currently visible/filtered/paginated), so
+  // switching filters afterward doesn't reveal badges that were "missed".
+  // Two separate batches are used because the Firestore rules only allow a
+  // report update to touch lastViewedStatus OR feedbackViewedBy in a single
+  // write, never both together. Each batch is further chunked to stay under
+  // Firestore's 500-operation-per-batch hard limit, regardless of how many
+  // reports need marking.
+  const handleMarkAllAsRead = useCallback(async () => {
+    if (!user?.ID) return;
+    const toMarkNew = reports.filter(
+      (r) => pageStatuses.includes(r.status) && isNewForUser(r),
+    );
+    const toMarkFeedback = reports.filter(
+      (r) => pageStatuses.includes(r.status) && hasFeedback(r),
+    );
+    if (toMarkNew.length === 0 && toMarkFeedback.length === 0) return;
+
+    try {
+      for (const group of chunk(toMarkNew, BATCH_CHUNK_SIZE)) {
+        const viewedBatch = writeBatch(db);
+        group.forEach((r) => {
+          viewedBatch.update(doc(db, "reports", r.id), {
+            [`lastViewedStatus.${user.ID}`]: r.status,
+          });
+        });
+        await viewedBatch.commit();
+      }
+
+      for (const group of chunk(toMarkFeedback, BATCH_CHUNK_SIZE)) {
+        const feedbackBatch = writeBatch(db);
+        group.forEach((r) => {
+          feedbackBatch.update(doc(db, "reports", r.id), {
+            feedbackViewedBy: arrayUnion(user.ID),
+          });
+        });
+        await feedbackBatch.commit();
+      }
+
+      // Patch local state immediately so badges disappear without waiting
+      // on the snapshot listener round-trip.
+      setReports((prev) =>
+        prev.map((r) => {
+          if (!pageStatuses.includes(r.status)) return r;
+          let updated = r;
+          if (isNewForUser(r)) {
+            updated = {
+              ...updated,
+              lastViewedStatus: {
+                ...(updated.lastViewedStatus || {}),
+                [user.ID]: updated.status,
+              },
+            };
+          }
+          if (hasFeedback(r)) {
+            updated = {
+              ...updated,
+              feedbackViewedBy: [...(updated.feedbackViewedBy || []), user.ID],
+            };
+          }
+          return updated;
+        }),
+      );
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
+  }, [reports, pageStatuses, user?.ID, isNewForUser, hasFeedback]);
 
   const PRIORITY_BG = {
     emergency: "bg-red-500",
@@ -1323,7 +1698,7 @@ export default function Home({
   const ReportCard = ({ report, reportDate }) => {
     const cfg = cardConfig(report.status, report.priorityLevel, theme);
     return (
-      <div className="relative w-full max-w-[250px] md:max-w-[300px] flex justify-center">
+      <div className="relative w-full  max-w-[250px] md:max-w-[300px] flex justify-center">
         {/* Feedback badge */}
         {hasFeedback(report) && (
           <span
@@ -1339,7 +1714,7 @@ export default function Home({
           </span>
         )}
         <div
-          className={`relative group select-none border ${cfg.border} ${cfg.glow} ${theme.cardBg} flex flex-col gap-3 cursor-pointer transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 rounded-2xl w-full max-w-[250px] md:max-w-[280px] p-4 overflow-hidden`}
+          className={`relative group select-none ${cfg.border} ${cfg.glow} ${theme.cardBg} flex flex-col gap-3 cursor-pointer transition-all border-${theme.secColor} duration-300 hover:scale-[1.03] hover:-translate-y-1 rounded-2xl w-full max-w-[250px] md:max-w-[280px] p-4 overflow-hidden`}
           onClick={() => displayReportDetails(report)}
         >
           {/* Top gradient line */}
@@ -1474,7 +1849,7 @@ export default function Home({
   );
 
   // ─── Empty state ───────────────────────────────────────────────────────────
-  const EmptyState = () => (
+  const EmptyState = ({ filtered }) => (
     <div className="flex flex-col items-center gap-3 my-16">
       <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl opacity-40">
         📋
@@ -1482,13 +1857,24 @@ export default function Home({
       <p
         className={`${theme.sectionCountText} text-sm tracking-widest uppercase font-semibold`}
       >
-        Nothing to display here...yet
+        {filtered
+          ? "No reports match your search"
+          : "Nothing to display here...yet"}
       </p>
     </div>
   );
 
   return (
     <>
+      {showBirthdayBanner && (
+        <BirthdayBanner
+          name={getFirstName(user)}
+          onDismiss={dismissBirthdayBanner}
+        />
+      )}
+
+      {showConfetti && <BirthdayConfetti />}
+
       <ReportDetailsContainer
         currentReport={currentReport}
         displayDetails={displayDetails}
@@ -1747,6 +2133,63 @@ export default function Home({
 
         {/* Content area */}
         <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-auto pt-20 pb-16 flex flex-col items-center z-0 gap-8">
+          {/* ── Search / filter / mark-all-as-read toolbar ─────────────────── */}
+          {specificReportsPage && (
+            <div className="w-full px-6 md:pl-[calc(20%+24px)] flex flex-col md:flex-row md:items-center gap-3">
+              <div
+                className={`flex-1 flex items-center gap-2 ${theme.sectionCountBg} border ${theme.sectionCountBorder} rounded-full px-4 py-2 min-w-0`}
+              >
+                <span
+                  className={`material-symbols-outlined text-base ${theme.sectionCountText} opacity-60`}
+                >
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search category or priority…"
+                  className={`flex-1 min-w-0 bg-transparent outline-none text-sm ${theme.sectionCountText} placeholder:opacity-50`}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className={`material-symbols-outlined text-base ${theme.sectionCountText} opacity-60 hover:opacity-100 cursor-pointer`}
+                    aria-label="Clear search"
+                  >
+                    close
+                  </button>
+                )}
+              </div>
+
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                className={`${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-semibold outline-none cursor-pointer`}
+              >
+                {TIME_FILTERS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+
+              {hasUnreadItems && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllAsRead}
+                  className={`flex items-center justify-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap`}
+                >
+                  <span className="material-symbols-outlined text-base">
+                    done_all
+                  </span>
+                  Mark all as read
+                </button>
+              )}
+            </div>
+          )}
+
           {/* First reports section */}
           <div className={`w-full py-6 border-b ${theme.sectionDivider}`}>
             <SectionHeader title={title1} count={firstReports.length} />
@@ -1767,7 +2210,7 @@ export default function Home({
               />
             </>
           ) : (
-            <EmptyState />
+            <EmptyState filtered={hasActiveFilters} />
           )}
 
           {/* Second reports section */}
@@ -1797,7 +2240,7 @@ export default function Home({
                 </div>
               ) : (
                 <div className="hidden md:flex">
-                  <EmptyState />
+                  <EmptyState filtered={hasActiveFilters} />
                 </div>
               )}
             </>

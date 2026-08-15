@@ -80,6 +80,25 @@ const CSS = `
     to   { transform: translate(30px, 20px) scale(1.08); }
   }
 
+  /* watermark — hospital name tiled diagonally across the whole background.
+     Rendered once as a repeating SVG pattern (not individual DOM nodes) so
+     it stays cheap regardless of viewport size. Sits above the mesh/blobs,
+     below the glass card, and drifts very slowly for a subtle "alive" feel. */
+  .phix-watermark {
+    position: fixed;
+    inset: -40px;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='620' height='260'><text x='-60' y='90' font-family='DM Sans, sans-serif' font-size='22' font-weight='700' letter-spacing='1' fill='white' fill-opacity='0.10' transform='rotate(-16 310 130)'>Holy%20Family%20Catholic%20Hospital,%20Berekum</text><text x='260' y='230' font-family='DM Sans, sans-serif' font-size='22' font-weight='700' letter-spacing='1' fill='white' fill-opacity='0.10' transform='rotate(-16 310 130)'>Holy%20Family%20Catholic%20Hospital,%20Berekum</text></svg>");
+    background-repeat: repeat;
+    animation: watermark-drift 60s linear infinite;
+  }
+
+  @keyframes watermark-drift {
+    from { background-position: 0 0; }
+    to   { background-position: -620px -260px; }
+  }
+
   /* glass card */
   .phix-card {
     position: relative;
@@ -174,6 +193,15 @@ const CSS = `
     border-color: rgba(255,255,255,.6);
     background: rgba(255,255,255,.2);
     box-shadow: 0 0 0 3px rgba(255,255,255,.12);
+  }
+
+  /* date inputs render their calendar-picker icon in dark grey by default,
+     which disappears against this dark glass background — invert it so
+     it's visible (light) instead. */
+  .phix-input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: .8;
+    cursor: pointer;
   }
 
   /* primary button */
@@ -279,6 +307,7 @@ export default function SignUp() {
   const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [location, setLocation] = useState("");
+  const [birthdate, setBirthdate] = useState("");
   const [profession, setProfession] = useState("");
   const [id, setId] = useState("");
   const [loginId, setLoginId] = useState("");
@@ -370,6 +399,13 @@ export default function SignUp() {
           value: location,
           onChange: setLocation,
         },
+        {
+          id: "birthdate",
+          label: "Date of birth",
+          type: "date",
+          value: birthdate,
+          onChange: setBirthdate,
+        },
       ],
     },
     {
@@ -410,6 +446,7 @@ export default function SignUp() {
     setPassword("");
     setPhoneNumber("");
     setLocation("");
+    setBirthdate("");
     setProfession("");
     setId("");
     setStep(0);
@@ -472,6 +509,10 @@ export default function SignUp() {
           profession: profession.trim(),
           ID: id.trim(),
           phoneNumber: phoneNumber.trim(),
+          // Stored as "YYYY-MM-DD" (native <input type="date"> format) so
+          // it sorts/compares easily. Used later to detect and celebrate
+          // birthdays in-app.
+          birthdate: birthdate.trim(),
           role: type,
           deactivated: false,
           createdAt: serverTimestamp(),
@@ -632,8 +673,8 @@ export default function SignUp() {
         <div className="phix-blob phix-blob-2" />
         <div className="phix-blob phix-blob-3" />
 
-        {/* logo */}
-        <div className="phix-logo">PHIX</div>
+        {/* watermark — repeated hospital name */}
+        <div className="phix-watermark" aria-hidden="true" />
 
         {/* card */}
         <div
@@ -698,6 +739,11 @@ export default function SignUp() {
                         }
                         value={field.value}
                         onChange={(e) => field.onChange(e.target.value)}
+                        max={
+                          field.id === "birthdate"
+                            ? new Date().toISOString().split("T")[0]
+                            : undefined
+                        }
                         placeholder={
                           field.id === "name"
                             ? "e.g. Kwame Mensah"

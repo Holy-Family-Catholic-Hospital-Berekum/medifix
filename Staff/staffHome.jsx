@@ -1,5 +1,5 @@
 import PageLayout from "./pageLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import electricity from "../images/electricity.jpg";
 import carpentry from "../images/carpentry.jpg";
 import plumbing from "../images/plumbing.jpg";
@@ -64,10 +64,7 @@ const systemWorkflows = [
   { step: "03", text: "Estate Manager receives report upon admin approval" },
   { step: "04", text: "Estate Manager makes a materials confirmation request" },
   { step: "05", text: "Admin confirms the materials request" },
-  {
-    step: "06",
-    text: "Procurement purchases the materials.",
-  },
+  { step: "06", text: "Procurement purchases the materials." },
   { step: "07", text: "Work is assigned to appropriate technician" },
   { step: "08", text: "Technician executes the task and updates progress" },
   { step: "09", text: "You review completed work and provide feedback" },
@@ -105,8 +102,152 @@ const timelines = [
   },
 ];
 
+// ─── Birthday helpers ─────────────────────────────────────────────────────────
+// birthdate stored as "YYYY-MM-DD"; only month/day need to match today.
+function isBirthdayToday(birthdate) {
+  if (!birthdate || typeof birthdate !== "string") return false;
+  const parts = birthdate.split("-").map(Number);
+  if (parts.length !== 3) return false;
+  const [, month, day] = parts;
+  if (!month || !day) return false;
+  const today = new Date();
+  return month === today.getMonth() + 1 && day === today.getDate();
+}
+
+function getFirstName(userObj) {
+  return userObj?.name?.trim().split(" ")[0] || "there";
+}
+
+function BirthdayBanner({ name, onDismiss }) {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setEntered(true), 10);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="fixed top-0 inset-x-0 z-[120] flex justify-center px-4 pt-4 pointer-events-none">
+      <div
+        className={`pointer-events-auto relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl border border-white/30 bg-gradient-to-r from-pink-500 via-fuchsia-500 to-orange-400 text-white px-5 py-4 flex items-center gap-3 transition-all duration-500 ${
+          entered ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
+        }`}
+      >
+        <span className="text-3xl animate-bounce">🎉</span>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-sm md:text-base leading-tight">
+            Happy Birthday, {name}! 🎂
+          </p>
+          <p className="text-xs md:text-sm text-white/85 mt-0.5">
+            Wishing you a fantastic day — from all of us here.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-white/80 hover:text-white text-lg font-bold px-1 flex-shrink-0"
+          aria-label="Dismiss birthday message"
+        >
+          ✕
+        </button>
+        <span className="absolute -top-2 left-8 text-base animate-pulse pointer-events-none">
+          ✨
+        </span>
+        <span className="absolute -bottom-2 right-12 text-base animate-pulse [animation-delay:0.3s] pointer-events-none">
+          🎈
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Birthday confetti ─────────────────────────────────────────────────────
+// Falls from just under the navbar for as long as it's mounted. StaffHome
+// unmounts it after 10s via a timeout, independent of the banner's dismiss
+// state, so refreshing on your birthday always re-triggers it.
+const CONFETTI_COLORS = [
+  "#f43f5e",
+  "#fb923c",
+  "#facc15",
+  "#4ade80",
+  "#38bdf8",
+  "#a78bfa",
+  "#f472b6",
+];
+
+function BirthdayConfetti() {
+  const [pieces] = useState(() =>
+    Array.from({ length: 70 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 1.5,
+      duration: 3 + Math.random() * 2.5,
+      width: 6 + Math.random() * 6,
+      height: 10 + Math.random() * 8,
+      color:
+        CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      drift: (Math.random() - 0.5) * 200,
+    })),
+  );
+
+  return (
+    <div className="fixed top-20 md:top-24 inset-x-0 bottom-0 z-[90] overflow-hidden pointer-events-none">
+      <style>{`
+        @keyframes confetti-fall {
+          0% { transform: translateY(-20px) translateX(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
+        }
+      `}</style>
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="absolute top-0 rounded-sm"
+          style={{
+            left: `${p.left}%`,
+            width: p.width,
+            height: p.height,
+            backgroundColor: p.color,
+            animation: `confetti-fall ${p.duration}s ease-in ${p.delay}s forwards`,
+            "--drift": `${p.drift}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function StaffHome() {
   const [sidePopup, setSidePopup] = useState(false);
+  const [showBirthdayBanner, setShowBirthdayBanner] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  const user = JSON.parse(localStorage.getItem("user"))?.data;
+
+  // Show the birthday banner once per day on the user's actual birthday.
+  // Dismissal is stored in localStorage so it won't reappear on the same day.
+  useEffect(() => {
+    if (!user?.birthdate || !isBirthdayToday(user.birthdate)) return;
+    const todayKey = new Date().toISOString().split("T")[0];
+    const dismissKey = `birthdayDismissed:${user.ID || user.email}:${todayKey}`;
+    if (localStorage.getItem(dismissKey)) return;
+    setShowBirthdayBanner(true);
+  }, []);
+
+  // Confetti runs for exactly 10s from mount/refresh, regardless of
+  // whether the banner has been dismissed for the day — so it replays
+  // every time the page opens/refreshes on the birthday.
+  useEffect(() => {
+    if (!user?.birthdate || !isBirthdayToday(user.birthdate)) return;
+    setShowConfetti(true);
+    const t = setTimeout(() => setShowConfetti(false), 10000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const dismissBirthdayBanner = () => {
+    setShowBirthdayBanner(false);
+    const todayKey = new Date().toISOString().split("T")[0];
+    const dismissKey = `birthdayDismissed:${user?.ID || user?.email}:${todayKey}`;
+    localStorage.setItem(dismissKey, "1");
+  };
 
   const pageContent = (
     <main className="bg-white pt-20 md:pt-24 pb-20 min-h-screen">
@@ -170,13 +311,11 @@ export default function StaffHome() {
               key={service.name}
               className="group relative bg-white rounded-2xl border-2 border-gray-100 hover:border-orange-300 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-default select-none"
             >
-              {/* colour bar */}
               <div
                 className={`h-1.5 w-full bg-gradient-to-r ${service.accent}`}
               />
 
               <div className="p-4">
-                {/* icon */}
                 <div className="text-3xl mb-3">{service.icon}</div>
 
                 <h3 className="font-black text-gray-900 text-sm leading-tight mb-2">
@@ -199,7 +338,6 @@ export default function StaffHome() {
                 </div>
               </div>
 
-              {/* image on hover */}
               <div className="overflow-hidden h-0 group-hover:h-28 transition-all duration-500">
                 <img
                   src={service.image}
@@ -220,7 +358,6 @@ export default function StaffHome() {
             background: `linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)`,
           }}
         >
-          {/* header */}
           <div className="px-8 pt-10 pb-6 flex items-center gap-4">
             <div>
               <h2 className="text-3xl font-black text-white">
@@ -235,9 +372,8 @@ export default function StaffHome() {
             </div>
           </div>
 
-          {/* steps */}
           <div className="px-8 pb-10 grid md:grid-cols-2 gap-3">
-            {systemWorkflows.map((w, i) => (
+            {systemWorkflows.map((w) => (
               <div
                 key={w.step}
                 className="flex items-center gap-4 bg-white/5 hover:bg-white/10 transition rounded-xl px-4 py-3 group"
@@ -339,5 +475,16 @@ export default function StaffHome() {
     </main>
   );
 
-  return <PageLayout content={pageContent} sidePopup={sidePopup} page="Home" />;
+  return (
+    <>
+      {showBirthdayBanner && (
+        <BirthdayBanner
+          name={getFirstName(user)}
+          onDismiss={dismissBirthdayBanner}
+        />
+      )}
+      {showConfetti && <BirthdayConfetti />}
+      <PageLayout content={pageContent} sidePopup={sidePopup} page="Home" />
+    </>
+  );
 }
