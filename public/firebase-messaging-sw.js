@@ -17,12 +17,12 @@ importScripts(
 );
 
 firebase.initializeApp({
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyCuDrhtC29zYiR3gztNuo1XmLeneOI1SQc",
+  authDomain: "phix-1072d.firebaseapp.com",
+  projectId: "phix-1072d",
+  storageBucket: "phix-1072d.firebasestorage.app",
+  messagingSenderId: "421861577856",
+  appId: "1:421861577856:web:6e5d970924462270514265",
 });
 
 const messaging = firebase.messaging();

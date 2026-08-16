@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
+import EnableNotificationsButton from "../components/EnableNotificationsButton";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const [user, setUser] = useState(null);
@@ -129,7 +130,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     );
   }
 
-  return children;
+  return (
+    <>
+      <EnableNotificationsButton />
+      {children}
+    </>
+  );
 };
 
 export default ProtectedRoute;

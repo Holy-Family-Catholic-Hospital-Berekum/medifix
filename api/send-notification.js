@@ -57,30 +57,40 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "targetUserId is required" });
   }
   if (!title || typeof title !== "string" || title.length > MAX_TITLE_LENGTH) {
-    return res
-      .status(400)
-      .json({
-        error: `title is required and must be under ${MAX_TITLE_LENGTH} characters`,
-      });
+    return res.status(400).json({
+      error: `title is required and must be under ${MAX_TITLE_LENGTH} characters`,
+    });
   }
   if (
     body != null &&
     (typeof body !== "string" || body.length > MAX_BODY_LENGTH)
   ) {
-    return res
-      .status(400)
-      .json({
-        error: `body must be a string under ${MAX_BODY_LENGTH} characters`,
-      });
+    return res.status(400).json({
+      error: `body must be a string under ${MAX_BODY_LENGTH} characters`,
+    });
   }
 
   try {
-    const targetSnap = await db.collection("users").doc(targetUserId).get();
-    if (!targetSnap.exists) {
+    // targetUserId here is the app-level worker/user "ID" field (e.g.
+    // "WK-042") used throughout the rest of the app for assignment —
+    // NOT the Firestore document ID / Firebase Auth uid. Every other
+    // part of the codebase (ReportDetailsContainer, StaffReportDetails,
+    // Firestore rules' getUserID()) treats this ID as the identity token
+    // for a user, so this route matches that convention rather than
+    // requiring callers to look up a uid first. A direct .doc(id).get()
+    // would silently miss almost every real user, since doc IDs are uids.
+    const targetQuery = await db
+      .collection("users")
+      .where("ID", "==", targetUserId)
+      .limit(1)
+      .get();
+
+    if (targetQuery.empty) {
       return res.status(404).json({ error: "Target user not found" });
     }
 
-    const tokens = targetSnap.data().fcmTokens;
+    const targetDoc = targetQuery.docs[0];
+    const tokens = targetDoc.data().fcmTokens;
     if (!Array.isArray(tokens) || tokens.length === 0) {
       // Not an error — the target just hasn't registered a device for
       // push yet (or cleared permission). The caller's own action (e.g.
@@ -114,10 +124,9 @@ export default async function handler(req, res) {
     });
 
     if (deadTokens.length > 0) {
-      await db
-        .collection("users")
-        .doc(targetUserId)
-        .update({ fcmTokens: tokens.filter((t) => !deadTokens.includes(t)) });
+      await targetDoc.ref.update({
+        fcmTokens: tokens.filter((t) => !deadTokens.includes(t)),
+      });
     }
 
     return res.status(200).json({
