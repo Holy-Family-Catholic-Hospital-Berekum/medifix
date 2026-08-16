@@ -2974,7 +2974,7 @@ export default function Dashboard({
                         ["Assigned", w.assigned, "#64748b"],
                         ["Done", w.done, "#22c55e"],
                         [
-                          "Performance",
+                          "Rate",
                           w.performancePct != null
                             ? `${w.performancePct}%`
                             : "—",
