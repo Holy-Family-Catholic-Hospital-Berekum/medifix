@@ -51,8 +51,12 @@ export function usePushNotifications() {
        * We only need to link the PHIX Firebase UID.
        */
       if (window.median?.onesignal) {
-        await linkPushUser(uid);
-
+        const linked = await linkPushUser(uid);
+        if (!linked) {
+          setError("Failed to link push notifications. Please try again.");
+          setStatus("error");
+          return;
+        }
         setPermission("granted");
         setStatus("enabled");
         return;

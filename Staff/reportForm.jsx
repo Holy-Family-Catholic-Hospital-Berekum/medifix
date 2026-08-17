@@ -302,7 +302,7 @@ export default function ReportForm({ formPopup, onClose }) {
           title: "New maintenance report",
           body: `${formData.category} — ${formData.priorityLevel}`,
         },
-      );
+      ).catch((err) => console.error("notifyOnStatusChange failed:", err));
 
       // Photos live in a separate reportImages/{reportId} doc, not on the
       // report itself — this keeps list-view snapshots (which pull every
