@@ -1,56 +1,83 @@
 // src/lib/push.js
 //
-// Links the current device's push subscription to your app's user id.
-// - Android (Median-wrapped APK): uses the native bridge, window.median.onesignal
-// - iOS (added-to-homescreen PWA) / any browser: uses OneSignal's Web SDK
+// OneSignal identity linking.
 //
-// Call this once, right after a user successfully authenticates.
+// Android:
+//   Median → OneSignal native SDK
+//
+// iOS PWA / Browser:
+//   OneSignal Web SDK
+//
+// The Firebase UID is used as the OneSignal External ID.
 
 function waitForMedianOneSignal(timeoutMs = 8000, intervalMs = 200) {
-  // The Median bridge injects asynchronously after native startup, so a
-  // single check right after login can race it — poll briefly instead.
   return new Promise((resolve) => {
     const start = Date.now();
+
     const check = () => {
-      if (window.median?.onesignal) return resolve(window.median.onesignal);
-      if (Date.now() - start > timeoutMs) return resolve(null);
+      if (window.median?.onesignal) {
+        return resolve(window.median.onesignal);
+      }
+
+      if (Date.now() - start > timeoutMs) {
+        return resolve(null);
+      }
+
       setTimeout(check, intervalMs);
     };
+
     check();
   });
 }
 
 export async function linkPushUser(userId) {
-  if (!userId) return;
+  if (!userId) return false;
+
   const uid = String(userId);
 
-  // ── Path A: Android, wrapped by Median ──────────────────────────────
+  // ─────────────────────────────────────────────
+  // ANDROID — MEDIAN
+  // ─────────────────────────────────────────────
+
   const medianOneSignal = await waitForMedianOneSignal();
+
   if (medianOneSignal) {
     try {
       medianOneSignal.login(uid);
-      console.log("[push] linked via Median bridge:", uid);
-    } catch (e) {
-      console.error("[push] Median onesignal.login() failed:", e);
+
+      console.log("[push] Linked via Median:", uid);
+
+      return true;
+    } catch (error) {
+      console.error("[push] Median OneSignal login failed:", error);
+
+      return false;
     }
-    return;
   }
 
-  // ── Path B: iOS home-screen PWA (or any regular browser) ────────────
-  // Requires the OneSignal Web SDK to already be loaded/initialized —
-  // see index.html changes below.
+  // ─────────────────────────────────────────────
+  // WEB / IOS PWA — ONESIGNAL WEB SDK
+  // ─────────────────────────────────────────────
+
   if (window.OneSignalDeferred) {
-    window.OneSignalDeferred.push(async (OneSignal) => {
-      try {
-        await OneSignal.login(uid);
-        console.log("[push] linked via OneSignal Web SDK:", uid);
-      } catch (e) {
-        console.error("[push] OneSignal.login() (web) failed:", e);
-      }
+    return new Promise((resolve) => {
+      window.OneSignalDeferred.push(async (OneSignal) => {
+        try {
+          await OneSignal.login(uid);
+
+          console.log("[push] Linked via OneSignal Web:", uid);
+
+          resolve(true);
+        } catch (error) {
+          console.error("[push] OneSignal Web login failed:", error);
+
+          resolve(false);
+        }
+      });
     });
-  } else {
-    console.warn(
-      "[push] No Median bridge and no OneSignal Web SDK found — push not linked.",
-    );
   }
+
+  console.warn("[push] No Median bridge and no OneSignal Web SDK found.");
+
+  return false;
 }

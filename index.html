@@ -2,33 +2,48 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
     />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="src/index.css" />
+
+    <link rel="stylesheet" href="/src/index.css" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <title>PHIX</title>
-  </head>
-  <!-- before </body> -->
-  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" defer></script>
-  <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function (OneSignal) {
-      await OneSignal.init({
-        appId: "b2ef1eeb-05bb-43c5-ad7f-469fa38f728c", // same app, this is just the web platform config
+
+    <!-- OneSignal -->
+    <script
+      src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+      defer
+    ></script>
+
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+      OneSignalDeferred.push(async function (OneSignal) {
+        await OneSignal.init({
+          appId: "b2ef1eeb-05bb-43c5-ad7f-469fa38f728a",
+        });
       });
-    });
-  </script>
+    </script>
+  </head>
+
   <body>
     <div id="root"></div>
+
     <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>
