@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyOnStatusChange } from "../src/notifications/notifyOnStatusChange";
 import {
   collection,
   addDoc,
@@ -292,6 +293,16 @@ export default function ReportForm({ formPopup, onClose }) {
 
       // Add report to Firestore
       const docRef = await addDoc(collection(db, "reports"), reportData);
+
+      notifyOnStatusChange(
+        null,
+        "incoming",
+        { id: docRef.id, ...reportData },
+        {
+          title: "New maintenance report",
+          body: `${formData.category} — ${formData.priorityLevel}`,
+        },
+      );
 
       // Photos live in a separate reportImages/{reportId} doc, not on the
       // report itself — this keeps list-view snapshots (which pull every

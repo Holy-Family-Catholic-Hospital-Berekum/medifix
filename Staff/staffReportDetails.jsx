@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyOnStatusChange } from "../src/notifications/notifyOnStatusChange";
 import {
   updateDoc,
   doc,
@@ -205,6 +206,7 @@ export default function StaffReportDetails({
       setReopenReason("");
       setShowReopenForm(false);
       setDisplayDetails(false);
+      notifyOnStatusChange("completed", "reopened", report);
     } catch (error) {
       console.error("Error reopening report:", error);
       alert("Failed to reopen report");
@@ -235,10 +237,12 @@ export default function StaffReportDetails({
       });
 
       onFeedbackSent?.(report.id, feedback.trim(), "closed");
+      alert("Thanks for your feedback.");
 
       setFeedback("");
       setRating(0);
       setDisplayDetails(false);
+      notifyOnStatusChange("completed", "closed", report);
     } catch (error) {
       console.error("Error sending feedback:", error);
       alert("Failed to send feedback");

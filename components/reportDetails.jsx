@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyOnStatusChange } from "../src/notifications/notifyOnStatusChange";
 import {
   updateDoc,
   doc,
@@ -433,9 +434,11 @@ export default function ReportDetailsContainer({
           createAlert(noteContent, "admin", "estate", report.status),
         ),
       });
+
       alert("Report approved!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
+      notifyOnStatusChange("incoming", "approved", report);
     } catch (error) {
       console.error("Error approving report:", error);
       alert("Failed to approve report");
@@ -455,9 +458,11 @@ export default function ReportDetailsContainer({
           createAlert(reason, "admin", report.reporterId, report.status),
         ),
       });
+
       alert("Report denied!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
+      notifyOnStatusChange("incoming", "denied", report);
     } catch (error) {
       console.error("Error denying report:", error);
       alert("Failed to deny report");
@@ -483,6 +488,7 @@ export default function ReportDetailsContainer({
       alert("Materials submitted for admin confirmation!");
       setMaterials([{ ...EMPTY_MATERIAL }]);
       setDisplayDetails(false);
+      notifyOnStatusChange(report.status, "pending", report);
     } catch (error) {
       console.error("Error adding materials:", error);
       alert("Failed to submit materials");
@@ -507,6 +513,7 @@ export default function ReportDetailsContainer({
       alert("Materials confirmed!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
+      notifyOnStatusChange("pending", "confirmed", report);
     } catch (error) {
       console.error("Error confirming materials:", error);
       alert("Failed to confirm materials");
@@ -531,6 +538,7 @@ export default function ReportDetailsContainer({
       alert("Materials denied!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
+      notifyOnStatusChange("pending", "costDenied", report);
     } catch (error) {
       console.error("Error denying materials:", error);
       alert("Failed to deny materials");
@@ -564,6 +572,7 @@ export default function ReportDetailsContainer({
       alert("Materials marked as procured!");
       setProcurementCost("");
       setDisplayDetails(false);
+      notifyOnStatusChange("confirmed", "procured", report);
     } catch (error) {
       console.error("Error marking procured:", error);
       alert("Failed to mark as procured");
@@ -608,6 +617,10 @@ export default function ReportDetailsContainer({
       alert(msg);
       setFormData({ ...formData, selectedWorker: "", instructions: "" });
       setDisplayDetails(false);
+      notifyOnStatusChange(report.status, "assigned", {
+        ...report,
+        assignedTo: formData.selectedWorker,
+      });
     } catch (error) {
       console.error("Error assigning worker:", error);
       alert("Failed to assign worker");
@@ -685,6 +698,7 @@ export default function ReportDetailsContainer({
       });
       alert("Job accepted!");
       setDisplayDetails(false);
+      notifyOnStatusChange("assigned", "accepted", report);
     } catch (error) {
       console.error("Error accepting job:", error);
       alert("Failed to accept job");
@@ -711,6 +725,7 @@ export default function ReportDetailsContainer({
       });
       alert("Job rejected.");
       setDisplayDetails(false);
+      notifyOnStatusChange("assigned", "rejected", report);
     } catch (error) {
       console.error("Error rejecting job:", error);
       alert("Failed to reject job");
@@ -781,6 +796,7 @@ export default function ReportDetailsContainer({
 
       alert("Work marked as completed!");
       setDisplayDetails(false);
+      notifyOnStatusChange(report.status, "completed", report);
     } catch (error) {
       console.error("Error completing work:", error);
       const msg = error.message || "Failed to complete work";
