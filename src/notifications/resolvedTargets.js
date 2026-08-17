@@ -1,5 +1,11 @@
-// src/notifications/resolveTargets.js
 export const TRANSITIONS = {
+  // New report submitted — notify admin for approval. This was missing
+  // entirely: notifyOnStatusChange(null, "incoming", ...) resolved
+  // "null->incoming" (no match) then "*->incoming" (also no match) and
+  // fell through to `if (!targets) return;` — so no notification attempt
+  // was ever made when a report was first created.
+  "*->incoming": [{ audience: "role", role: "admin" }],
+
   "incoming->approved": [{ audience: "role", role: "admin" }],
   "incoming->denied": [{ audience: "reporter" }],
   "*->pending": [{ audience: "role", role: "admin" }],
