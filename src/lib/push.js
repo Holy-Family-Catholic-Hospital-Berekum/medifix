@@ -55,24 +55,29 @@ export async function linkPushUser(userId) {
     }
   }
 
-  // ─────────────────────────────────────────────
   // WEB / IOS PWA — ONESIGNAL WEB SDK
-  // ─────────────────────────────────────────────
-
   if (window.OneSignalDeferred) {
     return new Promise((resolve) => {
       window.OneSignalDeferred.push(async (OneSignal) => {
-        try {
-          await OneSignal.login(uid);
-
-          console.log("[push] Linked via OneSignal Web:", uid);
-
-          resolve(true);
-        } catch (error) {
-          console.error("[push] OneSignal Web login failed:", error);
-
-          resolve(false);
-        }
+        const attemptLogin = async (retriesLeft) => {
+          try {
+            await OneSignal.login(uid);
+            console.log("[push] Linked via OneSignal Web:", uid);
+            resolve(true);
+          } catch (error) {
+            if (retriesLeft > 0) {
+              console.warn(
+                "[push] OneSignal not ready yet, retrying login...",
+                error,
+              );
+              setTimeout(() => attemptLogin(retriesLeft - 1), 500);
+            } else {
+              console.error("[push] OneSignal Web login failed:", error);
+              resolve(false);
+            }
+          }
+        };
+        attemptLogin(5);
       });
     });
   }

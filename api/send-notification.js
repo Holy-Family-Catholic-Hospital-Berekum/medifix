@@ -2,6 +2,7 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { resolveTargets } from "../../src/notifications/resolvedTargets";
 
 if (!getApps().length) {
   initializeApp({
@@ -18,7 +19,7 @@ const db = getFirestore();
 
 const MAX_TITLE_LENGTH = 120;
 const MAX_BODY_LENGTH = 500;
-const MAX_TARGETS = 100; // OneSignal external_id array cap per call; chunk above this if a role ever grows past it
+const MAX_TARGETS = 100; // OneSignal external_id cap per call — chunked below, not enforced as a hard limit
 
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
@@ -43,23 +44,15 @@ export default async function handler(req, res) {
   }
 
   // ── Validate payload ────────────────────────────────────────────────────
-  // targetUserIds replaces targetUserId — always an array now, even for a
-  // single recipient (denied, completed, assigned, closed all send a
-  // one-element array; role notifications send many).
-  const { targetUserIds, title, body, data } = req.body || {};
-  if (
-    !Array.isArray(targetUserIds) ||
-    targetUserIds.length === 0 ||
-    !targetUserIds.every((id) => typeof id === "string")
-  ) {
-    return res
-      .status(400)
-      .json({ error: "targetUserIds must be a non-empty array of strings" });
+  // Audience resolution now happens here, not on the client — the client
+  // no longer needs read access to other users' Firestore docs at all.
+  const { oldStatus, newStatus, report, title, body } = req.body || {};
+
+  if (!report || typeof report !== "object" || typeof report.id !== "string") {
+    return res.status(400).json({ error: "report (with an id) is required" });
   }
-  if (targetUserIds.length > MAX_TARGETS) {
-    return res
-      .status(400)
-      .json({ error: `targetUserIds exceeds max of ${MAX_TARGETS}` });
+  if (typeof newStatus !== "string" || !newStatus) {
+    return res.status(400).json({ error: "newStatus is required" });
   }
   if (!title || typeof title !== "string" || title.length > MAX_TITLE_LENGTH) {
     return res.status(400).json({
@@ -80,32 +73,82 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Same ID -> uid translation as before, batched. Firestore 'in' caps
-    // at 30 values per query, so chunk if a role could ever exceed that.
-    const uniqueIds = [...new Set(targetUserIds)];
-    const chunks = [];
-    for (let i = 0; i < uniqueIds.length; i += 30) {
-      chunks.push(uniqueIds.slice(i, i + 30));
+    const targets = resolveTargets(oldStatus ?? null, newStatus);
+    if (!targets) {
+      return res.status(200).json({
+        provider: "onesignal",
+        sent: 0,
+        reason: "No notification rule for this status transition",
+      });
     }
 
-    const targetUids = [];
-    for (const chunk of chunks) {
-      const snap = await db.collection("users").where("ID", "in", chunk).get();
-      snap.forEach((doc) => targetUids.push(doc.id));
+    const roles = new Set();
+    const customIds = new Set(); // legacy "ID" field, not the Firestore doc id
+
+    for (const t of targets) {
+      if (t.audience === "role") roles.add(t.role);
+      if (t.audience === "reporter" && report.reporterId)
+        customIds.add(String(report.reporterId));
+      if (t.audience === "assignedWorker" && report.assignedTo)
+        customIds.add(String(report.assignedTo));
     }
 
-    if (targetUids.length === 0) {
-      return res.status(404).json({ error: "No matching users found" });
+    const targetUids = new Set();
+
+    // Role audiences: the users collection is keyed by Firebase UID, so
+    // doc.id is already a valid OneSignal external_id — no translation
+    // needed, unlike the old client-side path.
+    for (const role of roles) {
+      const snap = await db.collection("users").where("role", "==", role).get();
+      snap.forEach((doc) => targetUids.add(doc.id));
     }
 
-    const oneSignalResult = await sendViaOneSignal({
-      externalIds: targetUids,
-      title,
-      body: body || "",
-      data,
-    });
+    // reporter / assignedWorker are stored as the legacy custom "ID"
+    // field on the report (see ReportForm.js: reporterId: currentUser.ID),
+    // so these still need the ID -> doc.id translation, chunked at
+    // Firestore's 30-value 'in' cap.
+    if (customIds.size > 0) {
+      const idList = [...customIds];
+      for (let i = 0; i < idList.length; i += 30) {
+        const chunk = idList.slice(i, i + 30);
+        const snap = await db
+          .collection("users")
+          .where("ID", "in", chunk)
+          .get();
+        snap.forEach((doc) => targetUids.add(doc.id));
+      }
+    }
 
-    if (oneSignalResult.recipients === 0) {
+    if (targetUids.size === 0) {
+      return res.status(200).json({
+        provider: "onesignal",
+        sent: 0,
+        reason: "No matching users found for this notification",
+      });
+    }
+
+    // Chunk into multiple OneSignal calls instead of truncating, so a
+    // role that grows past MAX_TARGETS still reaches everyone.
+    const allIds = [...targetUids];
+    const idChunks = [];
+    for (let i = 0; i < allIds.length; i += MAX_TARGETS) {
+      idChunks.push(allIds.slice(i, i + MAX_TARGETS));
+    }
+
+    let totalRecipients = 0;
+    const oneSignalIds = [];
+    for (const chunk of idChunks) {
+      const result = await sendViaOneSignal({
+        externalIds: chunk,
+        title,
+        body: body || "",
+        data: { reportId: report.id, status: newStatus },
+      });
+      totalRecipients += result.recipients;
+      oneSignalIds.push(result.id);
+    }
+
+    if (totalRecipients === 0) {
       return res.status(200).json({
         provider: "onesignal",
         sent: 0,
@@ -115,8 +158,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       provider: "onesignal",
-      sent: oneSignalResult.recipients,
-      oneSignalId: oneSignalResult.id,
+      sent: totalRecipients,
+      oneSignalIds,
     });
   } catch (err) {
     console.error("send-notification failed:", err);

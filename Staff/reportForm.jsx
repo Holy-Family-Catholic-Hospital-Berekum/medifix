@@ -297,7 +297,11 @@ export default function ReportForm({ formPopup, onClose }) {
       notifyOnStatusChange(
         null,
         "incoming",
-        { id: docRef.id, ...reportData },
+        {
+          id: docRef.id,
+          reporterId: reportData.reporterId,
+          assignedTo: reportData.assignedTo,
+        },
         {
           title: "New maintenance report",
           body: `${formData.category} — ${formData.priorityLevel}`,
