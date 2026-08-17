@@ -37,16 +37,17 @@ const user = JSON.parse(localStorage.getItem("user"))?.data;
 
 export default function App() {
   useEffect(() => {
-    const inspectMedian = async () => {
+    const inspectMedian = () => {
       if (!window.median) {
-        alert("window.median DOES NOT EXIST");
+        alert("Median bridge does not exist");
         return;
       }
 
       const output = {
+        medianExists: true,
         medianKeys: Object.keys(window.median),
-        onesignalExists: !!window.median.onesignal,
-        onesignalKeys: window.median.onesignal
+        hasOneSignal: !!window.median.onesignal,
+        oneSignalKeys: window.median.onesignal
           ? Object.keys(window.median.onesignal)
           : [],
       };
@@ -54,7 +55,8 @@ export default function App() {
       alert(JSON.stringify(output, null, 2));
     };
 
-    inspectMedian();
+    // Give Median time to finish injecting its modules
+    setTimeout(inspectMedian, 2000);
   }, []);
   return (
     <Routes>
