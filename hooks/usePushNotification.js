@@ -112,27 +112,25 @@ export function usePushNotifications() {
     setError("");
 
     try {
+      // Request permission FIRST, before any other await — the
+      // installed/standalone PWA context is stricter about how long the
+      // click's user-activation stays valid for gesture-gated APIs than
+      // a normal tab is.
+      const permissionResult = await Notification.requestPermission();
+      setPermission(permissionResult);
+      if (permissionResult !== "granted") {
+        setStatus("idle");
+        return;
+      }
+
       const supported = await isSupported();
       if (!supported) {
         throw new Error("Push notifications aren't supported in this browser.");
       }
 
-      const permissionResult = await Notification.requestPermission();
-      setPermission(permissionResult);
-      if (permissionResult !== "granted") {
-        // User dismissed or denied the browser prompt — not an error
-        // state, just back to idle so the button is clickable again.
-        setStatus("idle");
-        return;
-      }
-
       const registration = await navigator.serviceWorker.register(
         "/firebase-messaging-sw.js",
       );
-
-      // Same reasoning as the silent-sync effect above: wait for the
-      // worker to actually be active before asking FCM to subscribe
-      // through it, or getToken() throws AbortError.
       await navigator.serviceWorker.ready;
 
       const messaging = getMessaging();
@@ -150,8 +148,6 @@ export function usePushNotifications() {
         throw new Error("You must be signed in to enable notifications.");
       }
 
-      // arrayUnion so multiple devices/browsers for the same person each
-      // get their own token added, without duplicating one already saved.
       await updateDoc(doc(db, "users", uid), {
         fcmTokens: arrayUnion(token),
       });

@@ -1,5 +1,95 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router";
+
+const icons = {
+  assigned: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  ),
+
+  rejected: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 8l8 8M16 8l-8 8" />
+    </svg>
+  ),
+
+  progress: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  ),
+
+  reopened: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  ),
+
+  completed: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12l2.5 2.5L16 9" />
+    </svg>
+  ),
+
+  closed: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M8 12h8" />
+    </svg>
+  ),
+
+  dashboard: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+};
 
 export default function SlideInRight({
   sidePopup,
@@ -19,162 +109,334 @@ export default function SlideInRight({
   reopenedRedirect,
   dashboardRedirect,
   theme = {},
+  onClose,
 }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
 
   const {
-    slideBg = "bg-sky-950/95",
-    slideBorder = "border-sky-800",
+    slideBg = "bg-slate-950/98",
+    slideBorder = "border-white/10",
     slideTopBar = "from-sky-400 via-cyan-400",
-    linkActiveBg = "bg-sky-500/15",
-    linkActiveBorder = "border-sky-400/40",
+    linkActiveBg = "bg-sky-500/10",
+    linkActiveBorder = "border-sky-400/30",
     linkActiveText = "text-sky-300",
-    linkIdleBorder = "border-white/10",
-    linkIdleText = "text-white/40",
-    linkHoverText = "hover:text-sky-200",
-    linkHoverBorder = "hover:border-sky-400/30",
-    linkHoverBg = "hover:bg-sky-500/8",
-    feedbackBadge = "bg-sky-400 text-sky-950",
+    linkIdleText = "text-white/60",
+    linkHoverText = "hover:text-white",
+    linkHoverBg = "hover:bg-white/[0.04]",
+    feedbackBadge = "bg-amber-400 text-amber-950",
   } = theme;
 
   useEffect(() => {
     if (sidePopup) {
       setVisible(true);
       setClosing(false);
+      document.body.style.overflow = "hidden";
     } else if (visible) {
       setClosing(true);
-      const t = setTimeout(() => {
+
+      const timer = setTimeout(() => {
         setVisible(false);
         setClosing(false);
+        document.body.style.overflow = "";
       }, 300);
-      return () => clearTimeout(t);
+
+      return () => clearTimeout(timer);
     }
-  }, [sidePopup]);
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [sidePopup, visible]);
 
   if (!visible) return null;
 
-  const navClass = ({ isActive }) =>
-    `cursor-pointer transition-all duration-200 text-sm font-bold tracking-widest uppercase px-6 py-3 rounded-xl border w-full text-center ${
-      isActive
-        ? `${linkActiveText} ${linkActiveBorder} ${linkActiveBg}`
-        : `${linkIdleText} ${linkIdleBorder} ${linkHoverText} ${linkHoverBorder} ${linkHoverBg}`
-    }`;
+  let user = null;
 
-  const user = JSON.parse(localStorage.getItem("user"))?.data;
+  try {
+    user = JSON.parse(localStorage.getItem("user"))?.data;
+  } catch {
+    user = null;
+  }
+
+  const isManagementRole = ["admin", "estate", "procurement"].includes(
+    user?.role,
+  );
+
+  const items = [
+    {
+      label: "Assigned",
+      redirect: assignedRedirect,
+      icon: icons.assigned,
+      count: newAssignedCount,
+    },
+    {
+      label: "In Progress",
+      redirect: acceptedRedirect,
+      icon: icons.progress,
+      count: newAcceptedCount,
+    },
+    {
+      label: "Reopened",
+      redirect: reopenedRedirect,
+      icon: icons.reopened,
+      count: newReopenedCount,
+    },
+    {
+      label: "Completed",
+      redirect: completedRedirect,
+      icon: icons.completed,
+      count: newCompletedCount,
+      feedback: completedWithFeedback,
+    },
+    {
+      label: "Closed",
+      redirect: closedRedirect,
+      icon: icons.closed,
+      count: newClosedCount,
+      feedback: closedWithFeedback,
+    },
+    {
+      label: "Rejected",
+      redirect: rejectedRedirect,
+      icon: icons.rejected,
+      count: newRejectedCount,
+    },
+  ];
 
   return (
-    <div
-      className={`fixed top-0 flex flex-col gap-4 items-center justify-center md:justify-start right-0 w-full md:max-w-[500px] h-screen ${slideBg} backdrop-blur-xl border-l ${slideBorder} z-50 md:hidden overflow-y-auto px-8 ${
-        closing ? "slide-out-right" : "slide-in-right"
-      }`}
-    >
+    <>
+      {/* Backdrop */}
       <div
-        className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${slideTopBar} to-transparent`}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+        onClick={onClose}
       />
 
-      <p className="text-[10px] tracking-[0.3em] uppercase text-white/30 font-semibold mb-2">
-        Navigation
-      </p>
+      {/* Drawer */}
+      <aside
+        className={`
+          fixed top-0 right-0 z-50
+          h-screen w-[88%] max-w-[390px]
+          ${slideBg}
+          border-l ${slideBorder}
+          shadow-2xl
+          md:hidden
+          overflow-hidden
+          flex flex-col
+          ${closing ? "slide-out-right" : "slide-in-right"}
+        `}
+      >
+        {/* Top gradient */}
+        <div
+          className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${slideTopBar} to-transparent`}
+        />
 
-      {assignedRedirect && (
-        <NavLink to={`${assignedRedirect}`} className={navClass}>
-          Assigned
-          {newAssignedCount > 0 && (
-            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
-              {newAssignedCount}
-            </span>
-          )}
-        </NavLink>
-      )}
+        {/* Header */}
+        <div className="px-6 pt-24 pb-5 border-b border-white/[0.07]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-sky-400/70 font-bold">
+                Maintenance Portal
+              </p>
+            </div>
 
-      {rejectedRedirect && (
-        <NavLink to={`${rejectedRedirect}`} className={navClass}>
-          Rejected
-          {newRejectedCount > 0 && (
-            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
-              {newRejectedCount}
-            </span>
-          )}
-        </NavLink>
-      )}
-
-      {acceptedRedirect && (
-        <NavLink to={`${acceptedRedirect}`} className={navClass}>
-          In Progress
-          {newAcceptedCount > 0 && (
-            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
-              {newAcceptedCount}
-            </span>
-          )}
-        </NavLink>
-      )}
-
-      {reopenedRedirect && (
-        <NavLink to={`${reopenedRedirect}`} className={navClass}>
-          Reopened
-          {newReopenedCount > 0 && (
-            <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
-              {newReopenedCount}
-            </span>
-          )}
-        </NavLink>
-      )}
-
-      {completedRedirect && (
-        <NavLink to={`${completedRedirect}`} end className={navClass}>
-          <span className="flex items-center justify-center gap-2">
-            Completed
-            {newCompletedCount > 0 && (
-              <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
-                {newCompletedCount}
-              </span>
-            )}
-            {completedWithFeedback > 0 && (
-              <span
-                className={`${feedbackBadge} text-xs font-black px-2 py-0.5 rounded-full`}
+            <button
+              onClick={onClose}
+              aria-label="Close navigation"
+              className="
+                w-10 h-10 rounded-xl
+                flex items-center justify-center
+                text-white/50 hover:text-white
+                bg-white/[0.04] hover:bg-white/[0.08]
+                border border-white/[0.07]
+                transition
+              "
+            >
+              <svg
+                className="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
               >
-                {completedWithFeedback}
-              </span>
-            )}
-          </span>
-        </NavLink>
-      )}
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
 
-      {closedRedirect && (
-        <NavLink to={`${closedRedirect}`} end className={navClass}>
-          <span className="flex items-center justify-center gap-2">
-            Closed
-            {newClosedCount > 0 && (
-              <span className="bg-sky-400 text-sky-950 text-xs font-black px-2 py-0.5 rounded-full">
-                {newClosedCount}
-              </span>
+          {/* User info */}
+          {user && (
+            <div className="mt-5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-400/20 flex items-center justify-center text-sky-300 font-bold">
+                {user?.name?.charAt(0)?.toUpperCase() || "U"}
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-500 truncate">
+                  {user?.name || "User"}
+                </p>
+
+                <p className="text-[10px] uppercase tracking-wider text-white/30 mt-0.5">
+                  {user?.role || "Worker"}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto px-4 py-5">
+          <p className="px-3 mb-3 text-[10px] uppercase tracking-[0.25em] font-bold text-white/25">
+            Reports
+          </p>
+
+          <nav className="space-y-1">
+            {items.map(
+              ({ label, redirect, icon, count, feedback }) =>
+                redirect && (
+                  <NavLink
+                    key={label}
+                    to={redirect}
+                    end={label === "Completed" || label === "Closed"}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      `
+                      group relative flex items-center gap-3
+                      px-3 py-3.5 rounded-xl
+                      border
+                      transition-all duration-200
+                      ${
+                        isActive
+                          ? `${linkActiveText} ${linkActiveBg} ${linkActiveBorder}`
+                          : `border-transparent ${linkIdleText} ${linkHoverText} ${linkHoverBg}`
+                      }
+                    `
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {/* Active indicator */}
+                        {isActive && (
+                          <span className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-sky-400" />
+                        )}
+
+                        <span
+                          className={`
+                            w-9 h-9 rounded-lg
+                            flex items-center justify-center
+                            shrink-0
+                            ${
+                              isActive
+                                ? "bg-sky-400/10"
+                                : "bg-white/[0.03] group-hover:bg-white/[0.06]"
+                            }
+                          `}
+                        >
+                          <span className="w-[18px] h-[18px]">{icon}</span>
+                        </span>
+
+                        <span className="flex-1 text-sm font-semibold">
+                          {label}
+                        </span>
+
+                        <span className="flex items-center gap-1.5">
+                          {count > 0 && (
+                            <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-sky-400 text-sky-950 text-[10px] font-black flex items-center justify-center">
+                              {count > 99 ? "99+" : count}
+                            </span>
+                          )}
+
+                          {feedback > 0 && (
+                            <span
+                              className={`
+                                min-w-[22px] h-[22px] px-1.5
+                                rounded-full
+                                ${feedbackBadge}
+                                text-[10px] font-black
+                                flex items-center justify-center
+                              `}
+                              title={`${feedback} feedback waiting`}
+                            >
+                              {feedback > 99 ? "99+" : feedback}
+                            </span>
+                          )}
+
+                          <svg
+                            className="w-4 h-4 opacity-20 group-hover:opacity-50 transition"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                ),
             )}
-            {closedWithFeedback > 0 && (
-              <span
-                className={`${feedbackBadge} text-xs font-black px-2 py-0.5 rounded-full`}
+          </nav>
+
+          {/* Management */}
+          {isManagementRole && dashboardRedirect && (
+            <div >
+              <p className="px-3 mb-3 text-[10px] uppercase tracking-[0.25em] font-bold text-white/25">
+                Management
+              </p>
+
+              <NavLink
+                to={dashboardRedirect}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `
+                  group relative flex items-center gap-3
+                  px-3 py-3.5 rounded-xl
+                  border transition-all duration-200
+                  ${
+                    isActive
+                      ? `${linkActiveText} ${linkActiveBg} ${linkActiveBorder}`
+                      : `border-transparent ${linkIdleText} ${linkHoverText} ${linkHoverBg}`
+                  }
+                `
+                }
               >
-                {closedWithFeedback}
-              </span>
-            )}
-          </span>
-        </NavLink>
-      )}
+                <span className="w-9 h-9 rounded-lg bg-white/[0.03] flex items-center justify-center">
+                  <span className="w-[18px] h-[18px]">{icons.dashboard}</span>
+                </span>
 
-      {["admin", "estate", "procurement"].includes(user?.role) && (
-        <NavLink
-          to={`${dashboardRedirect}`}
-          className={({ isActive }) =>
-            `flex md:hidden cursor-pointer transition-all flex justify-center duration-200 text-sm font-bold tracking-widest uppercase px-6 py-3 rounded-xl border w-full ${
-              isActive
-                ? `${linkActiveText} ${linkActiveBorder} ${linkActiveBg}`
-                : `${linkIdleText} ${linkIdleBorder} ${linkHoverText} ${linkHoverBorder} ${linkHoverBg}`
-            }`
-          }
-        >
-          Dashboard
-        </NavLink>
-      )}
-    </div>
+                <span className="text-sm font-semibold">Dashboard</span>
+
+                <svg
+                  className="w-4 h-4 ml-auto opacity-20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </NavLink>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-5 border-t border-white/[0.07]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-white/20">
+                Signed in as
+              </p>
+              <p className="text-xs text-white/50 mt-1 capitalize">
+                {user?.role || "User"}
+              </p>
+            </div>
+
+            <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

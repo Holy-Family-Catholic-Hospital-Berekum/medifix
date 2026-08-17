@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route } from "react-router";
 
 import SignUp from "../signUp/signUp";
@@ -35,6 +36,26 @@ import ProcurementCompleted from "../Procurement/procurementCompleted";
 const user = JSON.parse(localStorage.getItem("user"))?.data;
 
 export default function App() {
+  useEffect(() => {
+    const inspectMedian = async () => {
+      if (!window.median) {
+        alert("window.median DOES NOT EXIST");
+        return;
+      }
+
+      const output = {
+        medianKeys: Object.keys(window.median),
+        onesignalExists: !!window.median.onesignal,
+        onesignalKeys: window.median.onesignal
+          ? Object.keys(window.median.onesignal)
+          : [],
+      };
+
+      alert(JSON.stringify(output, null, 2));
+    };
+
+    inspectMedian();
+  }, []);
   return (
     <Routes>
       <Route path="/" element={<SignUp />} />

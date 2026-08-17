@@ -28,13 +28,12 @@ if (import.meta.env.DEV) {
 // Must be initialized before any Firestore/Auth calls elsewhere in the app
 // actually hit the network, so it's done here, right after initializeApp.
 initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider(
-    import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY,
-  ),
+  provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY),
   isTokenAutoRefreshEnabled: true,
 });
 
 export const auth = getAuth(app);
+window.auth = auth;
 const db = getFirestore(app);
 
 export { db };

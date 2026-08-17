@@ -16,6 +16,11 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
+
+export function isMedianApp() {
+  return typeof window !== "undefined" && !!window.median;
+}
+
 export async function markOverdueReports(user) {
   if (!user || !["admin", "estate"].includes(user.role)) return;
 
