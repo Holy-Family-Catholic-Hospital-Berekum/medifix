@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { linkPushUser } from "../src/lib/push";
 import {
   doc,
   getDoc,
@@ -664,6 +665,7 @@ export default function SignUp() {
         "user",
         JSON.stringify({ data: userData, timestamp: Date.now() }),
       );
+      linkPushUser(uid);
       setLoginId("");
       setLoginPassword("");
       const routes = {

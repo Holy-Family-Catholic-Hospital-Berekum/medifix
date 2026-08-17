@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Routes, Route } from "react-router";
 
 import SignUp from "../signUp/signUp";
@@ -36,28 +35,6 @@ import ProcurementCompleted from "../Procurement/procurementCompleted";
 const user = JSON.parse(localStorage.getItem("user"))?.data;
 
 export default function App() {
-  useEffect(() => {
-    const inspectMedian = () => {
-      if (!window.median) {
-        alert("Median bridge does not exist");
-        return;
-      }
-
-      const output = {
-        medianExists: true,
-        medianKeys: Object.keys(window.median),
-        hasOneSignal: !!window.median.onesignal,
-        oneSignalKeys: window.median.onesignal
-          ? Object.keys(window.median.onesignal)
-          : [],
-      };
-
-      alert(JSON.stringify(output, null, 2));
-    };
-
-    // Give Median time to finish injecting its modules
-    setTimeout(inspectMedian, 2000);
-  }, []);
   return (
     <Routes>
       <Route path="/" element={<SignUp />} />
