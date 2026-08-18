@@ -396,24 +396,111 @@ export default function StaffHome() {
       {/* ── Report Timelines ──────────────────────────────────────── */}
       <section className="px-4 md:px-12 mb-16">
         <div className="flex items-center gap-4 mb-8">
-          <h2 className="text-3xl font-black text-gray-900">
-            Report Timelines
-          </h2>
-          <div className="flex-1 h-0.5 bg-gray-100 rounded" />
+          <div>
+            <h2 className="text-3xl font-black text-gray-900">
+              Report Timelines
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Response time depends on the urgency of the issue
+            </p>
+          </div>
+
+          <div className="flex-1 h-px bg-gray-100 rounded" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {timelines.map((t) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {timelines.map((t, index) => (
             <div
               key={t.priority}
-              className={`relative rounded-2xl border-2 ${t.border} overflow-hidden bg-white shadow-sm hover:shadow-lg transition-all duration-300`}
+              className={`
+          group
+          relative
+          overflow-hidden
+          rounded-2xl
+          bg-white
+          border-2
+          ${t.border}
+          shadow-sm
+          hover:shadow-lg
+          hover:-translate-y-1
+          transition-all
+          duration-300
+        `}
             >
-              <div className={`${t.color} px-6 py-4 flex items-center gap-3`}>
-                <span className="text-2xl">{t.icon}</span>
-                <h3 className="font-black text-white text-xl">{t.priority}</h3>
-              </div>
-              <div className="px-6 py-5">
-                <p className="text-gray-700 font-medium">{t.desc}</p>
+              {/* Subtle colored top accent */}
+              <div className={`h-2 ${t.color} opacity-80`} />
+
+              <div className="p-6">
+                {/* Priority heading */}
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`
+                  w-11 h-11
+                  rounded-xl
+                  ${t.badge}
+                  flex
+                  items-center
+                  justify-center
+                  text-2xl
+                `}
+                    >
+                      {t.icon}
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                        Priority
+                      </p>
+
+                      <h3 className={`text-xl font-black ${t.text}`}>
+                        {t.priority}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`
+                text-xs
+                font-black
+                ${t.text}
+                ${t.badge}
+                px-2.5
+                py-1
+                rounded-full
+              `}
+                  >
+                    0{index + 1}
+                  </span>
+                </div>
+
+                {/* Response time */}
+                <div
+                  className={`
+              flex
+              items-center
+              gap-2
+              px-3
+              py-2.5
+              rounded-lg
+              ${t.badge}
+              mb-4
+            `}
+                >
+                  <span className={`text-sm ${t.text}`}>◷</span>
+
+                  <span className={`text-sm font-bold ${t.text}`}>
+                    {t.priority === "Emergency"
+                      ? "As soon as possible"
+                      : t.priority === "Urgent"
+                        ? "Within 12 hours"
+                        : "Within 1–2 days"}
+                  </span>
+                </div>
+
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {t.desc}
+                </p>
               </div>
             </div>
           ))}
@@ -435,10 +522,9 @@ export default function StaffHome() {
               Important Notice
             </h3>
             <p className="text-gray-700 leading-relaxed">
-              The urgency of a report depends on the actual intensity of the
-              issue. Merely setting a priority as <strong>emergency</strong> or{" "}
-              <strong>urgent</strong> does not automatically make it one.
-              Reports are assessed independently.
+              Response times are based on the assessed severity of the issue.
+              Selecting a higher priority does not automatically guarantee
+              faster attention.
             </p>
           </div>
         </div>

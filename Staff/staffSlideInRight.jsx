@@ -53,7 +53,7 @@ export default function StaffSlideInRight({ sidePopup }) {
       <div
         className={`fixed top-0 right-0 z-50 h-screen w-full md:w-[420px]
         flex flex-col justify-center items-center gap-8 px-8
-        rounded-l-3xl shadow-2xl
+         shadow-2xl
         ${closing ? "slide-out-right" : "slide-in-right"}`}
         style={{
           background:
