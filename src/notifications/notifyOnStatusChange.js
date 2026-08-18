@@ -7,21 +7,17 @@ export async function notifyOnStatusChange(
   report,
   { title, body } = {},
 ) {
+  console.log("[notify] currentUser:", getAuth().currentUser);
   const idToken = await getAuth().currentUser?.getIdToken();
-  if (!idToken) return;
+  console.log("[notify] got idToken:", !!idToken);
+  if (!idToken) {
+    console.warn("[notify] aborting — no authenticated user");
+    return;
+  }
 
-  fetch("/api/send-notification", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({
-      oldStatus,
-      newStatus,
-      report,
-      title: title || "Report update",
-      body: body || `Report is now ${newStatus}.`,
-    }),
-  }).catch((err) => console.error("Notification send failed:", err));
+  const res = await fetch("/api/send-notification", {
+    /* ... */
+  });
+  const json = await res.json();
+  console.log("[notify] response:", res.status, json);
 }
