@@ -1,4 +1,4 @@
-import { getAuth } from "firebase-admin/auth";
+import { getAuth } from "firebase/auth";
 
 export async function notifyOnStatusChange(
   oldStatus,
