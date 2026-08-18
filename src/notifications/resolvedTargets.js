@@ -1,12 +1,11 @@
 export const TRANSITIONS = {
-  // New report submitted — notify admin for approval. This was missing
-  // entirely: notifyOnStatusChange(null, "incoming", ...) resolved
-  // "null->incoming" (no match) then "*->incoming" (also no match) and
-  // fell through to `if (!targets) return;` — so no notification attempt
-  // was ever made when a report was first created.
   "*->incoming": [{ audience: "role", role: "admin" }],
 
-  "incoming->approved": [{ audience: "role", role: "admin" }],
+  // Was: role "admin" — but admin is the one who just approved it, and
+  // estate is who actually needs to act next (add materials / assign a
+  // worker). This is why estate never got notified on approval.
+  "incoming->approved": [{ audience: "role", role: "estate" }],
+
   "incoming->denied": [{ audience: "reporter" }],
   "*->pending": [{ audience: "role", role: "admin" }],
   "pending->confirmed": [{ audience: "role", role: "procurement" }],
@@ -26,11 +25,3 @@ export const TRANSITIONS = {
     { audience: "assignedWorker" },
   ],
 };
-
-export function resolveTargets(oldStatus, newStatus) {
-  return (
-    TRANSITIONS[`${oldStatus}->${newStatus}`] ||
-    TRANSITIONS[`*->${newStatus}`] ||
-    null
-  );
-}
