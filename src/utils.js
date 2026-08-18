@@ -16,7 +16,6 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-
 export function isMedianApp() {
   return typeof window !== "undefined" && !!window.median;
 }
@@ -131,7 +130,9 @@ export const generatePDFReport = (
     doc.setFont("helvetica", isBold ? "bold" : "normal");
     doc.setFontSize(fontSize);
     doc.setTextColor(...color);
+
     const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
+
     doc.text(lines, margin, y);
     y += lines.length * (fontSize + 4);
   };
@@ -141,146 +142,202 @@ export const generatePDFReport = (
   };
 
   // ── Header ──────────────────────────────────────────────────────────────────
-  // Logo
   try {
-    // logo must be a base64 data URL or an imported asset URL
     const img = new Image();
     img.src = logo;
-    // jsPDF addImage: (imageData, format, x, y, width, height)
+
     doc.addImage(logo, "PNG", margin, y, 60, 60);
   } catch (e) {
     console.warn("Logo could not be added to PDF:", e);
   }
 
-  // Hospital name block — positioned to the right of the logo
-  const logoRight = margin + 70; // 60px logo + 10px gap
+  // Hospital name block
+  const logoRight = margin + 70;
   const headerTopY = y;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.setTextColor(180, 80, 0); // orange-brown to match hospital brand
+  doc.setTextColor(180, 80, 0);
+
   doc.text("Holy Family Catholic Hospital", logoRight, headerTopY + 18);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(0, 0, 0);
+
   doc.text("Berekum, Bono Region, Ghana", logoRight, headerTopY + 33);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(100, 100, 100);
+
   doc.text("Maintenance Department", logoRight, headerTopY + 46);
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
+
   doc.text("Materials / Items Request Form", logoRight, headerTopY + 60);
 
   // Move y below the logo block
   y = headerTopY + 72;
 
-  doc.setDrawColor(180, 80, 0); // orange divider line
+  doc.setDrawColor(180, 80, 0);
   doc.setLineWidth(1.5);
+
   doc.line(margin, y, pageWidth - margin, y);
-  doc.setLineWidth(1); // reset
+
+  doc.setLineWidth(1);
   doc.setDrawColor(180, 180, 180);
+
   addSectionGap(20);
 
-  // Work title & category on one line
+  // ── Work Information ────────────────────────────────────────────────────────
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
+
   doc.text("Work Title:", margin, y);
+
   doc.setFont("helvetica", "normal");
+
   doc.text(report.category || "N/A", margin + 62, y);
+
   doc.setFont("helvetica", "bold");
+
   doc.text("Work Category:", margin + 250, y);
+
   doc.setFont("helvetica", "normal");
+
   doc.text(report.location || "N/A", margin + 336, y);
+
   y += 18;
 
   doc.setFont("helvetica", "bold");
+
   doc.text("Priority:", margin, y);
+
   doc.setFont("helvetica", "normal");
+
   doc.text(report.priorityLevel || "N/A", margin + 48, y);
+
   doc.setFont("helvetica", "bold");
+
   doc.text("Report ID:", margin + 250, y);
+
   doc.setFont("helvetica", "normal");
+
   doc.text(report.id || "N/A", margin + 306, y);
+
   y += 18;
 
   doc.setFont("helvetica", "bold");
+
   doc.text("Reporter:", margin, y);
+
   doc.setFont("helvetica", "normal");
+
   doc.text(
     `${report.reporter || "N/A"}  |  ${report.reporterContact || ""}`,
     margin + 52,
     y,
   );
+
   y += 18;
 
   addSectionGap(4);
+
   doc.line(margin, y, pageWidth - margin, y);
+
   addSectionGap(10);
 
-  doc.setTextColor(0, 0, 0); // reset to black for body
+  doc.setTextColor(0, 0, 0);
 
   // ── Description ─────────────────────────────────────────────────────────────
+
   addLine("Problem Description", 11, true);
+
   addSectionGap(2);
+
   doc.setFont("helvetica", "normal");
+
   doc.setFontSize(10);
+
   const descLines = doc.splitTextToSize(
     report.reportDescription || "N/A",
     pageWidth - margin * 2,
   );
+
   doc.text(descLines, margin, y);
+
   y += descLines.length * 14;
+
   addSectionGap(10);
 
-  // ── Materials Table ──────────────────────────────────────────────────────────
+  // ── Materials Table ─────────────────────────────────────────────────────────
+
   const materials = Array.isArray(report.materials) ? report.materials : [];
 
   if (materials.length > 0) {
     addLine("Materials / Items Required", 11, true);
+
     addSectionGap(6);
 
     // Column widths
-    const colWidths = [30, 220, 80, 110]; // S/N | Description | Qty | Spec/Size
+    const colWidths = [30, 220, 80, 110];
+
     const headers = [
       "S/N",
       "Description of Material/Item",
       "Qty Required",
       "Specification / Size",
     ];
+
     const rowHeight = 22;
+
     const tableWidth = colWidths.reduce((a, b) => a + b, 0);
 
-    // Header row background
+    // Header row
     doc.setFillColor(240, 240, 240);
+
     doc.rect(margin, y, tableWidth, rowHeight, "F");
+
     doc.setDrawColor(160, 160, 160);
+
     doc.rect(margin, y, tableWidth, rowHeight, "S");
 
     // Header text
     doc.setFont("helvetica", "bold");
+
     doc.setFontSize(9);
+
     doc.setTextColor(0, 0, 0);
+
     let colX = margin;
+
     headers.forEach((h, i) => {
       doc.text(h, colX + 4, y + 14);
+
       colX += colWidths[i];
     });
+
     y += rowHeight;
 
     // Data rows
     doc.setFont("helvetica", "normal");
+
     doc.setFontSize(9);
+
     materials.forEach((item, idx) => {
       // Alternate row shading
       if (idx % 2 === 1) {
         doc.setFillColor(250, 250, 250);
+
         doc.rect(margin, y, tableWidth, rowHeight, "F");
       }
+
       doc.setDrawColor(200, 200, 200);
+
       doc.rect(margin, y, tableWidth, rowHeight, "S");
 
       const cells = [
@@ -289,12 +346,17 @@ export const generatePDFReport = (
         String(item.quantity || ""),
         item.specification || "",
       ];
+
       colX = margin;
+
       cells.forEach((cell, i) => {
         const clipped = doc.splitTextToSize(cell, colWidths[i] - 8)[0] || "";
+
         doc.text(clipped, colX + 4, y + 14);
+
         colX += colWidths[i];
       });
+
       y += rowHeight;
     });
 
@@ -302,11 +364,16 @@ export const generatePDFReport = (
   }
 
   // ── Cost ────────────────────────────────────────────────────────────────────
+
   if (report.cost != null) {
     addSectionGap(6);
+
     addLine("Cost of Materials", 11, true);
-    addLine(`₵${Number(report.cost).toLocaleString()}`);
+
+    addLine(`GHS ${Number(report.cost).toLocaleString()}`);
   }
+
+  // ── Confirmation Alert ─────────────────────────────────────────────────────
 
   const confirmationAlert =
     [...(report.alerts || [])]
@@ -321,50 +388,87 @@ export const generatePDFReport = (
 
   if (confirmationAlert?.content) {
     addSectionGap(4);
+
     addLine("Admin Confirmation Note", 11, true);
+
     addLine(confirmationAlert.content);
+
     addLine(
-      `Note Date: ${confirmationAlert.date ? new Date(confirmationAlert.date).toLocaleDateString() : "N/A"}`,
+      `Note Date: ${
+        confirmationAlert.date
+          ? new Date(confirmationAlert.date).toLocaleDateString()
+          : "N/A"
+      }`,
     );
   }
 
+  // ── Assigned Technician ─────────────────────────────────────────────────────
+
   if (workerName) {
     addSectionGap(6);
+
     addLine("Assigned Technician", 11, true);
+
     addLine(workerName);
-    if (workerPhone) addLine(`${workerPhone}`);
+
+    if (workerPhone) {
+      addLine(`${workerPhone}`);
+    }
   }
+
+  // ── Feedback ─────────────────────────────────────────────────────────────────
 
   if (report.feedback) {
     addSectionGap(6);
+
     addLine("Feedback", 11, true);
+
     addLine(report.feedback);
+
     addLine(`Feedback Date: ${formatDate(report.feedbackDate)}`);
   }
 
+  // ── Cost Summary ────────────────────────────────────────────────────────────
+
   if (report.cost != null || report.maintenanceCost != null) {
     addSectionGap(6);
+
     addLine("Cost Summary", 11, true);
+
     if (report.cost != null) {
-      addLine(`Materials Cost: ₵${Number(report.cost).toLocaleString()}`, 10);
-    }
-    if (report.maintenanceCost != null) {
       addLine(
-        `Maintenance Cost: ₵${Number(report.maintenanceCost).toLocaleString()}`,
+        `Materials Cost: GHS ${Number(report.cost).toLocaleString()}`,
         10,
       );
     }
+
+    if (report.maintenanceCost != null) {
+      addLine(
+        `Maintenance Cost: GHS ${Number(
+          report.maintenanceCost,
+        ).toLocaleString()}`,
+        10,
+      );
+    }
+
     const total =
       (Number(report.cost) || 0) + (Number(report.maintenanceCost) || 0);
-    addLine(`Total Cost: ₵${total.toLocaleString()}`, 11, true);
+
+    addLine(`Total Cost: GHS ${total.toLocaleString()}`, 11, true);
   }
 
   // ── Dates ────────────────────────────────────────────────────────────────────
+
   addSectionGap(10);
+
   doc.line(margin, y, pageWidth - margin, y);
+
   addSectionGap(8);
+
   addLine("Timeline", 11, true);
+
   addSectionGap(2);
+
   [
     ["Submitted", report.dateSent],
     ["Approved", report.dateApproved],
@@ -376,48 +480,81 @@ export const generatePDFReport = (
     ["Rejected", report.dateRejected],
     ["Completed", report.dateCompleted],
   ].forEach(([label, date]) => {
-    if (date) addLine(`${label}: ${formatDate(date)}`, 10);
+    if (date) {
+      addLine(`${label}: ${formatDate(date)}`, 10);
+    }
   });
 
   // ── Signatures ───────────────────────────────────────────────────────────────
+
   addSectionGap(20);
+
   doc.line(margin, y, pageWidth - margin, y);
+
   addSectionGap(12);
 
   const sigY = y;
-  // Left signature only (Requested by Maintenance Manager)
+
+  // Requested by
   doc.setFont("helvetica", "bold");
+
   doc.setFontSize(10);
-  doc.text("Requested by Maintenance Manager:", margin, sigY);
+
+  doc.text("Requested by:", margin, sigY);
+
   doc.setFont("helvetica", "normal");
+
   doc.text(estateManagerName || "", margin, sigY + 14);
+
   if (estateManagerPhone) {
     doc.text(`${estateManagerPhone}`, margin, sigY + 26);
   }
+
   doc.line(margin, sigY + 40, margin + 200, sigY + 40);
+
   doc.setFontSize(8);
+
   doc.text("Signature & Date", margin, sigY + 52);
 
   y = sigY + 70;
+
   addSectionGap(14);
 
-  // Procurement section
+  // ── Procurement Section ─────────────────────────────────────────────────────
+
   doc.setFont("helvetica", "bold");
+
   doc.setFontSize(10);
+
   doc.text("FOR PROCUREMENT OFFICE", margin, y);
+
   y += 16;
+
   doc.setFont("helvetica", "normal");
+
   doc.setFontSize(10);
+
   doc.text("Procurement Manager's Signature:", margin, y);
+
   doc.line(margin + 200, y, pageWidth - margin, y);
+
   y += 20;
+
   doc.text("Date Received:", margin, y);
+
   doc.line(margin + 80, y, margin + 220, y);
+
   doc.text("Cost of Materials:", margin + 240, y);
+
   doc.line(margin + 330, y, pageWidth - margin, y);
+
   y += 20;
+
   doc.text("Remarks:", margin, y);
+
   doc.line(margin + 52, y, pageWidth - margin, y);
+
+  // ── Save ─────────────────────────────────────────────────────────────────────
 
   doc.save(`Maintenance_Report_${report.id || "unknown"}.pdf`);
 };
@@ -429,18 +566,41 @@ export const generateDashboardStatsPDF = (
   period = "month",
 ) => {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const pageWidth = 595.28;
-  const pageHeight = 842;
-  const margin = 40;
-  const now = new Date();
 
-  // ── period metadata ──────────────────────────────────────────────────────
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+
+  const margin = 40;
+  const contentWidth = pageWidth - margin * 2;
+
+  const COLORS = {
+    primary: [180, 80, 0],
+    primaryLight: [255, 245, 235],
+
+    navy: [15, 23, 42],
+    slate: [71, 85, 105],
+    muted: [100, 116, 139],
+    lightText: [148, 163, 184],
+
+    border: [226, 232, 240],
+    background: [248, 250, 252],
+    white: [255, 255, 255],
+
+    green: [22, 163, 74],
+    blue: [37, 99, 235],
+    orange: [234, 88, 12],
+    red: [220, 38, 38],
+    purple: [124, 58, 237],
+    teal: [13, 148, 136],
+  };
+
   const PERIOD_LABELS = {
     month: "This Month",
     year: "This Year",
     lastYear: "Last Year",
     overall: "Overall (All Time)",
   };
+
   const PERIOD_FILE_TAGS = {
     month: "Monthly",
     year: "Yearly",
@@ -451,9 +611,17 @@ export const generateDashboardStatsPDF = (
   const periodLabel = PERIOD_LABELS[period] || PERIOD_LABELS.month;
   const periodName = PERIOD_FILE_TAGS[period] || PERIOD_FILE_TAGS.month;
 
-  // stats.periodStats holds { overall, month, year, lastYear }, each built
-  // via buildPeriodStats() — falls back to the legacy monthStats/overall shape
-  // if periodStats isn't present (older callers), so this stays backwards compatible.
+  const now = new Date();
+
+  const displayMonth = now.toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
+
+  // ---------------------------------------------------------------------------
+  // PERIOD DATA
+  // ---------------------------------------------------------------------------
+
   const selectedStats =
     stats?.periodStats?.[period] ??
     (period === "year"
@@ -479,192 +647,884 @@ export const generateDashboardStatsPDF = (
     catCount: stats?.catCount ?? {},
   };
 
-  const displayMonth = now.toLocaleString("default", {
-    month: "long",
-    year: "numeric",
-  });
-  const yearLabel = now.getFullYear();
+  // ---------------------------------------------------------------------------
+  // CURRENCY
+  // ---------------------------------------------------------------------------
 
-  const addText = (text, x, y, options = {}) => {
-    const {
-      fontSize = 11,
-      isBold = false,
-      color = [0, 0, 0],
-      lineHeight = 14,
-    } = options;
-    doc.setFont("helvetica", isBold ? "bold" : "normal");
-    doc.setFontSize(fontSize);
-    doc.setTextColor(...color);
-
-    const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
-    doc.text(lines, x, y);
-    return lines.length * lineHeight;
-  };
-
-  const addInfoBox = (title, items, accent = [248, 147, 76]) => {
-    const estimatedHeight = 28 + items.length * 18;
-    if (y + estimatedHeight > pageHeight - margin) {
-      doc.addPage();
-      y = margin;
-    }
-
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(
-      margin - 6,
-      y,
-      pageWidth - margin * 2 + 12,
-      estimatedHeight,
-      8,
-      8,
-      "F",
-    );
-    doc.setDrawColor(...accent);
-    doc.setLineWidth(1);
-    doc.roundedRect(
-      margin - 6,
-      y,
-      pageWidth - margin * 2 + 12,
-      estimatedHeight,
-      8,
-      8,
-      "S",
-    );
-
-    doc.setFillColor(...accent);
-    doc.roundedRect(margin - 6, y, pageWidth - margin * 2 + 12, 22, 8, 8, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text(title, margin, y + 14);
-
-    y += 30;
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-
-    if (items.length === 0) {
-      doc.setTextColor(148, 163, 184);
-      doc.text("No data for this period.", margin, y);
-      y += 14;
-    } else {
-      items.forEach((item) => {
-        const lines = doc.splitTextToSize(item, pageWidth - margin * 2 - 12);
-        doc.text(lines, margin, y);
-        y += lines.length * 14;
-      });
-    }
-
-    y += 8;
-  };
-
+  // Use GHS instead of the ₵ symbol because jsPDF's default Helvetica
+  // font does not reliably support the Ghana cedi Unicode character.
   const formatCedis = (value) =>
-    `₵${Number(value || 0).toLocaleString(undefined, {
+    `GHS ${Number(value || 0).toLocaleString(undefined, {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     })}`;
+
+  // ---------------------------------------------------------------------------
+  // CALCULATIONS
+  // ---------------------------------------------------------------------------
+
+  const completion = selectedStats.total
+    ? Math.round(
+        (Number(selectedStats.completed || 0) /
+          Number(selectedStats.total || 1)) *
+          100,
+      )
+    : 0;
+
+  const overallCompletion = overallStats.total
+    ? Math.round(
+        (Number(overallStats.completed || 0) /
+          Number(overallStats.total || 1)) *
+          100,
+      )
+    : 0;
 
   const statusEntries = Object.entries(
     selectedStats.byStatus || stats?.byStatus || {},
   )
     .filter(([, count]) => Number(count) > 0)
-    .map(([status, count]) => `• ${status}: ${count}`);
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+
   const categoryEntries = Object.entries(
     selectedStats.catCount || stats?.catCount || {},
   )
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([category, count]) => `• ${category}: ${count}`);
+    .filter(([, count]) => Number(count) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .slice(0, 6);
+
   const trend = Array.isArray(stats?.trend) ? stats.trend : [];
 
-  doc.setFillColor(255, 245, 235);
-  doc.rect(0, 0, pageWidth, 100, "F");
-  doc.setDrawColor(248, 147, 76);
-  doc.setLineWidth(1.5);
-  doc.line(margin, 72, pageWidth - margin, 72);
+  let y = 0;
 
-  let y = 48;
-  y += addText("Holy Family Catholic Hospital", margin, y, {
-    fontSize: 16,
-    isBold: true,
-    color: [180, 80, 0],
-  });
-  y += addText("Maintenance Dashboard Statistics Report", margin, y + 8, {
-    fontSize: 12,
-    isBold: true,
-  });
-  y += addText(`Role: ${roleLabel}`, margin, y + 8, { fontSize: 10 });
-  y += addText(`Generated by: ${userName}`, margin, y + 8, { fontSize: 10 });
-  y += addText(`Period: ${periodLabel} • ${displayMonth}`, margin, y + 8, {
-    fontSize: 10,
-  });
+  // ---------------------------------------------------------------------------
+  // FONT HELPER
+  // ---------------------------------------------------------------------------
 
-  y += 22;
+  const setFont = (size, bold = false, color = COLORS.navy) => {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
 
-  const completion = selectedStats.total
-    ? Math.round((selectedStats.completed / selectedStats.total) * 100)
-    : 0;
-  const overallCompletion = overallStats.total
-    ? Math.round((overallStats.completed / overallStats.total) * 100)
-    : 0;
+    doc.setFontSize(size);
+    doc.setTextColor(...color);
+  };
 
-  addInfoBox(`Selected Period Summary — ${periodLabel}`, [
-    `Total submissions: ${selectedStats.total ?? 0}`,
-    `Completed: ${selectedStats.completed ?? 0}`,
-    `Active: ${selectedStats.active ?? 0}`,
-    `Overdue: ${selectedStats.overdue ?? 0}`,
-    `Completion rate: ${completion}%`,
-    `Average resolution: ${selectedStats.avgResolutionDays ?? "—"} days`,
-    `Total spend: ${formatCedis(selectedStats.totalCost ?? 0)}`,
-  ]);
+  // ---------------------------------------------------------------------------
+  // PAGE SPACE
+  // ---------------------------------------------------------------------------
 
-  // Only show the separate "Overall" comparison box when a narrower period
-  // was selected — for "overall" itself it would just duplicate the box above.
-  if (period !== "overall") {
-    addInfoBox(
-      "Overall Comparison (All Time)",
-      [
-        `Total submissions: ${overallStats.total ?? 0}`,
-        `Completed: ${overallStats.completed ?? 0}`,
-        `Active: ${overallStats.active ?? 0}`,
-        `Overdue: ${overallStats.overdue ?? 0}`,
-        `Completion rate: ${overallCompletion}%`,
-        `Average resolution: ${overallStats.avgResolutionDays ?? "—"} days`,
-        `Total spend: ${formatCedis(overallStats.totalCost ?? 0)}`,
-      ],
-      [30, 64, 175],
+  const ensureSpace = (height) => {
+    if (y + height > pageHeight - 55) {
+      addPage();
+      return true;
+    }
+
+    return false;
+  };
+
+  // ---------------------------------------------------------------------------
+  // PAGE HEADER
+  // ---------------------------------------------------------------------------
+
+  const addPageHeader = () => {
+    doc.setFillColor(...COLORS.white);
+    doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+    // Top orange strip
+    doc.setFillColor(...COLORS.primary);
+    doc.rect(0, 0, pageWidth, 6, "F");
+
+    // Hospital logo
+    try {
+      doc.addImage(logo, "PNG", margin, 24, 46, 46);
+    } catch (error) {
+      console.warn("Dashboard PDF logo could not be added:", error);
+    }
+
+    setFont(15, true, COLORS.primary);
+
+    doc.text("Holy Family Catholic Hospital", margin + 58, 40);
+
+    setFont(9, false, COLORS.muted);
+
+    doc.text("Berekum, Bono Region, Ghana", margin + 58, 54);
+
+    setFont(8, true, COLORS.slate);
+
+    doc.text("MAINTENANCE DEPARTMENT", pageWidth - margin, 39, {
+      align: "right",
+    });
+
+    doc.setDrawColor(...COLORS.border);
+    doc.setLineWidth(1);
+
+    doc.line(margin, 82, pageWidth - margin, 82);
+
+    y = 105;
+  };
+
+  // ---------------------------------------------------------------------------
+  // FOOTER
+  // ---------------------------------------------------------------------------
+
+  const addFooter = () => {
+    const pageCount = doc.internal.getNumberOfPages();
+
+    for (let page = 1; page <= pageCount; page++) {
+      doc.setPage(page);
+
+      doc.setDrawColor(...COLORS.border);
+      doc.setLineWidth(0.7);
+
+      doc.line(margin, pageHeight - 38, pageWidth - margin, pageHeight - 38);
+
+      setFont(7.5, false, COLORS.lightText);
+
+      doc.text(
+        "Holy Family Catholic Hospital • Maintenance Dashboard",
+        margin,
+        pageHeight - 22,
+      );
+
+      doc.text(
+        `Page ${page} of ${pageCount}`,
+        pageWidth - margin,
+        pageHeight - 22,
+        {
+          align: "right",
+        },
+      );
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // NEW PAGE
+  // ---------------------------------------------------------------------------
+
+  const addPage = () => {
+    doc.addPage();
+    addPageHeader();
+  };
+
+  // ---------------------------------------------------------------------------
+  // SECTION TITLE
+  // ---------------------------------------------------------------------------
+
+  const addSectionTitle = (title, subtitle = "") => {
+    ensureSpace(40);
+
+    setFont(12, true, COLORS.navy);
+
+    doc.text(title, margin, y);
+
+    if (subtitle) {
+      setFont(8, false, COLORS.muted);
+
+      doc.text(subtitle, margin, y + 13);
+
+      y += 13;
+    }
+
+    y += 20;
+  };
+
+  // ---------------------------------------------------------------------------
+  // CARD
+  // ---------------------------------------------------------------------------
+
+  const drawRoundedCard = (x, cardY, width, height, fill = COLORS.white) => {
+    doc.setFillColor(...fill);
+    doc.setDrawColor(...COLORS.border);
+    doc.setLineWidth(0.8);
+
+    doc.roundedRect(x, cardY, width, height, 7, 7, "FD");
+  };
+
+  // ---------------------------------------------------------------------------
+  // KPI CARD
+  // ---------------------------------------------------------------------------
+
+  const addKpiCard = (
+    x,
+    cardY,
+    width,
+    height,
+    label,
+    value,
+    accent,
+    subText = "",
+  ) => {
+    drawRoundedCard(x, cardY, width, height);
+
+    // Accent bar
+    doc.setFillColor(...accent);
+
+    doc.roundedRect(x, cardY, 4, height, 2, 2, "F");
+
+    setFont(8.5, false, COLORS.muted);
+
+    doc.text(label, x + 15, cardY + 20);
+
+    setFont(20, true, COLORS.navy);
+
+    doc.text(String(value), x + 15, cardY + 43);
+
+    if (subText) {
+      setFont(7.5, false, COLORS.muted);
+
+      doc.text(subText, x + 15, cardY + 57);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // SMALL METRIC CARD
+  // ---------------------------------------------------------------------------
+
+  const addMiniMetric = (x, metricY, width, label, value, accent) => {
+    drawRoundedCard(x, metricY, width, 54);
+
+    doc.setFillColor(...accent);
+
+    doc.circle(x + 15, metricY + 18, 4, "F");
+
+    setFont(8, false, COLORS.muted);
+
+    doc.text(label, x + 26, metricY + 21);
+
+    setFont(12, true, COLORS.navy);
+
+    doc.text(String(value), x + 15, metricY + 42);
+  };
+
+  // ---------------------------------------------------------------------------
+  // PROGRESS BAR
+  // ---------------------------------------------------------------------------
+
+  const drawProgressBar = (x, barY, width, percentage, accent) => {
+    doc.setFillColor(...COLORS.border);
+
+    doc.roundedRect(x, barY, width, 6, 3, 3, "F");
+
+    const progressWidth = Math.max(
+      0,
+      Math.min(width, (percentage / 100) * width),
     );
+
+    if (progressWidth > 0) {
+      doc.setFillColor(...accent);
+
+      doc.roundedRect(x, barY, progressWidth, 6, 3, 3, "F");
+    }
+  };
+
+  // ===========================================================================
+  // START PDF
+  // ===========================================================================
+
+  addPageHeader();
+
+  // ---------------------------------------------------------------------------
+  // TITLE
+  // ---------------------------------------------------------------------------
+
+  setFont(20, true, COLORS.navy);
+
+  doc.text("Maintenance Dashboard", margin, y);
+
+  setFont(10, false, COLORS.muted);
+
+  doc.text(
+    `${periodLabel} performance and operational overview`,
+    margin,
+    y + 17,
+  );
+
+  // Period pill
+  const pillText = periodLabel;
+
+  const pillWidth = doc.getTextWidth(pillText) + 22;
+
+  doc.setFillColor(...COLORS.primaryLight);
+
+  doc.roundedRect(
+    pageWidth - margin - pillWidth,
+    y - 13,
+    pillWidth,
+    24,
+    12,
+    12,
+    "F",
+  );
+
+  setFont(8, true, COLORS.primary);
+
+  doc.text(pillText, pageWidth - margin - pillWidth / 2, y + 2, {
+    align: "center",
+  });
+
+  y += 42;
+
+  // ---------------------------------------------------------------------------
+  // REPORT METADATA
+  // ---------------------------------------------------------------------------
+
+  drawRoundedCard(margin, y, contentWidth, 58, COLORS.background);
+
+  setFont(8, false, COLORS.muted);
+
+  doc.text("REPORT PERIOD", margin + 15, y + 18);
+
+  setFont(9, true, COLORS.navy);
+
+  doc.text(displayMonth, margin + 15, y + 34);
+
+  setFont(8, false, COLORS.muted);
+
+  doc.text("GENERATED BY", margin + 180, y + 18);
+
+  setFont(9, true, COLORS.navy);
+
+  doc.text(userName || "User", margin + 180, y + 34);
+
+  setFont(8, false, COLORS.muted);
+
+  doc.text("ROLE", margin + 345, y + 18);
+
+  setFont(9, true, COLORS.navy);
+
+  doc.text(roleLabel || "User", margin + 345, y + 34);
+
+  y += 78;
+
+  // ---------------------------------------------------------------------------
+  // KEY PERFORMANCE INDICATORS
+  // ---------------------------------------------------------------------------
+
+  addSectionTitle(
+    "Key Performance Indicators",
+    `Performance for ${periodLabel.toLowerCase()}`,
+  );
+
+  const gap = 10;
+
+  const cardWidth = (contentWidth - gap * 3) / 4;
+
+  const cardHeight = 72;
+
+  const kpiY = y;
+
+  addKpiCard(
+    margin,
+    kpiY,
+    cardWidth,
+    cardHeight,
+    "TOTAL REPORTS",
+    selectedStats.total ?? 0,
+    COLORS.blue,
+  );
+
+  addKpiCard(
+    margin + cardWidth + gap,
+    kpiY,
+    cardWidth,
+    cardHeight,
+    "COMPLETED",
+    selectedStats.completed ?? 0,
+    COLORS.green,
+    `${completion}% completion`,
+  );
+
+  addKpiCard(
+    margin + (cardWidth + gap) * 2,
+    kpiY,
+    cardWidth,
+    cardHeight,
+    "ACTIVE",
+    selectedStats.active ?? 0,
+    COLORS.orange,
+  );
+
+  addKpiCard(
+    margin + (cardWidth + gap) * 3,
+    kpiY,
+    cardWidth,
+    cardHeight,
+    "OVERDUE",
+    selectedStats.overdue ?? 0,
+    COLORS.red,
+  );
+
+  y += cardHeight + 22;
+
+  // ---------------------------------------------------------------------------
+  // COMPLETION PERFORMANCE
+  // ---------------------------------------------------------------------------
+
+  drawRoundedCard(margin, y, contentWidth, 64, COLORS.white);
+
+  setFont(9, true, COLORS.navy);
+
+  doc.text("Completion Performance", margin + 15, y + 20);
+
+  setFont(9, true, COLORS.green);
+
+  doc.text(`${completion}%`, pageWidth - margin - 15, y + 20, {
+    align: "right",
+  });
+
+  drawProgressBar(
+    margin + 15,
+    y + 34,
+    contentWidth - 30,
+    completion,
+    COLORS.green,
+  );
+
+  setFont(7.5, false, COLORS.muted);
+
+  doc.text(
+    `${selectedStats.completed ?? 0} completed out of ${selectedStats.total ?? 0} total reports`,
+    margin + 15,
+    y + 53,
+  );
+
+  y += 84;
+
+  // ---------------------------------------------------------------------------
+  // FINANCIAL OVERVIEW
+  // ---------------------------------------------------------------------------
+
+  addSectionTitle(
+    "Financial Overview",
+    "Maintenance expenditure for the selected period",
+  );
+
+  const financialWidth = (contentWidth - gap * 2) / 3;
+
+  addMiniMetric(
+    margin,
+    y,
+    financialWidth,
+    "Total Spend",
+    formatCedis(selectedStats.totalCost),
+    COLORS.primary,
+  );
+
+  addMiniMetric(
+    margin + financialWidth + gap,
+    y,
+    financialWidth,
+    "Average Cost",
+    formatCedis(selectedStats.avgCost),
+    COLORS.blue,
+  );
+
+  addMiniMetric(
+    margin + (financialWidth + gap) * 2,
+    y,
+    financialWidth,
+    "Highest Cost",
+    formatCedis(selectedStats.maxCost),
+    COLORS.red,
+  );
+
+  y += 68;
+
+  // ---------------------------------------------------------------------------
+  // SPEND BY PRIORITY
+  // ---------------------------------------------------------------------------
+
+  drawRoundedCard(margin, y, contentWidth, 78, COLORS.background);
+
+  setFont(8.5, true, COLORS.navy);
+
+  doc.text("Spend by Priority", margin + 15, y + 19);
+
+  const priorities = [
+    ["Emergency", selectedStats.costByPriority?.emergency ?? 0, COLORS.red],
+    ["Urgent", selectedStats.costByPriority?.urgent ?? 0, COLORS.orange],
+    ["Routine", selectedStats.costByPriority?.routine ?? 0, COLORS.blue],
+  ];
+
+  const priorityWidth = (contentWidth - 30 - 20) / 3;
+
+  priorities.forEach(([label, value, accent], index) => {
+    const x = margin + 15 + index * (priorityWidth + 10);
+
+    setFont(7.5, false, COLORS.muted);
+
+    doc.text(label, x, y + 38);
+
+    setFont(10, true, COLORS.navy);
+
+    doc.text(formatCedis(value), x, y + 53);
+
+    const totalSpend = Number(selectedStats.totalCost || 0);
+
+    const percentage = totalSpend
+      ? Math.round((Number(value || 0) / totalSpend) * 100)
+      : 0;
+
+    drawProgressBar(x, y + 61, priorityWidth - 8, percentage, accent);
+  });
+
+  y += 100;
+
+  // ---------------------------------------------------------------------------
+  // OPERATIONAL BREAKDOWN
+  // ---------------------------------------------------------------------------
+
+  ensureSpace(220);
+
+  addSectionTitle(
+    "Operational Breakdown",
+    "Distribution of reports by status and work category",
+  );
+
+  const columnGap = 14;
+
+  const columnWidth = (contentWidth - columnGap) / 2;
+
+  const breakdownY = y;
+
+  const breakdownHeight = 190;
+
+  // STATUS
+  drawRoundedCard(
+    margin,
+    breakdownY,
+    columnWidth,
+    breakdownHeight,
+    COLORS.white,
+  );
+
+  setFont(10, true, COLORS.navy);
+
+  doc.text("Status Breakdown", margin + 15, breakdownY + 22);
+
+  setFont(7.5, false, COLORS.muted);
+
+  doc.text(periodLabel, margin + 15, breakdownY + 35);
+
+  if (statusEntries.length === 0) {
+    setFont(8, false, COLORS.lightText);
+
+    doc.text("No status data available.", margin + 15, breakdownY + 65);
+  } else {
+    const maxStatus = Math.max(
+      ...statusEntries.map(([, count]) => Number(count)),
+      1,
+    );
+
+    statusEntries.slice(0, 7).forEach(([status, count], index) => {
+      const rowY = breakdownY + 55 + index * 19;
+
+      const normalizedStatus =
+        String(status).charAt(0).toUpperCase() + String(status).slice(1);
+
+      setFont(7.5, false, COLORS.slate);
+
+      doc.text(normalizedStatus, margin + 15, rowY);
+
+      setFont(7.5, true, COLORS.navy);
+
+      doc.text(String(count), margin + columnWidth - 15, rowY, {
+        align: "right",
+      });
+
+      drawProgressBar(
+        margin + 15,
+        rowY + 5,
+        columnWidth - 30,
+        (Number(count) / maxStatus) * 100,
+        COLORS.green,
+      );
+    });
   }
 
-  addInfoBox(
-    `Financial Summary — ${periodLabel}`,
-    [
-      `Total spend: ${formatCedis(selectedStats.totalCost ?? 0)}`,
-      `Average cost per completed work: ${formatCedis(selectedStats.avgCost ?? 0)}`,
-      `Highest work cost: ${formatCedis(selectedStats.maxCost ?? 0)}`,
-      `Emergency: ${formatCedis(selectedStats.costByPriority?.emergency ?? 0)}`,
-      `Urgent: ${formatCedis(selectedStats.costByPriority?.urgent ?? 0)}`,
-      `Routine: ${formatCedis(selectedStats.costByPriority?.routine ?? 0)}`,
-    ],
-    [127, 29, 29],
+  // CATEGORIES
+  const categoryX = margin + columnWidth + columnGap;
+
+  drawRoundedCard(
+    categoryX,
+    breakdownY,
+    columnWidth,
+    breakdownHeight,
+    COLORS.white,
   );
 
-  addInfoBox(`Status Breakdown — ${periodLabel}`, statusEntries, [34, 197, 94]);
-  addInfoBox(
-    `Top Work Categories — ${periodLabel}`,
-    categoryEntries,
-    [76, 29, 149],
+  setFont(10, true, COLORS.navy);
+
+  doc.text("Top Work Categories", categoryX + 15, breakdownY + 22);
+
+  setFont(7.5, false, COLORS.muted);
+
+  doc.text(
+    "Highest number of submitted reports",
+    categoryX + 15,
+    breakdownY + 35,
   );
 
-  addInfoBox(
-    "Last 6 Months Submissions",
-    trend.map((item) => `• ${item.label}: ${item.value}`),
-    [15, 23, 42],
+  if (categoryEntries.length === 0) {
+    setFont(8, false, COLORS.lightText);
+
+    doc.text("No category data available.", categoryX + 15, breakdownY + 65);
+  } else {
+    const maxCategory = Math.max(
+      ...categoryEntries.map(([, count]) => Number(count)),
+      1,
+    );
+
+    categoryEntries.forEach(([category, count], index) => {
+      const rowY = breakdownY + 55 + index * 21;
+
+      const categoryText =
+        String(category).length > 24
+          ? `${String(category).slice(0, 22)}…`
+          : String(category);
+
+      setFont(7.5, false, COLORS.slate);
+
+      doc.text(categoryText, categoryX + 15, rowY);
+
+      setFont(7.5, true, COLORS.navy);
+
+      doc.text(String(count), categoryX + columnWidth - 15, rowY, {
+        align: "right",
+      });
+
+      drawProgressBar(
+        categoryX + 15,
+        rowY + 5,
+        columnWidth - 30,
+        (Number(count) / maxCategory) * 100,
+        COLORS.purple,
+      );
+    });
+  }
+
+  y = breakdownY + breakdownHeight + 25;
+
+  // ---------------------------------------------------------------------------
+  // SUBMISSION TREND
+  // ---------------------------------------------------------------------------
+
+  ensureSpace(210);
+
+  addSectionTitle(
+    "Submission Trend",
+    "Reports submitted over the last six months",
   );
 
-  const safeMonth = now.toLocaleString("default", {
-    month: "long",
+  const chartHeight = 145;
+
+  const chartX = margin;
+  const chartY = y;
+  const chartWidth = contentWidth;
+
+  drawRoundedCard(chartX, chartY, chartWidth, chartHeight, COLORS.white);
+
+  if (trend.length === 0) {
+    setFont(9, false, COLORS.lightText);
+
+    doc.text(
+      "No trend data available.",
+      chartX + chartWidth / 2,
+      chartY + chartHeight / 2,
+      {
+        align: "center",
+      },
+    );
+  } else {
+    const chartLeft = chartX + 38;
+
+    const chartRight = chartX + chartWidth - 18;
+
+    const chartTop = chartY + 22;
+
+    const chartBottom = chartY + chartHeight - 28;
+
+    const values = trend.map((item) => Number(item.value || 0));
+
+    const maxValue = Math.max(...values, 1);
+
+    // Grid lines
+    for (let i = 0; i <= 4; i++) {
+      const gridY = chartBottom - ((chartBottom - chartTop) / 4) * i;
+
+      doc.setDrawColor(...COLORS.border);
+
+      doc.setLineWidth(0.5);
+
+      doc.line(chartLeft, gridY, chartRight, gridY);
+
+      setFont(6.5, false, COLORS.lightText);
+
+      const gridValue = Math.round((maxValue / 4) * i);
+
+      doc.text(String(gridValue), chartLeft - 7, gridY + 2, {
+        align: "right",
+      });
+    }
+
+    const usableWidth = chartRight - chartLeft;
+
+    trend.forEach((item, index) => {
+      const x =
+        trend.length === 1
+          ? chartLeft + usableWidth / 2
+          : chartLeft + (usableWidth / (trend.length - 1)) * index;
+
+      const value = Number(item.value || 0);
+
+      const pointY =
+        chartBottom - (value / maxValue) * (chartBottom - chartTop);
+
+      const barWidth = Math.min(24, usableWidth / trend.length / 2);
+
+      doc.setFillColor(...COLORS.primaryLight);
+
+      doc.roundedRect(
+        x - barWidth / 2,
+        pointY,
+        barWidth,
+        chartBottom - pointY,
+        3,
+        3,
+        "F",
+      );
+
+      // Value
+      setFont(7, true, COLORS.primary);
+
+      doc.text(String(value), x, pointY - 7, {
+        align: "center",
+      });
+
+      // Label
+      setFont(6.5, false, COLORS.muted);
+
+      const label = String(item.label || "");
+
+      doc.text(
+        label.length > 12 ? `${label.slice(0, 11)}…` : label,
+        x,
+        chartBottom + 15,
+        {
+          align: "center",
+        },
+      );
+    });
+  }
+
+  y += chartHeight + 25;
+
+  // ---------------------------------------------------------------------------
+  // OVERALL COMPARISON
+  // ---------------------------------------------------------------------------
+
+  if (period !== "overall") {
+    ensureSpace(125);
+
+    addSectionTitle(
+      "Overall Performance",
+      "All-time comparison against the selected reporting period",
+    );
+
+    const comparisonY = y;
+
+    const comparisonHeight = 82;
+
+    drawRoundedCard(
+      margin,
+      comparisonY,
+      contentWidth,
+      comparisonHeight,
+      COLORS.background,
+    );
+
+    const comparisonItems = [
+      ["Total Reports", selectedStats.total ?? 0, overallStats.total ?? 0],
+      ["Completed", selectedStats.completed ?? 0, overallStats.completed ?? 0],
+      ["Active", selectedStats.active ?? 0, overallStats.active ?? 0],
+      ["Completion", `${completion}%`, `${overallCompletion}%`],
+    ];
+
+    const comparisonWidth = contentWidth / 4;
+
+    comparisonItems.forEach(([label, selected, overall], index) => {
+      const x = margin + index * comparisonWidth;
+
+      setFont(7.5, false, COLORS.muted);
+
+      doc.text(label, x + 15, comparisonY + 20);
+
+      setFont(13, true, COLORS.navy);
+
+      doc.text(String(selected), x + 15, comparisonY + 41);
+
+      setFont(7, false, COLORS.lightText);
+
+      doc.text(`Overall: ${overall}`, x + 15, comparisonY + 57);
+    });
+
+    y += comparisonHeight + 20;
+  }
+
+  // ---------------------------------------------------------------------------
+  // REPORT SUMMARY
+  // ---------------------------------------------------------------------------
+
+  ensureSpace(100);
+
+  addSectionTitle("Report Summary");
+
+  const summaryText =
+    `During ${periodLabel.toLowerCase()}, the Maintenance Department ` +
+    `recorded ${selectedStats.total ?? 0} maintenance report(s). ` +
+    `${selectedStats.completed ?? 0} report(s) were completed, representing ` +
+    `a completion rate of ${completion}%. ` +
+    `There are currently ${selectedStats.active ?? 0} active report(s) ` +
+    `and ${selectedStats.overdue ?? 0} overdue report(s). ` +
+    `Total recorded expenditure for the period was ` +
+    `${formatCedis(selectedStats.totalCost ?? 0)}.`;
+
+  drawRoundedCard(margin, y, contentWidth, 64, COLORS.primaryLight);
+
+  setFont(8.5, false, COLORS.slate);
+
+  const summaryLines = doc.splitTextToSize(summaryText, contentWidth - 30);
+
+  doc.text(summaryLines, margin + 15, y + 20);
+
+  y += 84;
+
+  // ---------------------------------------------------------------------------
+  // FINAL METADATA
+  // ---------------------------------------------------------------------------
+
+  setFont(7.5, false, COLORS.lightText);
+
+  doc.text(`Generated on ${now.toLocaleString()}`, margin, y);
+
+  doc.text(`Report period: ${periodLabel}`, pageWidth - margin, y, {
+    align: "right",
   });
-  doc.save(`Maintenance_Dashboard_${periodName}_${safeMonth}_${yearLabel}.pdf`);
+
+  // ---------------------------------------------------------------------------
+  // FOOTER
+  // ---------------------------------------------------------------------------
+
+  addFooter();
+
+  // ---------------------------------------------------------------------------
+  // SAVE
+  // ---------------------------------------------------------------------------
+
+  doc.save(
+    `Maintenance_Dashboard_${periodName}_${displayMonth.replace(
+      /\s+/g,
+      "_",
+    )}.pdf`,
+  );
 };
 
 /**
