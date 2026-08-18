@@ -1,6 +1,3 @@
-// src/notifications/notifyOnStatusChange.js
-import { getAuth } from "firebase/auth";
-
 export async function notifyOnStatusChange(
   oldStatus,
   newStatus,
@@ -10,7 +7,7 @@ export async function notifyOnStatusChange(
   const idToken = await getAuth().currentUser?.getIdToken();
   if (!idToken) return;
 
-  fetch("/api/send-notification", {
+  const res = await fetch("/api/send-notification", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -23,5 +20,8 @@ export async function notifyOnStatusChange(
       title: title || "Report update",
       body: body || `Report is now ${newStatus}.`,
     }),
-  }).catch((err) => console.error("Notification send failed:", err));
+  });
+
+  const json = await res.json();
+  console.log("[notify] response:", res.status, json);
 }
