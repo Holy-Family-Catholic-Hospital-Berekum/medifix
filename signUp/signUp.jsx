@@ -300,20 +300,22 @@ const CSS = `
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 30_000; // 30 seconds
 const STORAGE_KEY = "phix_login_attempts";
-const VALID_REG_TYPES = [
-  "staff",
-  "worker",
-  "estate",
-  "admin",
-  "manager",
-  "procurement",
-];
+
+// 'admin' is intentionally excluded — firestore.rules never allows a PIN
+// of type 'admin' to be created (see registrationIDs.create), so no valid
+// admin PIN can ever exist to satisfy this list. Admin accounts must be
+// provisioned out-of-band (Firebase console / Admin SDK). Kept out here
+// too so this list stays in sync with what the rules will actually accept.
+const VALID_REG_TYPES = ["staff", "worker", "estate", "manager", "procurement"];
 
 // A 6-digit PIN only has 1,000,000 possible values — far fewer than the
 // old nanoid — so this expiry window (not just uniqueness) is what keeps
 // a leaked or guessed PIN from being claimable indefinitely. Must match
 // what's advertised to the generating admin/manager in GenIDModal
-// (Dashboard.jsx: "Expires in 48 hours if not used to register.").
+// (Dashboard.jsx: "Expires in 48 hours if not used to register.") AND
+// firestore.rules' own 48h check on the registrationIDs update rule —
+// the rules enforce this server-side now too, so this client-side check
+// is a fast-fail UX nicety, not the actual security boundary.
 const REG_ID_EXPIRY_MS = 48 * 60 * 60 * 1000; // 48 hours
 
 export default function SignUp() {
@@ -584,6 +586,12 @@ export default function SignUp() {
           role: regType,
           deactivated: false,
           createdAt: serverTimestamp(),
+          // Required by firestore.rules' users/{userId} create rule: it
+          // looks up registrationIDs/{registrationId} and checks used ==
+          // true and type == this document's role, proving this profile
+          // was actually created off the back of a legitimately claimed
+          // PIN of the matching type — not just any authenticated write.
+          registrationId: claimedRegId,
         });
         alert("Account created successfully!");
         resetForm();
