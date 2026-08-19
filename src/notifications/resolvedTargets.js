@@ -17,48 +17,48 @@ export const TRANSITIONS = {
   },
   "*->pending": {
     targets: [{ audience: "role", role: "admin" }],
-    title: "Report Pending",
-    body: "A report is awaiting cost review.",
+    title: "Materials Confirmation Request",
+    body: "A request is awaiting your approval.",
   },
   "pending->confirmed": {
     targets: [{ audience: "role", role: "procurement" }],
-    title: "Cost Confirmed",
-    body: "Ready for procurement.",
+    title: "New Materials Request",
+    body: "Estate manager requested some materials.",
   },
   "pending->costDenied": {
     targets: [{ audience: "role", role: "estate" }],
-    title: "Cost Denied",
-    body: "The submitted cost was rejected.",
+    title: "Request Denied",
+    body: "The submitted materials request was rejected.",
   },
   "confirmed->procured": {
     targets: [{ audience: "role", role: "estate" }],
     title: "Materials Procured",
-    body: "Ready to assign a worker.",
+    body: "Ready to assign a Technician.",
   },
   "*->assigned": {
     targets: [{ audience: "assignedWorker" }],
     title: "New Assignment",
-    body: "You've been assigned a report.",
+    body: "You've been assigned a job.",
   },
   "assigned->accepted": {
     targets: [{ audience: "role", role: "estate" }],
     title: "Assignment Accepted",
-    body: "The worker accepted the job.",
+    body: "The technician accepted the job.",
   },
   "assigned->rejected": {
     targets: [{ audience: "role", role: "estate" }],
     title: "Assignment Rejected",
-    body: "The worker declined the job.",
+    body: "The technician declined the job.",
   },
   "accepted->completed": {
     targets: [{ audience: "reporter" }],
-    title: "Report Completed",
-    body: "Your report has been resolved.",
+    title: "Job Completed",
+    body: "Awaiting your feedback.",
   },
   "reopened->completed": {
     targets: [{ audience: "reporter" }],
-    title: "Report Completed",
-    body: "Your report has been resolved.",
+    title: "Job Completed",
+    body: "Awaiting your feedback.",
   },
   "completed->closed": {
     targets: [

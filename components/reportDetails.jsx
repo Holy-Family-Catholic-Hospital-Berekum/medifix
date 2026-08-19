@@ -1133,7 +1133,6 @@ export default function ReportDetailsContainer({
             Technician:
           </h2>
           <div className="flex flex-col gap-1">
-          
             <PhoneCallButton
               phoneNumber={assignedWorker?.phoneNumber}
               label={assignedWorker?.name}
@@ -1294,18 +1293,18 @@ export default function ReportDetailsContainer({
           />
           <div className="flex gap-2">
             <button
-              onClick={handleApprove}
-              disabled={loading}
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-            >
-              {loading ? "Processing..." : "Approve"}
-            </button>
-            <button
               onClick={handleDeny}
               disabled={loading}
               className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
             >
               {loading ? "Processing..." : "Deny"}
+            </button>
+            <button
+              onClick={handleApprove}
+              disabled={loading}
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+            >
+              {loading ? "Processing..." : "Approve"}
             </button>
           </div>
         </div>
@@ -1380,18 +1379,18 @@ export default function ReportDetailsContainer({
           />
           <div className="flex gap-2">
             <button
-              onClick={handleConfirmCost}
-              disabled={loading}
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
-            >
-              {loading ? "Processing..." : "Confirm Materials"}
-            </button>
-            <button
               onClick={handleDenyCost}
               disabled={loading}
               className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-1"
             >
-              {loading ? "Processing..." : "Deny Materials"}
+              {loading ? "Processing..." : "Deny"}
+            </button>
+            <button
+              onClick={handleConfirmCost}
+              disabled={loading}
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
+            >
+              {loading ? "Processing..." : "Confirm"}
             </button>
           </div>
         </div>
@@ -1571,18 +1570,18 @@ export default function ReportDetailsContainer({
           )}
           <div className="flex gap-2">
             <button
-              onClick={handleAcceptJob}
-              disabled={loading}
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
-            >
-              {loading ? "Processing..." : "Accept Job"}
-            </button>
-            <button
               onClick={handleRejectJob}
               disabled={loading}
               className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-1"
             >
               {loading ? "Processing..." : "Reject Job"}
+            </button>
+            <button
+              onClick={handleAcceptJob}
+              disabled={loading}
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
+            >
+              {loading ? "Processing..." : "Accept Job"}
             </button>
           </div>
         </div>
