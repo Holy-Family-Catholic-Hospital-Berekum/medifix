@@ -24,6 +24,20 @@ const MAX_TARGETS = 100; // OneSignal external_id cap per call — chunked below
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
+// Custom notification sound, uploaded via Median App Studio (Native Plugins
+// > OneSignal). Median converts the uploaded file to two platform-specific
+// resources bundled into the compiled app — a rebuild + reinstall is
+// required any time this changes for it to actually exist on-device:
+//   - iOS:     custom_sound_1.caf  — referenced directly by filename below.
+//   - Android: custom_sound_1.mp3  — Android can't reference a sound file
+//              directly in the push payload; it's tied to a Notification
+//              Channel instead. ANDROID_CHANNEL_ID below points at the
+//              channel (OneSignal dashboard > Settings > Push & In-App >
+//              Android Notification Channels) that has this sound
+//              configured. Changing the sound there instead of here.
+const IOS_SOUND = "custom_sound_1.caf";
+const ANDROID_CHANNEL_ID = "9d88ffe6-598b-4568-acd5-016eb7e24661";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -184,6 +198,11 @@ async function sendViaOneSignal({ externalIds, title, body, data }) {
     target_channel: "push",
     headings: { en: title },
     contents: { en: body },
+    // iOS: reference the bundled sound file directly, extension required.
+    ios_sound: IOS_SOUND,
+    // Android: sound is set on the Notification Channel itself, so the
+    // payload just points at that channel rather than a filename.
+    android_channel_id: ANDROID_CHANNEL_ID,
     ...(data && typeof data === "object"
       ? { data: stringifyDataValues(data) }
       : {}),
