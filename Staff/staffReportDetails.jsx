@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 import { formatDate, canUserSendFeedback, createAlert } from "../src/utils";
-import PhoneCallButton from "../components/PhoneCallButton";
+import PhoneCallButton from "../components/phoneCallButton";
 
 function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
   const [hovered, setHovered] = useState(0);
@@ -336,11 +336,6 @@ export default function StaffReportDetails({
               Technician:
             </h2>
             <div className="flex flex-col gap-1">
-              {assignedWorker?.name && (
-                <p className="text-blue-100 md:text-lg">
-                  {assignedWorker.name}
-                </p>
-              )}
               {assignedWorker?.phoneNumber ? (
                 <PhoneCallButton
                   phoneNumber={assignedWorker.phoneNumber}
@@ -358,12 +353,6 @@ export default function StaffReportDetails({
             </div>
           </div>
         )}
-
-        {/* location */}
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl whitespace-nowrap">Location:</h2>
-          <p className="text-blue-100 md:text-lg">{report.location}</p>
-        </div>
 
         {/* before / after images */}
         {(reportImagesData?.image || reportImagesData?.completionImage) && (
