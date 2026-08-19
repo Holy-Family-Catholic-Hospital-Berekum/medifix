@@ -15,6 +15,7 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { notifyOnStatusChange } from "./notifications/notifyOnStatusChange";
 
 export function isMedianApp() {
   return typeof window !== "undefined" && !!window.median;
@@ -47,24 +48,48 @@ export async function markOverdueReports(user) {
 
     if (snapshot.empty) return;
 
-    const overdueReports = snapshot.docs.filter((docSnap) => {
-      const data = docSnap.data();
-      if (!data.dateDue) return false;
-      const due = data.dateDue?.toDate
-        ? data.dateDue.toDate()
-        : new Date(data.dateDue);
-      return due < now;
-    });
+    // Keep both the doc snapshot and its data around — the data is needed
+    // afterward to notify (reporterId/assignedTo/status), not just to
+    // decide which docs are overdue.
+    const overdueReports = snapshot.docs
+      .map((docSnap) => ({ docSnap, data: docSnap.data() }))
+      .filter(({ data }) => {
+        if (!data.dateDue) return false;
+        const due = data.dateDue?.toDate
+          ? data.dateDue.toDate()
+          : new Date(data.dateDue);
+        return due < now;
+      });
 
     if (overdueReports.length === 0) return;
 
     const batch = writeBatch(db);
-    overdueReports.forEach((docSnap) => {
+    overdueReports.forEach(({ docSnap }) => {
       batch.update(doc(db, "reports", docSnap.id), { overdue: true });
     });
     await batch.commit();
 
     console.log(`Marked ${overdueReports.length} report(s) as overdue.`);
+
+    // Notify the estate manager and the assigned worker (if any) for each
+    // report that JUST became overdue. This only fires once per report:
+    // the query above is scoped to overdue == false, so a report that's
+    // already marked overdue won't be re-fetched (and re-notified) on a
+    // later page load. `newStatus: "overdue"` is a synthetic value used
+    // purely to key into the "*->overdue" rule in resolvedTargets.js — it
+    // is never written back to the report's real `status` field.
+    overdueReports.forEach(({ docSnap, data }) => {
+      notifyOnStatusChange(data.status, "overdue", {
+        id: docSnap.id,
+        reporterId: data.reporterId,
+        assignedTo: data.assignedTo,
+      }).catch((err) =>
+        console.error(
+          `notifyOnStatusChange failed for overdue report ${docSnap.id}:`,
+          err,
+        ),
+      );
+    });
   } catch (err) {
     console.error("markOverdueReports failed:", err);
   }

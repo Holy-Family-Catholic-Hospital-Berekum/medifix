@@ -76,6 +76,14 @@ export const TRANSITIONS = {
     title: "Report Reopened",
     body: "This report has been reopened.",
   },
+  "*->overdue": {
+    targets: [
+      { audience: "role", role: "estate" },
+      { audience: "assignedWorker" },
+    ],
+    title: "Report Overdue",
+    body: "This report has passed its due date.",
+  },
 };
 
 export function resolveTransition(oldStatus, newStatus) {
