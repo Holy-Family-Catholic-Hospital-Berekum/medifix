@@ -1,27 +1,84 @@
+// src/notifications/resolvedTargets.js
 export const TRANSITIONS = {
-  "*->incoming": [{ audience: "role", role: "admin" }],
-  "incoming->approved": [{ audience: "role", role: "estate" }],
-  "incoming->denied": [{ audience: "reporter" }],
-  "*->pending": [{ audience: "role", role: "admin" }],
-  "pending->confirmed": [{ audience: "role", role: "procurement" }],
-  "pending->costDenied": [{ audience: "role", role: "estate" }],
-  "confirmed->procured": [{ audience: "role", role: "estate" }],
-  "*->assigned": [{ audience: "assignedWorker" }],
-  "assigned->accepted": [{ audience: "role", role: "estate" }],
-  "assigned->rejected": [{ audience: "role", role: "estate" }],
-  "accepted->completed": [{ audience: "reporter" }],
-  "reopened->completed": [{ audience: "reporter" }],
-  "completed->closed": [
-    { audience: "assignedWorker" },
-    { audience: "role", role: "estate" },
-  ],
-  "completed->reopened": [
-    { audience: "role", role: "estate" },
-    { audience: "assignedWorker" },
-  ],
+  "*->incoming": {
+    targets: [{ audience: "role", role: "admin" }],
+    title: "New Report",
+    body: "A new maintenance report was submitted.",
+  },
+  "incoming->approved": {
+    targets: [{ audience: "role", role: "estate" }],
+    title: "New Report",
+    body: "Approved by admin.",
+  },
+  "incoming->denied": {
+    targets: [{ audience: "reporter" }],
+    title: "Report Denied",
+    body: "Your report was not approved.",
+  },
+  "*->pending": {
+    targets: [{ audience: "role", role: "admin" }],
+    title: "Report Pending",
+    body: "A report is awaiting cost review.",
+  },
+  "pending->confirmed": {
+    targets: [{ audience: "role", role: "procurement" }],
+    title: "Cost Confirmed",
+    body: "Ready for procurement.",
+  },
+  "pending->costDenied": {
+    targets: [{ audience: "role", role: "estate" }],
+    title: "Cost Denied",
+    body: "The submitted cost was rejected.",
+  },
+  "confirmed->procured": {
+    targets: [{ audience: "role", role: "estate" }],
+    title: "Materials Procured",
+    body: "Ready to assign a worker.",
+  },
+  "*->assigned": {
+    targets: [{ audience: "assignedWorker" }],
+    title: "New Assignment",
+    body: "You've been assigned a report.",
+  },
+  "assigned->accepted": {
+    targets: [{ audience: "role", role: "estate" }],
+    title: "Assignment Accepted",
+    body: "The worker accepted the job.",
+  },
+  "assigned->rejected": {
+    targets: [{ audience: "role", role: "estate" }],
+    title: "Assignment Rejected",
+    body: "The worker declined the job.",
+  },
+  "accepted->completed": {
+    targets: [{ audience: "reporter" }],
+    title: "Report Completed",
+    body: "Your report has been resolved.",
+  },
+  "reopened->completed": {
+    targets: [{ audience: "reporter" }],
+    title: "Report Completed",
+    body: "Your report has been resolved.",
+  },
+  "completed->closed": {
+    targets: [
+      { audience: "assignedWorker" },
+      { audience: "role", role: "estate" },
+    ],
+    title: "Report Closed",
+    body: "This report is now closed.",
+  },
+  "completed->reopened": {
+    targets: [
+      { audience: "role", role: "estate" },
+      { audience: "assignedWorker" },
+    ],
+    title: "Report Reopened",
+    body: "This report has been reopened.",
+  },
 };
 
-export function resolveTargets(oldStatus, newStatus) {
+export function resolveTransition(oldStatus, newStatus) {
   return (
     TRANSITIONS[`${oldStatus}->${newStatus}`] ||
     TRANSITIONS[`*->${newStatus}`] ||

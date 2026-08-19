@@ -368,7 +368,7 @@ export default function ReportForm({ formPopup, onClose }) {
         }}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#F88534] to-orange-500 px-8 py-8 text-white">
+        <div className="bg-gradient-to-r from-[#F88534] to-orange-500 px-8 pt-20 pb-8 md:py-8 text-white">
           <h1 className="text-3xl font-bold">Maintenance Report</h1>
 
           <p className="mt-2 text-orange-100">

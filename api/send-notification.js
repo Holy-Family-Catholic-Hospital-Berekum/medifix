@@ -2,7 +2,7 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { resolveTargets } from "../src/notifications/resolvedTargets.js";
+import { resolveTransition } from "../src/notifications/resolvedTargets.js";
 
 if (!getApps().length) {
   initializeApp({
@@ -54,9 +54,16 @@ export default async function handler(req, res) {
   if (typeof newStatus !== "string" || !newStatus) {
     return res.status(400).json({ error: "newStatus is required" });
   }
-  if (!title || typeof title !== "string" || title.length > MAX_TITLE_LENGTH) {
+  // title/body are now optional — if the caller doesn't pass them, we fall
+  // back to the copy defined per-transition below. Still validate length
+  // when a caller *does* pass an override, so a bad override can't slip
+  // through to OneSignal.
+  if (
+    title != null &&
+    (typeof title !== "string" || title.length > MAX_TITLE_LENGTH)
+  ) {
     return res.status(400).json({
-      error: `title is required and must be under ${MAX_TITLE_LENGTH} characters`,
+      error: `title must be a string under ${MAX_TITLE_LENGTH} characters`,
     });
   }
   if (
@@ -73,8 +80,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const targets = resolveTargets(oldStatus ?? null, newStatus);
-    if (!targets) {
+    const transition = resolveTransition(oldStatus ?? null, newStatus);
+    if (!transition) {
       return res.status(200).json({
         provider: "onesignal",
         sent: 0,
@@ -82,10 +89,13 @@ export default async function handler(req, res) {
       });
     }
 
+    const finalTitle = title || transition.title;
+    const finalBody = body || transition.body || "";
+
     const roles = new Set();
     const customIds = new Set(); // legacy "ID" field, not the Firestore doc id
 
-    for (const t of targets) {
+    for (const t of transition.targets) {
       if (t.audience === "role") roles.add(t.role);
       if (t.audience === "reporter" && report.reporterId)
         customIds.add(String(report.reporterId));
@@ -140,8 +150,8 @@ export default async function handler(req, res) {
     for (const chunk of idChunks) {
       const result = await sendViaOneSignal({
         externalIds: chunk,
-        title,
-        body: body || "",
+        title: finalTitle,
+        body: finalBody,
         data: { reportId: report.id, status: newStatus },
       });
       totalRecipients += result.recipients;

@@ -38,10 +38,6 @@ export default function Footer({ page }) {
           </h1>
 
           <p className="mt-2 text-blue-200 text-sm">Maintenance made simple.</p>
-
-          <p className="mt-1 text-blue-100/60 text-xs italic">
-            “We will phix it.”
-          </p>
         </div>
 
         {/* Divider */}

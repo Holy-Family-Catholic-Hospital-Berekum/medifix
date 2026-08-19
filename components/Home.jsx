@@ -1122,65 +1122,65 @@ export const THEMES = {
 
   procurement: {
     // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100",
+    pageBg: "bg-gradient-to-br from-rose-50 via-red-50 to-orange-50",
 
     sidebarBg:
-      "bg-gradient-to-br from-violet-200/55 via-purple-100/45 to-indigo-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-violet-200/35",
+      "bg-gradient-to-br from-rose-200/55 via-red-100/45 to-orange-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-rose-200/35",
 
     sidebarBorder:
-      "border border-white/30 shadow-[0_8px_32px_rgba(124,58,237,0.18)]",
+      "border border-white/30 shadow-[0_8px_32px_rgba(225,29,72,0.18)]",
 
     contentBg: "bg-transparent",
 
     // ─── Navbar ──────────────────────────────────────────
     navBg:
-      "bg-gradient-to-r from-violet-500/90 via-purple-500/85 to-indigo-400/80 backdrop-blur-2xl",
+      "bg-gradient-to-r from-rose-600/90 via-red-500/85 to-rose-400/80 backdrop-blur-2xl",
 
     navBorder:
-      "border border-white/20 shadow-[0_8px_32px_rgba(124,58,237,0.18)]",
+      "border border-white/20 shadow-[0_8px_32px_rgba(225,29,72,0.18)]",
 
-    logoFrom: "from-violet-950",
-    logoTo: "to-indigo-600",
-    logoSub: "text-violet-950/60",
+    logoFrom: "from-rose-950",
+    logoTo: "to-amber-500",
+    logoSub: "text-rose-950/60",
 
-    liveColor: "bg-indigo-300",
-    liveShadow: "shadow-[0_0_10px_2px_rgba(165,180,252,0.7)]",
-    liveText: "text-violet-950",
+    liveColor: "bg-amber-300",
+    liveShadow: "shadow-[0_0_10px_2px_rgba(252,211,77,0.7)]",
+    liveText: "text-rose-950",
 
     linkActive: "text-white",
-    linkHover: "hover:text-indigo-100",
-    linkBar: "bg-indigo-200",
+    linkHover: "hover:text-rose-100",
+    linkBar: "bg-amber-300",
 
     logoutBorder: "border-white/20",
-    logoutText: "text-violet-950",
+    logoutText: "text-rose-950",
 
-    logoutHoverBorder: "hover:border-red-400/50",
-    logoutHoverText: "hover:text-red-500",
-    logoutHoverBg: "hover:bg-red-500/5",
+    logoutHoverBorder: "hover:border-red-800/50",
+    logoutHoverText: "hover:text-red-800",
+    logoutHoverBg: "hover:bg-red-800/5",
 
-    accent: "shadow-[0_1px_0_0_rgba(199,210,254,0.25)]",
-    glowLine: "via-violet-300/40",
+    accent: "shadow-[0_1px_0_0_rgba(252,211,77,0.25)]",
+    glowLine: "via-rose-300/40",
 
     // ─── Sidebar nav ─────────────────────────────────────
     sideNavActive:
-      "text-violet-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
+      "text-rose-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
 
     sideNavIdle:
-      "text-violet-900/80 hover:text-violet-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
+      "text-rose-900/80 hover:text-rose-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
 
-    sideNavDotActive: "bg-indigo-300 shadow-[0_0_8px_rgba(165,180,252,0.95)]",
-    sideNavDotIdle: "bg-violet-500/40 group-hover:bg-violet-500",
-    sideNavLabel: "text-violet-950/50",
+    sideNavDotActive: "bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.95)]",
+    sideNavDotIdle: "bg-rose-500/40 group-hover:bg-rose-500",
+    sideNavLabel: "text-rose-950/50",
 
     // ─── Section headers ─────────────────────────────────
-    sectionAccentBar: "from-violet-500 to-indigo-400",
-    sectionLabel: "text-violet-700/70",
-    sectionTitle: "text-violet-950",
+    sectionAccentBar: "from-rose-600 to-amber-400",
+    sectionLabel: "text-rose-700/70",
+    sectionTitle: "text-rose-950",
     sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
     sectionCountBorder: "border-white/30",
-    sectionCountDot: "bg-indigo-300 shadow-[0_0_6px_rgba(165,180,252,0.8)]",
-    sectionCountText: "text-violet-950",
-    sectionDivider: "border-violet-300/40",
+    sectionCountDot: "bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.8)]",
+    sectionCountText: "text-rose-950",
+    sectionDivider: "border-rose-300/40",
 
     // ─── Cards ───────────────────────────────────────────
     cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
@@ -1191,11 +1191,11 @@ export const THEMES = {
     cardNormalAccent: "from-emerald-500/15 to-transparent",
     cardNormalPriority: "text-emerald-700",
 
-    cardEmergencyBorder: "border-red-400/60",
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
-    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
-    cardEmergencyAccent: "from-red-500/20 to-transparent",
-    cardEmergencyPriority: "text-red-500",
+    cardEmergencyBorder: "border-red-500/60",
+    cardEmergencyGlow: "shadow-[0_0_20px_rgba(220,38,38,0.24)]",
+    cardEmergencyDot: "bg-red-500 shadow-[0_0_8px_rgba(220,38,38,0.85)]",
+    cardEmergencyAccent: "from-red-600/20 to-transparent",
+    cardEmergencyPriority: "text-red-600",
 
     cardUrgentBorder: "border-yellow-400/60",
     cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
@@ -1203,60 +1203,60 @@ export const THEMES = {
     cardUrgentAccent: "from-yellow-400/20 to-transparent",
     cardUrgentPriority: "text-yellow-600",
 
-    cardDateLabel: "text-violet-900/60",
-    cardDateValue: "text-violet-950",
+    cardDateLabel: "text-rose-900/60",
+    cardDateValue: "text-rose-950",
     cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
     cardStatusBorder: "border-white/20",
-    cardStatusText: "text-violet-900",
+    cardStatusText: "text-rose-900",
 
     // ─── Feedback badge ──────────────────────────────────
-    feedbackBadge: "bg-indigo-300 text-violet-950 shadow-lg",
+    feedbackBadge: "bg-amber-300 text-rose-950 shadow-lg",
 
     // ─── Mobile toggle ───────────────────────────────────
     mobileToggleBg: "bg-white/25 backdrop-blur-xl",
     mobileToggleBorder: "border-white/30",
-    mobileToggleText: "text-violet-950",
+    mobileToggleText: "text-rose-950",
     mobileToggleHover: "hover:bg-white/40",
 
     mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
     mobileBottomBorder: "border-white/30",
-    mobileBottomDot: "bg-indigo-300",
-    mobileBottomText: "text-violet-950",
+    mobileBottomDot: "bg-amber-300",
+    mobileBottomText: "text-rose-950",
 
     // ─── Bottom sheet ────────────────────────────────────
     sheetBg:
-      "bg-gradient-to-br from-violet-100/95 to-indigo-50/95 backdrop-blur-2xl",
+      "bg-gradient-to-br from-rose-100/95 to-orange-50/95 backdrop-blur-2xl",
     sheetBorder: "border-white/30",
-    sheetTopBar: "from-violet-400 via-indigo-400",
-    titleColor: "text-violet-950",
-    emptyText: "text-violet-700/50",
+    sheetTopBar: "from-rose-500 via-amber-300",
+    titleColor: "text-rose-950",
+    emptyText: "text-rose-700/50",
 
     // ─── Slide panel ─────────────────────────────────────
     slideBg:
-      "bg-gradient-to-br from-violet-100/95 to-indigo-50/95 backdrop-blur-2xl",
+      "bg-gradient-to-br from-rose-100/95 to-orange-50/95 backdrop-blur-2xl",
     slideBorder: "border-white/30",
-    slideTopBar: "from-violet-400 via-indigo-400",
+    slideTopBar: "from-rose-500 via-amber-300",
 
     linkActiveBg: "bg-white/35 backdrop-blur-xl",
     linkActiveBorder: "border-white/40",
-    linkActiveText: "text-violet-950",
+    linkActiveText: "text-rose-950",
     linkIdleBorder: "border-white/10",
-    linkIdleText: "text-violet-900/50",
-    linkHoverText: "hover:text-violet-950",
+    linkIdleText: "text-rose-900/50",
+    linkHoverText: "hover:text-rose-950",
     linkHoverBorder: "hover:border-white/30",
     linkHoverBg: "hover:bg-white/20",
 
     // ─── Spinner ─────────────────────────────────────────
-    spinnerOuter: "border-t-violet-500",
-    spinnerInner: "border-t-indigo-400/70",
-    dotColor: "bg-indigo-300",
-    textColor: "text-violet-700/70",
+    spinnerOuter: "border-t-rose-600",
+    spinnerInner: "border-t-amber-400/70",
+    dotColor: "bg-amber-300",
+    textColor: "text-rose-700/70",
 
     // ─── Report details ──────────────────────────────────
-    detailsBg: "bg-gradient-to-br from-violet-100 to-indigo-50",
-    detailsCloseText: "text-violet-950",
-    detailsLabelColor: "text-violet-900",
-    detailsValueColor: "text-violet-700",
+    detailsBg: "bg-gradient-to-br from-rose-100 to-orange-50",
+    detailsCloseText: "text-rose-950",
+    detailsLabelColor: "text-rose-900",
+    detailsValueColor: "text-rose-700",
   },
 };
 
