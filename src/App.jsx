@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 
 import SignUp from "../signUp/signUp";
 import ProtectedRoute from "./protectedRoute";
@@ -32,12 +32,38 @@ import WorkerClosed from "../Worker/workerClosed";
 import ProcurementHome from "../Procurement/procurementHome";
 import ProcurementCompleted from "../Procurement/procurementCompleted";
 
-const user = JSON.parse(localStorage.getItem("user"))?.data;
+// Maps a stored user's role to their home route. Kept in sync with the
+// `routes` map in SignUp.jsx's handleLogin and with the route paths below.
+const ROLE_HOME = {
+  staff: "/Home",
+  worker: "/wh",
+  admin: "/ah",
+  estate: "/eh",
+  manager: "/manager",
+  procurement: "/ph",
+};
+
+// Renders at "/". If a cached session exists in localStorage, redirect
+// straight to that role's home page instead of showing the login form —
+// this is what keeps users logged in across app restarts. This is just a
+// fast, optimistic check based on the local cache; ProtectedRoute is the
+// actual source of truth and will bounce the user back here if Firebase
+// Auth or Firestore (e.g. a deactivated account) says otherwise.
+function RootRoute() {
+  const stored = JSON.parse(localStorage.getItem("user") || "null");
+  const role = stored?.data?.role;
+
+  if (role && ROLE_HOME[role]) {
+    return <Navigate to={ROLE_HOME[role]} replace />;
+  }
+
+  return <SignUp />;
+}
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<SignUp />} />
+      <Route path="/" element={<RootRoute />} />
 
       <Route
         path="/ah"
