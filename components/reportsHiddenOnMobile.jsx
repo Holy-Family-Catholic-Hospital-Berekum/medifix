@@ -29,7 +29,7 @@ export default function ReportsHiddenOnMobile({
   if (!showReportsHiddenOnMobile && !closing) return null;
 
   return (
-    <div className="z-[70] md:hidden fixed inset-0 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+    <div className="z-[30] md:hidden fixed inset-0 flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div
         className={`${sheetBg} border-t border-l border-r ${sheetBorder} w-full h-[90%] overflow-y-auto pt-8 flex flex-col items-center gap-4 rounded-t-3xl relative ${
           closing ? "slide-down" : "slide-up"

@@ -425,10 +425,10 @@ export default function SlideInRight({
         <div className="px-6 py-5 border-t border-white/[0.07]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-white/20">
+              <p className="text-[10px] uppercase tracking-widest text-gray-500">
                 Signed in as
               </p>
-              <p className="text-xs text-white/50 mt-1 capitalize">
+              <p className="text-xs text-gray-500 mt-1 capitalize">
                 {user?.role || "User"}
               </p>
             </div>

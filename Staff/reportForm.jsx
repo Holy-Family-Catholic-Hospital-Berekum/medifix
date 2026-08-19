@@ -544,11 +544,11 @@ export default function ReportForm({ formPopup, onClose }) {
           </div>
 
           {/* Buttons */}
-          <div className="mt-10 flex flex-col-reverse md:flex-row gap-4">
+          <div className="mt-10 mb-32 md:mb-10 flex flex-col-reverse md:flex-row gap-8">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-300 py-3 font-semibold text-gray-700 hover:bg-gray-100 transition"
+              className="flex-1 cursor-pointer rounded-xl border border-gray-300 py-3 font-semibold text-gray-700 hover:bg-gray-100 transition"
             >
               Cancel
             </button>
@@ -556,7 +556,7 @@ export default function ReportForm({ formPopup, onClose }) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 rounded-xl py-3 font-semibold text-lg text-white bg-gradient-to-r from-[#F88534] to-orange-600 hover:shadow-xl hover:scale-[1.02] transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 cursor-pointer rounded-xl py-3 font-semibold text-lg text-white bg-gradient-to-r from-[#F88534] to-orange-600 hover:shadow-xl hover:scale-[1.02] transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

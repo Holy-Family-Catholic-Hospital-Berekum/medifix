@@ -2209,7 +2209,7 @@ export default function Home({
       {/* Mobile bottom sheet toggle */}
       {!specificReportsPage && (
         <div
-          className={`fixed z-[100] bottom-0 cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-2xl px-8 py-2.5 md:hidden ${theme.mobileBottomBg} border border-b-0 ${theme.mobileBottomBorder} shadow-[0_-4px_24px_rgba(0,0,0,0.5)] flex items-center gap-2 hover:brightness-110 transition-all`}
+          className={`fixed z-[40] bottom-0 cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-2xl px-8 py-2.5 md:hidden ${theme.mobileBottomBg} border border-b-0 ${theme.mobileBottomBorder} shadow-[0_-4px_24px_rgba(0,0,0,0.5)] flex items-center gap-2 hover:brightness-110 transition-all`}
           onClick={() => SetShowReportsHiddenOnMobile((prev) => !prev)}
         >
           <span
