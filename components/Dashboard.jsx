@@ -1,15 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { nanoid } from "nanoid";
 import {
   collection,
   doc,
   updateDoc,
   deleteDoc,
   setDoc,
+  getDoc,
   getDocs,
   query,
   orderBy,
   limit,
+  serverTimestamp,
 } from "firebase/firestore";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db } from "../src/firebase";
@@ -52,6 +53,39 @@ const USERS_PAGE_SIZE = 20;
 
 const paginate = (arr, page, pageSize) =>
   arr.slice((page - 1) * pageSize, page * pageSize);
+
+// ─── registration PIN generation ───────────────────────────────────────────
+// Registration IDs used to be a nanoid() — long enough that a collision was
+// astronomically unlikely, so nothing ever checked for one. A 6-digit
+// numeric PIN only has 1,000,000 possible values, so two things change:
+//
+// 1. Uniqueness has to be actively checked before writing (see
+//    generateUniqueRegistrationId below), not just assumed.
+// 2. registrationIDs/{id} is publicly readable (`allow get: if true` in
+//    firestore.rules) because SignUp.jsx has to validate a PIN before the
+//    person has an account/auth token yet — a short PIN is guessable in a
+//    way a long one never practically was. `createdAt` (a real server
+//    timestamp, enforced by firestore.rules) gives SignUp.jsx something to
+//    check a 48-hour expiry against, so a guessed or leaked PIN stops being
+//    claimable well before someone could brute-force the ~1M keyspace.
+const REG_ID_LENGTH = 6;
+const REG_ID_MAX_GENERATION_ATTEMPTS = 10;
+
+async function generateUniqueRegistrationId() {
+  for (let attempt = 0; attempt < REG_ID_MAX_GENERATION_ATTEMPTS; attempt++) {
+    const candidate = Array.from({ length: REG_ID_LENGTH }, () =>
+      Math.floor(Math.random() * 10),
+    ).join("");
+    const snap = await getDoc(doc(db, "registrationIDs", candidate));
+    if (!snap.exists()) return candidate;
+  }
+  // Vanishingly unlikely at 1M possible codes and normal generation
+  // volume, but fail loudly rather than silently overwriting an existing
+  // active PIN if it ever does happen.
+  throw new Error(
+    "Could not generate a unique registration PIN — please try again.",
+  );
+}
 
 // ─── meta maps ───────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -793,15 +827,21 @@ function GenIDModal({ role, onClose }) {
     if (genLoading) return;
     setGenLoading(true);
     try {
-      const id = nanoid();
+      const id = await generateUniqueRegistrationId();
       await setDoc(doc(db, "registrationIDs", id), {
         type: genType,
         used: false,
+        // Anchors the 48-hour expiry SignUp.jsx checks at claim time.
+        // Must be a real server timestamp — firestore.rules rejects any
+        // create where this isn't exactly request.time.
+        createdAt: serverTimestamp(),
       });
       setGeneratedID(id);
     } catch (e) {
       console.error("Failed to generate ID:", e);
-      alert("Failed to generate registration ID. Please try again.");
+      alert(
+        e?.message || "Failed to generate registration ID. Please try again.",
+      );
     } finally {
       setGenLoading(false);
     }
@@ -811,7 +851,7 @@ function GenIDModal({ role, onClose }) {
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 flex flex-col gap-4">
         <h2 className="text-lg font-bold text-gray-800">
-          Generate Registration ID
+          Generate Registration PIN
         </h2>
         {!generatedID ? (
           <>
@@ -853,11 +893,11 @@ function GenIDModal({ role, onClose }) {
         ) : (
           <>
             <p className="text-sm text-gray-600">
-              Share this ID with the new{" "}
+              Share this PIN with the new{" "}
               <span className="font-semibold capitalize">{genType}</span>:
             </p>
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
-              <span className="flex-1 text-sm font-mono text-gray-800 break-all">
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-3">
+              <span className="flex-1 text-center text-2xl font-mono font-bold tracking-[0.3em] text-gray-800">
                 {generatedID}
               </span>
               <button
@@ -868,6 +908,9 @@ function GenIDModal({ role, onClose }) {
                 content_copy
               </button>
             </div>
+            <p className="text-xs text-gray-400 text-center -mt-2">
+              Expires in 48 hours if not used to register.
+            </p>
             <div className="flex gap-3 mt-2">
               <button
                 type="button"

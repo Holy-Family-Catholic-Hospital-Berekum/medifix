@@ -309,6 +309,13 @@ const VALID_REG_TYPES = [
   "procurement",
 ];
 
+// A 6-digit PIN only has 1,000,000 possible values — far fewer than the
+// old nanoid — so this expiry window (not just uniqueness) is what keeps
+// a leaked or guessed PIN from being claimable indefinitely. Must match
+// what's advertised to the generating admin/manager in GenIDModal
+// (Dashboard.jsx: "Expires in 48 hours if not used to register.").
+const REG_ID_EXPIRY_MS = 48 * 60 * 60 * 1000; // 48 hours
+
 export default function SignUp() {
   const [mode, setMode] = useState("login");
   const [step, setStep] = useState(0);
@@ -496,12 +503,17 @@ export default function SignUp() {
 
       // Atomically check-and-claim the registration ID inside a
       // transaction, so two submissions of the same ID arriving at nearly
-      // the same time can't both read "unused" and both succeed. The
-      // transaction body must be free of side effects other than reads/
-      // writes against Firestore — validation and the eventual role value
-      // are handled via the outer `regType` variable and thrown sentinel
-      // errors, since transaction functions in the modular SDK may be
-      // retried by the SDK on contention.
+      // the same time can't both read "unused" and both succeed. Also
+      // enforces the 48-hour expiry window against createdAt, which
+      // firestore.rules guarantees is a genuine server timestamp (rules
+      // require request.resource.data.createdAt == request.time on
+      // create) — so this check can't be defeated by a client writing a
+      // fabricated or backdated createdAt. The transaction body must be
+      // free of side effects other than reads/writes against Firestore —
+      // validation and the eventual role value are handled via the outer
+      // `regType` variable and thrown sentinel errors, since transaction
+      // functions in the modular SDK may be retried by the SDK on
+      // contention.
       let regType;
       try {
         await runTransaction(db, async (tx) => {
@@ -512,6 +524,15 @@ export default function SignUp() {
           const regData = regSnap.data();
           if (regData.used === true) {
             throw new Error("REG_ALREADY_USED");
+          }
+          const createdAtMs = regData.createdAt?.toMillis
+            ? regData.createdAt.toMillis()
+            : null;
+          if (
+            createdAtMs == null ||
+            Date.now() - createdAtMs > REG_ID_EXPIRY_MS
+          ) {
+            throw new Error("REG_EXPIRED");
           }
           const type = regData.type?.toLowerCase();
           if (!VALID_REG_TYPES.includes(type)) {
@@ -527,6 +548,10 @@ export default function SignUp() {
           );
         } else if (txError.message === "REG_ALREADY_USED") {
           alert("This registration ID has already been used.");
+        } else if (txError.message === "REG_EXPIRED") {
+          alert(
+            "This registration ID has expired. Please request a new one from the Admin or IT Manager.",
+          );
         } else if (txError.message === "REG_INVALID_TYPE") {
           alert("Invalid registration ID type. Contact the IT Manager.");
         } else {

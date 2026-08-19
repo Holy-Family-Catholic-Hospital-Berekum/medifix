@@ -83,17 +83,6 @@ function getLastActivityDate(report) {
   return latest ?? new Date(0);
 }
 
-// How long a denied report is kept around before it's considered expired.
-// There's no server-side TTL policy on this yet (that needs a Blaze/billing
-// plan, which isn't set up) — so this is enforced client-side only: the
-// countdown label below and the safety-net cleanup pass in the onSnapshot
-// listener are the entire mechanism. That means expiry only actually
-// happens when someone with access to a given denied report opens this
-// page after the window has passed. Revisit this once billing is enabled
-// and a Firestore TTL policy can be added on an `expiresAt` field for
-// guaranteed background deletion.
-const DENIED_RETENTION_DAYS = 7;
-
 const STATUS_MESSAGES = {
   incoming: "Your report has been sent, waiting for admin approval.",
   approved: "Admin has approved your report, waiting for estate review.",
@@ -130,25 +119,6 @@ function getStatusMessage(report) {
       : "Your work has been completed, waiting for your feedback.";
   }
   return STATUS_MESSAGES[report.status] || "";
-}
-
-// Days remaining before a denied report is auto-removed. Prefers the
-// server-set `expiresAt` field when present; falls back to counting from
-// `dateReportDenied`/`dateDenied` for older reports written before that
-// field existed.
-function getDaysUntilExpiry(report) {
-  const expiresAt = toDate(report?.expiresAt);
-  if (expiresAt) {
-    return Math.max(
-      0,
-      Math.ceil((expiresAt.getTime() - Date.now()) / 86400000),
-    );
-  }
-  const deniedAt =
-    toDate(report?.dateReportDenied) || toDate(report?.dateDenied);
-  if (!deniedAt) return null;
-  const expiry = deniedAt.getTime() + DENIED_RETENTION_DAYS * 86400000;
-  return Math.max(0, Math.ceil((expiry - Date.now()) / 86400000));
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -296,7 +266,6 @@ function ReportCard({
     user?.role === "staff" &&
     report?.reporterId === user?.ID &&
     report?.status === "denied";
-  const daysUntilExpiry = canDelete ? getDaysUntilExpiry(report) : null;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
@@ -533,19 +502,13 @@ function ReportCard({
           </div>
         )}
 
-        {/* Staff can dismiss a denied report themselves instead of it
-            sitting around forever. It's also auto-removed by a Firestore
-            TTL policy ~7 days after denial, so this button is really just
-            "don't want to wait." */}
+        {/* Staff can dismiss a denied report themselves. This is now the
+            ONLY way a denied report ever gets removed — there is no
+            auto-expiry, TTL policy, or background cleanup of any kind. It
+            stays visible indefinitely until the reporting staff member
+            deletes it manually. */}
         {canDelete && (
           <div className="border-t border-gray-100 pt-4 mt-4">
-            {daysUntilExpiry != null && (
-              <p className="text-xs text-gray-400 mb-2 text-center">
-                {daysUntilExpiry > 0
-                  ? `Auto-removed in ${daysUntilExpiry} day${daysUntilExpiry === 1 ? "" : "s"} if left untouched`
-                  : "Pending automatic removal"}
-              </p>
-            )}
             <button
               type="button"
               onClick={() => onDeleteReport?.(report)}
@@ -624,30 +587,6 @@ export default function Pending() {
           .sort((a, b) => getLastActivityDate(b) - getLastActivityDate(a));
         setReports(data);
         setLoading(false);
-
-        // Safety-net cleanup: if a denied report is well past its expiry
-        // window, quietly remove it client-side rather than waiting on the
-        // Firestore TTL policy (which can lag up to ~24h after expiry, and
-        // won't apply retroactively to reports written before the
-        // `expiresAt` field existed). This only fires for the reports this
-        // user can already see, so it's cheap and scoped.
-        //
-        // The attached photo (if any) lives in a separate reportImages/{id}
-        // doc, and its own delete rule reads the parent reports/{id} doc —
-        // so it has to be removed before the report doc itself, or the
-        // lookup inside that rule has nothing left to read.
-        data
-          .filter((r) => r.status === "denied")
-          .forEach((r) => {
-            const days = getDaysUntilExpiry(r);
-            if (days === 0) {
-              deleteDoc(doc(db, "reportImages", r.id))
-                .catch(() => {})
-                .finally(() => {
-                  deleteDoc(doc(db, "reports", r.id)).catch(console.error);
-                });
-            }
-          });
 
         const ids = [
           ...new Set(
@@ -746,10 +685,8 @@ export default function Pending() {
     }
   };
 
-  // Staff dismissing a denied report. Denied reports are also removed
-  // automatically ~7 days after denial via a Firestore TTL policy on the
-  // `expiresAt` field, so this is just an early/manual version of the same
-  // outcome, not a different code path from the reporter's point of view.
+  // Staff dismissing a denied report. This is now the ONLY way a denied
+  // report is ever removed — there is no automatic expiry of any kind.
   const handleDeleteReport = async (report) => {
     if (
       !report?.id ||
