@@ -29,7 +29,6 @@ import {
   canUserSubmitCost,
   canUserMarkProcured,
   getTotalCost,
-  createAlert,
   canUserAcceptOrRejectJob, // add this
 } from "../src/utils";
 
@@ -62,6 +61,40 @@ const compressImageToBase64 = (file) => {
     };
   });
 };
+
+// Read-only star display for the technician rating, so any role viewing
+// this panel (not just the staff member who submitted it) can see it.
+function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div
+      className="flex gap-1"
+      role="radiogroup"
+      aria-label="Technician rating"
+    >
+      {[1, 2, 3, 4, 5].map((star) => {
+        const filled = readOnly ? star <= value : star <= (hovered || value);
+        return (
+          <button
+            key={star}
+            type="button"
+            role={readOnly ? undefined : "radio"}
+            aria-checked={!readOnly && star === value}
+            disabled={readOnly}
+            onClick={() => onChange?.(star)}
+            onMouseEnter={() => setHovered(star)}
+            onMouseLeave={() => setHovered(0)}
+            className={`${size} leading-none p-0 bg-transparent border-0 select-none transition-transform ${
+              readOnly ? "cursor-default" : "cursor-pointer hover:scale-110"
+            } ${filled ? "text-yellow-400" : "text-gray-300"}`}
+          >
+            ★
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function MaterialsTable({ materials, onChange, readOnly = false }) {
   const addRow = () => onChange([...materials, { ...EMPTY_MATERIAL }]);
@@ -399,14 +432,9 @@ export default function ReportDetailsContainer({
     if (!canUserApprove(user, report)) return;
     setLoading(true);
     try {
-      const noteContent = formData.note || "Report approved";
       await updateDoc(doc(db, "reports", report.id), {
         status: "approved",
         dateApproved: serverTimestamp(),
-
-        alerts: arrayUnion(
-          createAlert(noteContent, "admin", "estate", report.status),
-        ),
       });
 
       alert("Report approved!");
@@ -423,14 +451,10 @@ export default function ReportDetailsContainer({
 
   const handleDeny = async () => {
     if (!canUserApprove(user, report)) return;
-    const reason = formData.note || "Report denied";
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
         status: "denied",
-        alerts: arrayUnion(
-          createAlert(reason, "admin", report.reporterId, report.status),
-        ),
       });
 
       alert("Report denied!");
@@ -475,14 +499,9 @@ export default function ReportDetailsContainer({
     if (!canUserConfirmCost(user, report)) return;
     setLoading(true);
     try {
-      const noteContent = formData.note || "Materials confirmed by admin";
       await updateDoc(doc(db, "reports", report.id), {
         status: "confirmed",
         dateConfirmed: serverTimestamp(),
-        alerts: arrayUnion({
-          ...createAlert(noteContent, "admin", "estate", report.status),
-          subtype: "confirmed",
-        }),
       });
       alert("Materials confirmed!");
       setFormData({ ...formData, note: "" });
@@ -498,16 +517,11 @@ export default function ReportDetailsContainer({
 
   const handleDenyCost = async () => {
     if (!canUserConfirmCost(user, report)) return;
-    const reason = formData.note || "Materials denied by admin";
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
         status: "costDenied",
         dateCostDenied: serverTimestamp(),
-        alerts: arrayUnion({
-          ...createAlert(reason, "admin", "estate", report.status),
-          subtype: "denied",
-        }),
       });
       alert("Materials denied!");
       setFormData({ ...formData, note: "" });
@@ -534,14 +548,6 @@ export default function ReportDetailsContainer({
         status: "procured",
         cost: parsed,
         dateProcured: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(
-            `Materials procured at ₵${parsed.toLocaleString()}`,
-            "procurement",
-            "estate",
-            report.status,
-          ),
-        ),
       });
       alert("Materials marked as procured!");
       setProcurementCost("");
@@ -567,14 +573,6 @@ export default function ReportDetailsContainer({
         assignedTo: formData.selectedWorker,
         status: "assigned",
         dateAssigned: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(
-            `Worker assigned: ${formData.selectedWorker}`,
-            "estate",
-            formData.selectedWorker,
-            report.status,
-          ),
-        ),
       };
 
       if (formData.instructions.trim()) {
@@ -612,14 +610,6 @@ export default function ReportDetailsContainer({
     try {
       await updateDoc(doc(db, "reports", report.id), {
         instructions: formData.instructions.trim(),
-        alerts: arrayUnion(
-          createAlert(
-            `Instructions: ${formData.instructions.trim()}`,
-            "estate",
-            report.assignedTo,
-            report.status,
-          ),
-        ),
       });
       alert("Instructions saved!");
       setFormData({ ...formData, instructions: "" });
@@ -646,6 +636,7 @@ export default function ReportDetailsContainer({
       });
       alert("Maintenance cost submitted successfully!");
       setActualCost("");
+      setDisplayDetails(false);
     } catch (error) {
       console.error("Error submitting maintenance cost:", error);
       alert("Failed to submit maintenance cost");
@@ -661,14 +652,6 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "accepted",
         dateAccepted: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(
-            "Job accepted by worker",
-            report.assignedTo,
-            "estate",
-            report.status,
-          ),
-        ),
       });
       alert("Job accepted!");
       setDisplayDetails(false);
@@ -688,14 +671,6 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         status: "rejected",
         dateRejected: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(
-            "Job rejected by worker",
-            report.assignedTo,
-            "estate",
-            report.status,
-          ),
-        ),
       });
       alert("Job rejected.");
       setDisplayDetails(false);
@@ -828,9 +803,6 @@ export default function ReportDetailsContainer({
       await updateDoc(doc(db, "reports", report.id), {
         feedback: formData.feedback,
         feedbackDate: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(formData.feedback, "staff", "admin", report.status),
-        ),
       });
       alert("Feedback submitted!");
       setFormData({ ...formData, feedback: "" });
@@ -842,79 +814,6 @@ export default function ReportDetailsContainer({
       setLoading(false);
     }
   };
-
-  const getRelevantAlert = () => {
-    if (!report.alerts?.length) return null;
-
-    switch (report.status) {
-      case "approved":
-        return (
-          report.alerts.find(
-            (a) =>
-              a.sentBy === "admin" &&
-              a.sentTo === "estate" &&
-              a.type === "incoming",
-          ) || null
-        );
-
-      case "confirmed":
-        return (
-          [...report.alerts]
-            .filter(
-              (a) =>
-                a.sentBy === "admin" &&
-                a.sentTo === "estate" &&
-                a.type === "pending",
-            )
-            .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null
-        );
-
-      case "costDenied":
-        return (
-          [...report.alerts]
-            .filter(
-              (a) =>
-                a.sentBy === "admin" &&
-                a.sentTo === "estate" &&
-                a.type === "pending",
-            )
-            .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null
-        );
-
-      case "assigned":
-        return (
-          report.alerts.find(
-            (a) => a.sentTo === report.assignedTo && a.type === "confirmed",
-          ) || null
-        );
-
-      case "denied":
-        return (
-          report.alerts.find(
-            (a) => a.sentTo === user?.ID && a.type === "incoming",
-          ) || null
-        );
-
-      // New: surface the worker's note/reason once they've accepted or rejected
-      case "accepted":
-      case "rejected":
-        return (
-          [...report.alerts]
-            .filter(
-              (a) =>
-                a.sentBy === "worker" &&
-                a.sentTo === "estate" &&
-                a.type === "assigned",
-            )
-            .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const relevantAlert = getRelevantAlert();
 
   const reportDetails = (
     <div className={`flex flex-col px-10 gap-10 pb-20`}>
@@ -1214,25 +1113,6 @@ export default function ReportDetailsContainer({
           </div>
         )}
 
-      {relevantAlert && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            {report.status === "denied"
-              ? "Denial Reason:"
-              : report.status === "costDenied"
-                ? "Denial Note:"
-                : report.status === "rejected"
-                  ? "Rejection Reason:"
-                  : "Note:"}
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {relevantAlert.content}
-          </p>
-        </div>
-      )}
-
       {report.instructions && user?.role !== "staff" && (
         <div className="flex gap-2">
           <h2
@@ -1256,6 +1136,19 @@ export default function ReportDetailsContainer({
           <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {report.feedback}
           </p>
+        </div>
+      )}
+
+      {/* Technician rating — now visible to every role viewing this panel,
+          not just the staff member who submitted it. */}
+      {report.technicianRating && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Technician Rating:
+          </h2>
+          <StarRating value={report.technicianRating} readOnly size="text-xl" />
         </div>
       )}
 

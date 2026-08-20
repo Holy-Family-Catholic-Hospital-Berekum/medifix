@@ -283,7 +283,6 @@ export default function ReportForm({ formPopup, onClose }) {
         feedbackViewedBy: [],
         instructions: "",
         notes: [],
-        alerts: [],
 
         // Metadata
         createdAt: serverTimestamp(),

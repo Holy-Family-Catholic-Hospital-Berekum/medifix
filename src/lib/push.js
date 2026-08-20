@@ -62,7 +62,7 @@ export async function linkPushUser(userId) {
         const attemptLogin = async (retriesLeft) => {
           try {
             await OneSignal.login(uid);
-            console.log("[push] Linked via OneSignal Web:", uid);
+            
             resolve(true);
           } catch (error) {
             if (retriesLeft > 0) {
