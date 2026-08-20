@@ -25,7 +25,7 @@ export const TRANSITIONS = {
     body: "Estate manager requested some materials.",
   },
   "pending->costDenied": {
-    targets: [{ audience: "role", role: "estate", route: () => "/er" }],
+    targets: [{ audience: "role", role: "estate", route: () => "/eh" }],
     title: "Request Denied",
     body: "The submitted materials request was rejected.",
   },
@@ -77,7 +77,7 @@ export const TRANSITIONS = {
   },
   "*->overdue": {
     targets: [
-      { audience: "role", role: "estate", route: () => "/eip" },
+      { audience: "role", role: "estate", route: () => "/eh" },
       { audience: "assignedWorker", route: () => "/wa" },
     ],
     title: "Report Overdue",

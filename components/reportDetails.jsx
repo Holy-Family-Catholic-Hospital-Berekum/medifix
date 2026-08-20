@@ -1353,7 +1353,8 @@ export default function ReportDetailsContainer({
             <option value="">Choose worker</option>
             {workers.map((worker) => (
               <option key={worker.id} value={worker.ID || worker.id}>
-                {worker.name} {worker.ID ? `(${worker.ID})` : ""}
+                {worker.name}{" "}
+                {worker.profession ? `(${worker.profession})` : ""}
               </option>
             ))}
           </select>
