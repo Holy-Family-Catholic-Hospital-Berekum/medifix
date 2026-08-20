@@ -17,7 +17,6 @@ export default function EstateInProgress() {
       reportDetailsBgColor="bg-green-300"
       specificReportsPage={true}
       completedRedirect={"/ec"}
-      acceptedRedirect={"/ea"}
       assignedRedirect={"/ea"}
       rejectedRedirect={"/er"}
       acceptedRedirect={"/eip"}

@@ -31,6 +31,20 @@ const isActive = (status) => !TERMINAL_STATUSES.includes(status);
 const isOverdueEligible = (report) =>
   report.overdue && !OVERDUE_EXCLUDED_STATUSES.includes(report.status);
 
+// ─── worker performance weights ──────────────────────────────────────────
+// "Performance" blends three independent signals into one score:
+//  - quality: customer star rating (Bayesian-weighted)
+//  - reliability: inverse of how often a completed job gets reopened
+//  - speed: accepted→completed time relative to the rest of the fleet
+// Raw completion rate (done/assigned) is deliberately NOT a component:
+// every assigned job gets completed eventually (or reassigned), so it
+// isn't a meaningful signal on its own.
+const PERFORMANCE_WEIGHTS = {
+  quality: 0.5,
+  reliability: 0.3,
+  speed: 0.2,
+};
+
 // ─── data-volume caps ───────────────────────────────────────────────────────
 // The dashboard used to hold a LIVE, UNBOUNDED listener on the entire
 // `reports` and `users` collections. That meant every dashboard load (and
@@ -298,12 +312,19 @@ function buildPeriodStats(subset) {
       ).toFixed(1)
     : null;
 
-  // "Completion rate" counts anything the reporter has confirmed done
+  // "Completion rate" (kept for the PDF export / historical callers that
+  // still read it) counts anything the reporter has confirmed done
   // (closed) or that finished the technician's work (completed, even if
   // still awaiting reporter confirmation) as resolved.
   const completionRate = total
     ? Math.round(((completed + closed) / total) * 100)
     : 0;
+
+  // "Closure rate" is the terminal-only figure the dashboard now surfaces
+  // at the top level: closed = the reporter has confirmed the job was
+  // done well. Completed on its own is still just a pending-feedback
+  // state, not a finished job — so it doesn't count toward this rate.
+  const closureRate = total ? Math.round((closed / total) * 100) : 0;
 
   const getReportTotalCost = (r) =>
     (Number(r.cost) || 0) + (Number(r.maintenanceCost) || 0);
@@ -356,6 +377,7 @@ function buildPeriodStats(subset) {
     byPriority,
     catCount,
     completionRate,
+    closureRate,
     avgResolutionDays,
     reportsWithCost: reportsWithCost.length,
     totalCost,
@@ -575,6 +597,205 @@ function StatCard({ label, value, icon, accent, sub }) {
         {value}
       </span>
       {sub && <span style={{ fontSize: 11, color: "#94a3b8" }}>{sub}</span>}
+    </Card>
+  );
+}
+
+// Small centered label/value block used inside the worker leaderboard's
+// metrics grid (see WorkerCard below). Pulled out as its own primitive so
+// the grid can lay out any number of these responsively without repeating
+// the same inline-style block four times per card.
+function WorkerMetric({ label, value, sub, color = "#0f172a", empty }) {
+  return (
+    <div style={{ textAlign: "center", minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: 9,
+          color: "#94a3b8",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: ".05em",
+        }}
+      >
+        {label}
+      </div>
+      {empty ? (
+        <span style={{ fontSize: 12, color: "#cbd5e1", fontStyle: "italic" }}>
+          {empty}
+        </span>
+      ) : (
+        <>
+          <div
+            style={{
+              fontSize: 17,
+              fontWeight: 800,
+              color,
+              lineHeight: 1.3,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {value}
+          </div>
+          {sub && (
+            <span
+              style={{
+                fontSize: 9,
+                color: "#2d2f31",
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {sub}
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// One leaderboard row for a worker. Split into a header (rank, avatar,
+// name, performance bar) and a metrics grid underneath — stacking them
+// vertically, and letting the metrics grid re-flow from 4 to 2 columns via
+// the ".worker-metrics" CSS rule, is what keeps this readable on narrow
+// mobile widths instead of overflowing a single wide row.
+function WorkerCard({ w, rank }) {
+  const perfColor =
+    w.performancePct == null
+      ? "#cbd5e1"
+      : w.performancePct >= 80
+        ? "#22c55e"
+        : w.performancePct >= 50
+          ? "#f59e0b"
+          : "#ef4444";
+
+  return (
+    <Card style={{ padding: "14px 18px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: rank === 0 ? "#f59e0b" : "#94a3b8",
+            width: 22,
+            flexShrink: 0,
+            textAlign: "center",
+          }}
+        >
+          {rank === 0
+            ? "🥇"
+            : rank === 1
+              ? "🥈"
+              : rank === 2
+                ? "🥉"
+                : `#${rank + 1}`}
+        </span>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
+            background: "#fef2f2",
+            color: "#ef4444",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 800,
+            fontSize: 14,
+            flexShrink: 0,
+          }}
+        >
+          {w.name?.charAt(0)?.toUpperCase() ?? "?"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 14,
+              color: "#0f172a",
+              marginBottom: 6,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {w.name}
+            {w.reworked > 0 && (
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#854d0e",
+                  background: "#fef9c3",
+                  borderRadius: 5,
+                  padding: "1px 6px",
+                }}
+                title="Jobs this worker has had reopened, ever — still counted after they were redone and closed"
+              >
+                🔁 {w.reworked} reopened
+              </span>
+            )}
+          </div>
+          {/* Tracks the blended performance score, not raw completion
+              rate — every assigned job gets completed eventually (or
+              reassigned), so completion rate alone isn't a meaningful
+              signal. */}
+          <div
+            style={{
+              height: 5,
+              borderRadius: 999,
+              background: "#f1f5f9",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                borderRadius: 999,
+                width: `${w.performancePct ?? 0}%`,
+                background: perfColor,
+                transition: "width .5s ease",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Metrics grid — deliberately excludes average resolution time,
+          which gets its own section (see "Average resolution time" below
+          the leaderboard) so this row stays compact and doesn't overflow
+          on mobile screens. */}
+      <div
+        className="worker-metrics"
+        style={{
+          marginTop: 12,
+          paddingTop: 12,
+          borderTop: "1px solid #f1f5f9",
+        }}
+      >
+        {w.weightedRating != null ? (
+          <WorkerMetric
+            label="Rating"
+            value={`★ ${w.weightedRating.toFixed(2)}`}
+            sub={`${w.avgRating.toFixed(2)} raw · ${w.ratingCount} rated`}
+            color="#f59e0b"
+          />
+        ) : (
+          <WorkerMetric label="Rating" empty="No ratings" />
+        )}
+        <WorkerMetric label="Assigned" value={w.assigned} color="#64748b" />
+        <WorkerMetric label="Done" value={w.done} color="#22c55e" />
+        <WorkerMetric
+          label="Performance"
+          value={w.performancePct != null ? `${w.performancePct}%` : "—"}
+          color={perfColor}
+        />
+      </div>
     </Card>
   );
 }
@@ -1404,19 +1625,60 @@ export default function Dashboard({
       };
     });
 
+    // ── job-completion time helper ──────────────────────────────────────
+    const toDate = (v) => (v?.toDate ? v.toDate() : new Date(v));
+    const diffDays = (start, end) =>
+      (toDate(end).getTime() - toDate(start).getTime()) / 86400000;
+
     const workers = users.filter((u) => u.role === "worker");
+
+    // "Clean" completions only: accepted → completed, with NO reopen in
+    // between. A report that got reopened and re-completed has its
+    // dateAccepted/dateCompleted fields overwritten by the SECOND cycle
+    // (see firestore.rules), so the elapsed time would include however
+    // long it sat waiting on the reporter/estate to reopen it — time that
+    // has nothing to do with how fast the worker did the work. Excluding
+    // reopened reports trades some sample size for not unfairly
+    // penalizing a worker for someone else's delay.
+    const isCleanCompletion = (r) =>
+      !!r.dateAccepted && !!r.dateCompleted && !r.dateReopened;
+
+    const fleetCleanDurations = reports
+      .filter((r) => r.assignedTo && isCleanCompletion(r))
+      .map((r) => diffDays(r.dateAccepted, r.dateCompleted));
+    const fleetAvgCompletionDays = fleetCleanDurations.length
+      ? fleetCleanDurations.reduce((s, d) => s + d, 0) /
+        fleetCleanDurations.length
+      : null;
+
     const workerStatsRaw = workers.map((w) => {
       const workerReports = reports.filter((r) => r.assignedTo === w.ID);
       const assigned = workerReports.length;
       const done = workerReports.filter((r) =>
         ["completed", "closed"].includes(r.status),
       ).length;
+
+      // Cumulative reopen count, keyed off `dateReopened` (set once, the
+      // first time a report is reopened) — NOT `status === 'reopened'`.
+      // The old version checked current status, so a report stopped
+      // counting as "reworked" the instant it was completed again or
+      // closed out, silently erasing a worker's rework history over
+      // time. A report that was reopened, redone, and closed is still a
+      // job this worker didn't get right the first time; it should count
+      // forever, not just while it happens to still say "reopened".
       const reworked = workerReports.filter(
-        (r) => r.status === "reopened",
+        (r) => r.dateReopened != null,
       ).length;
 
-      // Rating: only reports the reporter has actually rated carry
-      // technicianRating (set alongside feedback when they close a job).
+      // Ever-completed count, used as the denominator for rework rate.
+      // Also driven off a field (dateCompleted) rather than current
+      // status, so a job that's back in 'reopened' still counts as
+      // having been completed at least once.
+      const completedAtLeastOnce = workerReports.filter(
+        (r) => r.dateCompleted != null,
+      ).length;
+
+      // ── quality: customer star ratings ──────────────────────────────
       const ratedReports = workerReports.filter(
         (r) => typeof r.technicianRating === "number",
       );
@@ -1427,51 +1689,157 @@ export default function Dashboard({
       );
       const avgRating = ratingCount ? ratingSum / ratingCount : null;
 
+      // ── speed: accepted → completed, clean completions only ─────────
+      const cleanDurations = workerReports
+        .filter(isCleanCompletion)
+        .map((r) => diffDays(r.dateAccepted, r.dateCompleted));
+      const completionCount = cleanDurations.length;
+      const avgCompletionDays = completionCount
+        ? cleanDurations.reduce((s, d) => s + d, 0) / completionCount
+        : null;
+
       return {
         id: w.ID,
         name: w.name,
         assigned,
         done,
         reworked,
+        completedAtLeastOnce,
         rate: assigned ? Math.round((done / assigned) * 100) : 0,
         avgRating,
         ratingCount,
         ratingSum,
+        avgCompletionDays,
+        completionCount,
       };
     });
 
-    // ── Bayesian-weighted rating (IMDb-style) ────────────────────────────
-    // Pulls a worker's score toward the fleet-wide average C until they've
-    // built up enough ratings (m) for their own average to be trusted.
-    // This stops a worker with one lucky 5★ outranking one with fifty
-    // solid 4.5★s — the classic small-sample-size problem with raw averages.
-    const ratedWorkers = workerStatsRaw.filter((w) => w.ratingCount > 0);
+    // ── Bayesian shrinkage, applied to THREE signals ────────────────────
+    // Same idea as before — pull a worker's own average toward the
+    // fleet-wide average until they've built up enough of a sample to be
+    // trusted — now applied to rating, reopen rate, AND completion speed.
+    // Each gets its own confidence threshold (m): "enough ratings to
+    // trust" and "enough completed jobs to trust a rework rate" aren't
+    // the same number.
 
-    const C = ratedWorkers.length
+    // Quality (unchanged from before)
+    const ratedWorkers = workerStatsRaw.filter((w) => w.ratingCount > 0);
+    const ratingC = ratedWorkers.length
       ? ratedWorkers.reduce((s, w) => s + w.ratingSum, 0) /
         ratedWorkers.reduce((s, w) => s + w.ratingCount, 0)
-      : 0; // fleet-wide average rating across every individual rating given
-
-    const m = ratedWorkers.length
+      : 0;
+    const ratingM = ratedWorkers.length
       ? ratedWorkers.reduce((s, w) => s + w.ratingCount, 0) /
         ratedWorkers.length
-      : 0; // average number of ratings per rated worker — the confidence threshold
+      : 0;
+
+    // Reliability: fleet-wide pooled rework rate, and average sample size
+    // among workers who've completed at least one job.
+    const completedWorkers = workerStatsRaw.filter(
+      (w) => w.completedAtLeastOnce > 0,
+    );
+    const fleetReworkRate = completedWorkers.length
+      ? completedWorkers.reduce((s, w) => s + w.reworked, 0) /
+        completedWorkers.reduce((s, w) => s + w.completedAtLeastOnce, 0)
+      : 0;
+    const reliabilityM = completedWorkers.length
+      ? completedWorkers.reduce((s, w) => s + w.completedAtLeastOnce, 0) /
+        completedWorkers.length
+      : 0;
+
+    // Speed: average number of clean completions per worker who has any,
+    // used as the confidence threshold for shrinking toward
+    // fleetAvgCompletionDays.
+    const timedWorkers = workerStatsRaw.filter((w) => w.completionCount > 0);
+    const speedM = timedWorkers.length
+      ? timedWorkers.reduce((s, w) => s + w.completionCount, 0) /
+        timedWorkers.length
+      : 0;
 
     const workerStats = workerStatsRaw
       .map((w) => {
+        // Quality
         const weightedRating =
           w.ratingCount > 0
-            ? (w.ratingCount / (w.ratingCount + m)) * w.avgRating +
-              (m / (w.ratingCount + m)) * C
-            : null; // no ratings at all → no score, not a 0 or the fleet average
-        // Performance = weighted rating expressed as a percentage of the 5-star
-        // scale, so a technician's overall standing is one number that already
-        // accounts for sample-size confidence, not just raw completion throughput.
-        const performancePct =
-          weightedRating != null
-            ? Math.round((weightedRating / 5) * 100)
+            ? (w.ratingCount / (w.ratingCount + ratingM)) * w.avgRating +
+              (ratingM / (w.ratingCount + ratingM)) * ratingC
             : null;
-        return { ...w, weightedRating, performancePct };
+
+        // Reliability — shrink the worker's own rework rate toward the
+        // fleet rate, then invert it into a 0–100 "did it right the
+        // first time" score. No completions yet → no signal, not 0/100.
+        let reliabilityPct = null;
+        if (w.completedAtLeastOnce > 0) {
+          const ownReworkRate = w.reworked / w.completedAtLeastOnce;
+          const n = w.completedAtLeastOnce;
+          const weightedReworkRate =
+            (n / (n + reliabilityM)) * ownReworkRate +
+            (reliabilityM / (n + reliabilityM)) * fleetReworkRate;
+          reliabilityPct = Math.round((1 - weightedReworkRate) * 100);
+        }
+
+        // Speed — shrink the worker's own average completion time toward
+        // the fleet average, then express it as a percentage: the fleet
+        // average time scores 100%, faster caps at 100%, slower scores
+        // proportionally lower. No clean completions yet → no signal.
+        let speedPct = null;
+        let weightedCompletionDays = null;
+        if (w.completionCount > 0 && fleetAvgCompletionDays != null) {
+          const n = w.completionCount;
+          weightedCompletionDays =
+            (n / (n + speedM)) * w.avgCompletionDays +
+            (speedM / (n + speedM)) * fleetAvgCompletionDays;
+          speedPct =
+            weightedCompletionDays > 0
+              ? Math.max(
+                  0,
+                  Math.min(
+                    100,
+                    Math.round(
+                      (fleetAvgCompletionDays / weightedCompletionDays) * 100,
+                    ),
+                  ),
+                )
+              : 100; // completed essentially instantly
+        }
+
+        // ── blended overall performance ──────────────────────────────
+        // Only components with actual data contribute, with weight
+        // redistributed across whatever IS available — a worker with
+        // completions but no ratings yet still gets a performance score
+        // from reliability + speed, instead of showing "no data" just
+        // because feedback hasn't come in.
+        const components = [
+          weightedRating != null && {
+            value: (weightedRating / 5) * 100,
+            weight: PERFORMANCE_WEIGHTS.quality,
+          },
+          reliabilityPct != null && {
+            value: reliabilityPct,
+            weight: PERFORMANCE_WEIGHTS.reliability,
+          },
+          speedPct != null && {
+            value: speedPct,
+            weight: PERFORMANCE_WEIGHTS.speed,
+          },
+        ].filter(Boolean);
+
+        const totalWeight = components.reduce((s, c) => s + c.weight, 0);
+        const performancePct = totalWeight
+          ? Math.round(
+              components.reduce((s, c) => s + c.value * c.weight, 0) /
+                totalWeight,
+            )
+          : null;
+
+        return {
+          ...w,
+          weightedRating,
+          reliabilityPct,
+          speedPct,
+          weightedCompletionDays,
+          performancePct,
+        };
       })
       .sort((a, b) => b.done - a.done); // default order unchanged; ranking view sorts separately
 
@@ -1495,6 +1863,7 @@ export default function Dashboard({
     const completionRate = total
       ? Math.round(((completed + closed) / total) * 100)
       : 0;
+    const closureRate = total ? Math.round((closed / total) * 100) : 0;
 
     const getResolutionAverage = (subset) => {
       const resolved = subset.filter((r) => r.dateCompleted && r.dateSent);
@@ -1614,6 +1983,7 @@ export default function Dashboard({
       procurementCount,
       deactivatedCount,
       completionRate,
+      closureRate,
       avgResolutionDays,
       recentUsers,
       reportsWithCost: reportsWithCost.length,
@@ -1653,12 +2023,25 @@ export default function Dashboard({
 
   const rankedWorkerStats = useMemo(() => {
     return [...stats.workerStats].sort((a, b) => {
-      const scoreA = a.weightedRating ?? -Infinity;
-      const scoreB = b.weightedRating ?? -Infinity;
+      const scoreA = a.performancePct ?? -Infinity;
+      const scoreB = b.performancePct ?? -Infinity;
       if (scoreB !== scoreA) return scoreB - scoreA;
-      return b.done - a.done; // tie-break for unrated workers
+      return b.done - a.done; // tie-break for workers without a score yet
     });
   }, [stats.workerStats]);
+
+  // Workers with usable resolution-time data, sorted fastest-first — feeds
+  // the standalone "Average resolution time" section on the Workers tab.
+  const timedWorkerStats = useMemo(() => {
+    return rankedWorkerStats
+      .filter((w) => w.avgCompletionDays != null)
+      .sort((a, b) => a.avgCompletionDays - b.avgCompletionDays);
+  }, [rankedWorkerStats]);
+
+  const maxAvgCompletionDays = useMemo(() => {
+    if (!timedWorkerStats.length) return 1;
+    return Math.max(...timedWorkerStats.map((w) => w.avgCompletionDays), 1);
+  }, [timedWorkerStats]);
 
   // Stats for whichever period is currently selected on the Overview tab
   const displayStats =
@@ -1935,8 +2318,9 @@ export default function Dashboard({
         .kpi-6   { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; }
         .two-col { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
         .user-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
+        .worker-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
         @media(max-width:900px){ .kpi-5{grid-template-columns:repeat(3,1fr);} .kpi-6{grid-template-columns:repeat(3,1fr);} }
-        @media(max-width:640px){ .kpi-5{grid-template-columns:repeat(2,1fr);} .kpi-3{grid-template-columns:repeat(2,1fr);} .kpi-6{grid-template-columns:repeat(2,1fr);} .two-col{grid-template-columns:1fr;} }
+        @media(max-width:640px){ .kpi-5{grid-template-columns:repeat(2,1fr);} .kpi-3{grid-template-columns:repeat(2,1fr);} .kpi-6{grid-template-columns:repeat(2,1fr);} .two-col{grid-template-columns:1fr;} .worker-metrics{grid-template-columns:repeat(2,1fr);} }
         @media(max-width:400px){ .kpi-5{grid-template-columns:1fr;} .kpi-3{grid-template-columns:1fr;} .kpi-6{grid-template-columns:1fr;} }
       `}</style>
 
@@ -2251,12 +2635,17 @@ export default function Dashboard({
                 accent="#f97316"
                 sub="In pipeline"
               />
+              {/* Closed, not Completed — closed is the terminal status
+                  where the reporter has confirmed the work was done well.
+                  Completed on its own just means the job is awaiting that
+                  feedback, so it's a status-breakdown detail rather than a
+                  top-level "done" metric. */}
               <StatCard
-                label="Completed"
-                value={displayStats.completed}
-                icon="✅"
+                label="Closed"
+                value={displayStats.closed}
+                icon="🔒"
                 accent="#22c55e"
-                sub={`${displayStats.completionRate}% rate`}
+                sub={`${displayStats.closureRate}% rate`}
               />
               <StatCard
                 label="Overdue"
@@ -2285,14 +2674,14 @@ export default function Dashboard({
                 value={displayStats.reopened ?? 0}
                 icon="🔁"
                 accent="#f59e0b"
-                sub="Reporter wasn't satisfied — no overdue countdown"
+                sub="Reporter wasn't satisfied"
               />
               <StatCard
-                label="Closed"
-                value={displayStats.closed ?? 0}
-                icon="🔒"
-                accent="#64748b"
-                sub="Confirmed resolved by reporter"
+                label="Awaiting Feedback"
+                value={displayStats.completed ?? 0}
+                icon="⏳"
+                accent="#22c55e"
+                sub="Work done — reporter hasn't given feedback yet"
               />
               <StatCard
                 label="Jobs Declined by Worker"
@@ -2858,202 +3247,92 @@ export default function Dashboard({
                 style={{ display: "flex", flexDirection: "column", gap: 10 }}
               >
                 {rankedWorkerStats.map((w, i) => (
-                  <Card
-                    key={i}
-                    style={{
-                      padding: "14px 18px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: i === 0 ? "#f59e0b" : "#94a3b8",
-                        width: 22,
-                        flexShrink: 0,
-                        textAlign: "center",
-                      }}
-                    >
-                      {i === 0
-                        ? "🥇"
-                        : i === 1
-                          ? "🥈"
-                          : i === 2
-                            ? "🥉"
-                            : `#${i + 1}`}
-                    </span>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "50%",
-                        background: "#fef2f2",
-                        color: "#ef4444",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 800,
-                        fontSize: 14,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {w.name?.charAt(0)?.toUpperCase() ?? "?"}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          fontSize: 14,
-                          color: "#0f172a",
-                          marginBottom: 6,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {w.name}
-                        {w.reworked > 0 && (
-                          <span
-                            style={{
-                              marginLeft: 8,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: "#854d0e",
-                              background: "#fef9c3",
-                              borderRadius: 5,
-                              padding: "1px 6px",
-                            }}
-                            title="Jobs the reporter reopened after this worker marked them complete"
-                          >
-                            🔁 {w.reworked} reopened
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          height: 5,
-                          borderRadius: 999,
-                          background: "#f1f5f9",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            borderRadius: 999,
-                            width: `${w.rate}%`,
-                            background:
-                              w.rate >= 80
-                                ? "#22c55e"
-                                : w.rate >= 50
-                                  ? "#f59e0b"
-                                  : "#ef4444",
-                            transition: "width .5s ease",
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 14,
-                        flexShrink: 0,
-                        alignItems: "center",
-                      }}
-                    >
-                      <div style={{ textAlign: "center", minWidth: 60 }}>
-                        <div
-                          style={{
-                            fontSize: 9,
-                            color: "#94a3b8",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: ".05em",
-                          }}
-                        >
-                          Rating
-                        </div>
-                        {w.weightedRating != null ? (
-                          <>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "baseline",
-                                gap: 3,
-                                justifyContent: "center",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: 17,
-                                  fontWeight: 800,
-                                  color: "#f59e0b",
-                                }}
-                              >
-                                ★ {w.weightedRating.toFixed(2)}
-                              </span>
-                            </div>
-                            <span style={{ fontSize: 9, color: "#2d2f31" }}>
-                              {w.avgRating.toFixed(2)} raw · {w.ratingCount}{" "}
-                              rated
-                            </span>
-                          </>
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: 12,
-                              color: "#cbd5e1",
-                              fontStyle: "italic",
-                            }}
-                          >
-                            No ratings
-                          </span>
-                        )}
-                      </div>
-                      {[
-                        ["Assigned", w.assigned, "#64748b"],
-                        ["Done", w.done, "#22c55e"],
-                        [
-                          "Rate",
-                          w.performancePct != null
-                            ? `${w.performancePct}%`
-                            : "—",
-                          w.performancePct == null
-                            ? "#cbd5e1"
-                            : w.performancePct >= 80
-                              ? "#22c55e"
-                              : w.performancePct >= 50
-                                ? "#f59e0b"
-                                : "#ef4444",
-                        ],
-                      ].map(([l, v, c]) => (
-                        <div key={l} style={{ textAlign: "center" }}>
-                          <div
-                            style={{
-                              fontSize: 9,
-                              color: "#94a3b8",
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: ".05em",
-                            }}
-                          >
-                            {l}
-                          </div>
-                          <div
-                            style={{ fontSize: 17, fontWeight: 800, color: c }}
-                          >
-                            {v}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
+                  <WorkerCard key={w.id ?? i} w={w} rank={i} />
                 ))}
               </div>
             )}
+
+            {/* Average resolution time — pulled out of the leaderboard rows
+                into its own section. Keeping it here (rather than crammed
+                into each card's metrics row) is what lets the leaderboard
+                stay a compact, mobile-friendly grid instead of overflowing
+                a wide row on narrow screens. */}
+            <SectionTitle>Average resolution time</SectionTitle>
+            <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
+              {timedWorkerStats.length > 0 ? (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  {timedWorkerStats.map((w) => {
+                    const pct = Math.min(
+                      100,
+                      Math.round(
+                        (w.avgCompletionDays / maxAvgCompletionDays) * 100,
+                      ),
+                    );
+                    return (
+                      <div key={w.id}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 8,
+                            marginBottom: 4,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#374151",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {w.name}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              fontFamily: "monospace",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {w.avgCompletionDays.toFixed(1)}d
+                            <span style={{ color: "#9ca3af", marginLeft: 6 }}>
+                              · {w.completionCount} timed
+                            </span>
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            height: 5,
+                            borderRadius: 999,
+                            background: "#f1f5f9",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              borderRadius: 999,
+                              width: `${pct}%`,
+                              background: "#8b5cf6",
+                              transition: "width .5s ease",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                  No timing data yet.
+                </p>
+              )}
+            </Card>
 
             <SectionTitle>Category demand</SectionTitle>
             <Card style={{ padding: "18px 20px" }}>
