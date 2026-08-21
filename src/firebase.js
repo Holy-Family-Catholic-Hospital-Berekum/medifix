@@ -16,13 +16,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Must be initialized before any Firestore/Auth calls elsewhere in the app
-// actually hit the network, so it's done here, right after initializeApp.
-initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY),
-  isTokenAutoRefreshEnabled: true,
-});
-
 // Local dev only — makes App Check issue a debug token instead of running
 // real reCAPTCHA v3 (which won't validate correctly on localhost anyway).
 // The token gets logged to the browser console on first run; copy it into
@@ -32,6 +25,9 @@ if (import.meta.env.DEV) {
   self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
 
+// Must be initialized before any Firestore/Auth calls elsewhere in the app
+// actually hit the network, so it's done here, right after initializeApp.
+// NOTE: only call this once per app instance — calling it twice throws.
 export const appCheck = initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY),
   isTokenAutoRefreshEnabled: true,

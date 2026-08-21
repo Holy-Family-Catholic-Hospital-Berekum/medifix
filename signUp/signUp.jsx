@@ -532,7 +532,27 @@ export default function SignUp() {
           },
           body: JSON.stringify({ pin: trimmedId }),
         });
-        const json = await res.json();
+
+        // Guard against non-JSON responses (e.g. the API route being
+        // misconfigured and the request falling through to the SPA's
+        // index.html / a host 404 page instead of hitting the function).
+        const contentType = res.headers.get("content-type") || "";
+        let json;
+        if (contentType.includes("application/json")) {
+          try {
+            json = await res.json();
+          } catch (parseErr) {
+            console.error("Failed to parse claim response as JSON:", parseErr);
+            throw new Error("BAD_RESPONSE");
+          }
+        } else {
+          const text = await res.text();
+          console.error(
+            `Unexpected non-JSON response (status ${res.status}):`,
+            text.slice(0, 200),
+          );
+          throw new Error("BAD_RESPONSE");
+        }
 
         if (!res.ok) {
           if (res.status === 429) {
@@ -560,7 +580,13 @@ export default function SignUp() {
         regType = json.role;
       } catch (txError) {
         console.error("Registration ID claim failed:", txError);
-        alert("Unable to verify registration ID. Please try again later.");
+        if (txError.message === "BAD_RESPONSE") {
+          alert(
+            "Unable to reach the registration service (unexpected server response). Please try again shortly or contact support.",
+          );
+        } else {
+          alert("Unable to verify registration ID. Please try again later.");
+        }
         try {
           await deleteUser(createdUser);
         } catch (e) {
