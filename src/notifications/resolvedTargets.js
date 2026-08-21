@@ -49,6 +49,16 @@ export const TRANSITIONS = {
     title: "Assignment Rejected",
     body: "The technician declined the job.",
   },
+  "*->dropped": {
+    targets: [{ audience: "role", role: "estate", route: () => "/edr" }],
+    title: "Job Dropped",
+    body: "A technician dropped a job — it needs reassignment.",
+  },
+  "assigned->rejected": {
+    targets: [{ audience: "role", role: "estate", route: () => "/er" }],
+    title: "Assignment Rejected",
+    body: "The technician declined the job.",
+  },
   "accepted->completed": {
     targets: [{ audience: "reporter", route: () => "/Completed" }],
     title: "Job Completed",

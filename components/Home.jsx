@@ -1843,6 +1843,8 @@ export default function Home({
     rejected:
       "Technician declined this job — waiting for Estate Manager reassignment.",
     accepted: "Technician accepted the job and is currently working on it.",
+    dropped:
+      "Worker dropped this job — waiting for Estate Manager reassignment.",
     reopened: "Reporter wasn't satisfied — back with the Estate Manager.",
     closed: "Report closed.",
   };
@@ -1857,9 +1859,10 @@ export default function Home({
     costDenied: "dateCostDenied",
     confirmed: "dateConfirmed",
     procured: "dateProcured",
-    assigned: "dateAssigned", // dateReAssigned is checked separately below
+    assigned: "dateAssigned",
     rejected: "dateRejected",
     accepted: "dateAccepted",
+    dropped: "dateDropped",
     reopened: "dateReopened",
     completed: "dateCompleted",
     closed: "dateClosed",
@@ -1876,6 +1879,7 @@ export default function Home({
     assigned: "Assigned",
     rejected: "Rejected",
     accepted: "Accepted",
+    dropped: "Dropped",
     reopened: "Reopened",
     completed: "Completed",
     closed: "Closed",

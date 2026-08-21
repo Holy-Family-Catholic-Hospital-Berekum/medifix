@@ -1604,9 +1604,14 @@ export const canUserMarkProcured = (user, report) => {
 export const canUserAssignWorker = (user, report) => {
   return (
     user?.role === "estate" &&
-    ["approved", "procured", "assigned", "rejected", "reopened"].includes(
-      report?.status,
-    )
+    [
+      "approved",
+      "procured",
+      "assigned",
+      "rejected",
+      "reopened",
+      "dropped",
+    ].includes(report?.status)
   );
 };
 
