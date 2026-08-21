@@ -8,7 +8,7 @@
 // token — there is none here, nobody is logged in).
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { sendPushForTransition } from "../../../src/notifications/sendPushForTransition.js";
+import { sendPushForTransition } from "../../src/notifications/sendPushForTransition.js";
 
 if (!getApps().length) {
   initializeApp({
