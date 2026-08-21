@@ -268,10 +268,46 @@ function formatDate(date) {
   });
 }
 
+// Denial reasons for "denied" reports live in the report's `notes` array
+// (written by ReportDetailsContainer.jsx's handleDeny as
+// { type: "denial", content, date, by }) — NOT in a top-level
+// `denialReason` field, which never existed on any report document. This
+// mirrors ReportDetailsContainer.jsx's own getDenialNote helper so both
+// places read the same shape the same way. Scoped deliberately to
+// "denied" (incoming → denied) only — costDenied is a separate flow and
+// out of scope for this feed.
+function getDenialReasonText(report) {
+  if (!report || report.status !== "denied") return null;
+  const denialNotes = (report.notes || []).filter((n) => n?.type === "denial");
+  return denialNotes.length
+    ? denialNotes[denialNotes.length - 1].content
+    : null;
+}
+
+// Sort key for the denial feed: prefer the date on the denial note itself
+// (a plain client-side Date, since serverTimestamp() sentinels aren't
+// allowed inside arrayUnion() array elements) and fall back to dateSent if
+// that's ever missing.
+function getDenialSortDate(report) {
+  const denialNotes = (report.notes || []).filter(
+    (n) => n?.type === "denial",
+  );
+  if (denialNotes.length) {
+    const raw = denialNotes[denialNotes.length - 1].date;
+    const d = raw?.toDate ? raw.toDate() : new Date(raw);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return report.dateSent?.toDate ? report.dateSent.toDate() : new Date(0);
+}
+
 // Computes report + cost stats for an arbitrary subset of reports.
 // Used to build the "overall / month / year / lastYear" period breakdowns
 // that drive the Overview tab and the PDF download period select.
 function buildPeriodStats(subset) {
+  const toDate = (v) => (v?.toDate ? v.toDate() : new Date(v));
+  const diffDays = (from, to) =>
+    (toDate(to).getTime() - toDate(from).getTime()) / 86400000;
+
   const total = subset.length;
   const completed = subset.filter((r) => r.status === "completed").length;
   const closed = subset.filter((r) => r.status === "closed").length;
@@ -365,6 +401,99 @@ function buildPeriodStats(subset) {
       costByPriority[r.priorityLevel] += getReportTotalCost(r);
   });
 
+  // ── 1. denial rate ──────────────────────────────────────────────────
+  // "denied" (admin rejects the report outright) and "costDenied" (admin
+  // rejects the submitted materials list) are both dead-ends the staff
+  // member has to act on, so both count toward one denial rate.
+  const deniedCount = subset.filter((r) => r.status === "denied").length;
+  const costDeniedCount = subset.filter(
+    (r) => r.status === "costDenied",
+  ).length;
+  const denialRate = total
+    ? Math.round(((deniedCount + costDeniedCount) / total) * 100)
+    : 0;
+
+  // ── 2. pipeline stage duration ───────────────────────────────────────
+  // Average days spent in each stage transition, computed only over
+  // reports that actually have both timestamps — a report that skipped a
+  // stage (e.g. assigned directly with no materials) simply doesn't
+  // contribute a data point for that stage rather than skewing it toward
+  // zero.
+  const avgStageDays = (fromKey, toKey) => {
+    const diffs = subset
+      .filter((r) => r[fromKey] && r[toKey])
+      .map((r) => diffDays(r[fromKey], r[toKey]))
+      .filter((d) => d >= 0);
+    return diffs.length
+      ? diffs.reduce((s, d) => s + d, 0) / diffs.length
+      : null;
+  };
+  const stageDurations = [
+    {
+      label: "Incoming → Approved",
+      days: avgStageDays("dateSent", "dateApproved"),
+    },
+    {
+      label: "Approved → Assigned",
+      days: avgStageDays("dateApproved", "dateAssigned"),
+    },
+    {
+      label: "Assigned → Accepted",
+      days: avgStageDays("dateAssigned", "dateAccepted"),
+    },
+    {
+      label: "Accepted → Completed",
+      days: avgStageDays("dateAccepted", "dateCompleted"),
+    },
+  ];
+
+  // ── 3. reassignment rate ─────────────────────────────────────────────
+  // Distinct from "Jobs Declined by Worker" (a live count of reports
+  // currently sitting in "rejected") — this is the share of every job
+  // that was EVER assigned that needed a reassignment at some point,
+  // whether that was triggered by a worker rejecting it or by a reopen.
+  const everAssignedCount = subset.filter((r) => r.dateAssigned).length;
+  const reassignedCount = subset.filter((r) => r.dateReAssigned).length;
+  const reassignmentRate = everAssignedCount
+    ? Math.round((reassignedCount / everAssignedCount) * 100)
+    : 0;
+
+  // ── 4. overdue by priority ───────────────────────────────────────────
+  const overdueByPriority = { emergency: 0, urgent: 0, routine: 0 };
+  subset.forEach((r) => {
+    if (isOverdueEligible(r) && r.priorityLevel in overdueByPriority) {
+      overdueByPriority[r.priorityLevel]++;
+    }
+  });
+
+  // ── 5. location hotspots ─────────────────────────────────────────────
+  const locationCounts = {};
+  subset.forEach((r) => {
+    const loc = (r.location || "").trim();
+    if (loc) locationCounts[loc] = (locationCounts[loc] || 0) + 1;
+  });
+  const topLocations = Object.entries(locationCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([location, count]) => ({ location, count }));
+
+  // ── 6. first-time-fix rate (fleet-wide) ──────────────────────────────
+  // Share of every job that reached "completed" at least once which was
+  // closed WITHOUT ever being reopened. dateReopened is set once, the
+  // first time a report is reopened, and never cleared — same "counts
+  // forever" convention used for the per-worker rework figure below, so a
+  // job that was eventually fixed after a reopen still counts against
+  // this rate rather than disappearing once it's closed.
+  const everCompletedCount = subset.filter((r) => r.dateCompleted).length;
+  const everReworkedCount = subset.filter(
+    (r) => r.dateCompleted && r.dateReopened,
+  ).length;
+  const firstTimeFixRate = everCompletedCount
+    ? Math.round(
+        ((everCompletedCount - everReworkedCount) / everCompletedCount) * 100,
+      )
+    : 0;
+
   return {
     total,
     completed,
@@ -387,6 +516,17 @@ function buildPeriodStats(subset) {
     maxCost,
     costByCategory,
     costByPriority,
+    deniedCount,
+    costDeniedCount,
+    denialRate,
+    stageDurations,
+    everAssignedCount,
+    reassignedCount,
+    reassignmentRate,
+    overdueByPriority,
+    topLocations,
+    everCompletedCount,
+    firstTimeFixRate,
   };
 }
 
@@ -1031,6 +1171,38 @@ function InlineNotice({ tone = "info", children }) {
   );
 }
 
+// A louder, dedicated banner for the emergency-overdue flag — deliberately
+// styled to stand apart from InlineNotice (solid red left bar, larger
+// icon) since this specific condition — an emergency-priority job that's
+// overdue — is meant to demand attention rather than blend in with routine
+// "data may be stale" notices. Shown regardless of which Overview period is
+// selected, since "is anything on fire right now" shouldn't depend on the
+// dropdown.
+function EmergencyOverdueBanner({ count }) {
+  if (!count) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        background: "#fef2f2",
+        border: "1px solid #fecaca",
+        borderLeft: "4px solid #dc2626",
+        borderRadius: 10,
+        padding: "12px 16px",
+        marginBottom: 16,
+      }}
+    >
+      <span style={{ fontSize: 22, flexShrink: 0 }}>🚨</span>
+      <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 700 }}>
+        {count} emergency-priority report{count === 1 ? " is" : "s are"} overdue
+        right now — needs immediate attention.
+      </span>
+    </div>
+  );
+}
+
 // ─── Generate Registration ID modal ──────────────────────────────────────────
 function GenIDModal({ role, onClose }) {
   const allowedTypes =
@@ -1484,6 +1656,13 @@ export default function Dashboard({
   // bounded, most-recent window once per mount/refresh instead, with a
   // manual "Refresh" control (rendered further down) for anyone who wants
   // up-to-the-second numbers.
+  //
+  // IMPORTANT: because this is explicitly-refreshed rather than live, any
+  // action taken elsewhere in the app (e.g. denying a report from
+  // ReportDetailsContainer.jsx) will NOT appear here until either this
+  // component remounts (e.g. navigating back to the Dashboard) or the
+  // "Refresh" button in the header below is clicked. This is by design —
+  // see the caps comment above — not a bug.
   const loadReports = useCallback(async () => {
     if (!hasAccess) return;
     setReportsLoading(true);
@@ -1851,6 +2030,21 @@ export default function Dashboard({
       )
       .slice(0, 10);
 
+    // ── recent denial reasons (global, not period-scoped) ────────────────
+    // Mirrors the "Recent activity" feed's shape: most-recent-first,
+    // capped at 15. Scoped ONLY to "denied" (incoming → denied) reports —
+    // "costDenied" is a separate flow and intentionally excluded here.
+    // Reads the reason out of the report's `notes` array (written by
+    // ReportDetailsContainer.jsx's handleDeny as a { type: "denial", ... }
+    // entry) via getDenialReasonText/getDenialSortDate above — there is no
+    // top-level `denialReason` field on the report document.
+    const recentDenials = [...reports]
+      .filter((r) => r.status === "denied")
+      .map((r) => ({ ...r, resolvedDenialReason: getDenialReasonText(r) }))
+      .filter((r) => r.resolvedDenialReason != null)
+      .sort((a, b) => getDenialSortDate(b) - getDenialSortDate(a))
+      .slice(0, 15);
+
     const staffCount = users.filter((u) => u.role === "staff").length;
     const workerCount = workers.length;
     const estateCount = users.filter((u) => u.role === "estate").length;
@@ -1975,6 +2169,7 @@ export default function Dashboard({
       trend,
       workerStats,
       recent,
+      recentDenials,
       staffCount,
       workerCount,
       estateCount,
@@ -2552,6 +2747,12 @@ export default function Dashboard({
           </InlineNotice>
         )}
 
+        {/* 4. Overdue breakdown by priority — a global "is anything on fire"
+            banner, independent of the Overview period selector. */}
+        <EmergencyOverdueBanner
+          count={stats.periodStats.overall.overdueByPriority.emergency}
+        />
+
         {/* ── tab bar ──────────────────────────────────────────────── */}
         <div
           style={{
@@ -2690,6 +2891,132 @@ export default function Dashboard({
                 accent="#f43f5e"
                 sub="Awaiting reassignment"
               />
+            </div>
+
+            {/* 1. Denial rate & 3. reassignment rate & 6. first-time-fix
+                rate — three quality/risk signals grouped together since
+                they're all "how well is the pipeline working", distinct
+                from the raw lifecycle counts above. */}
+            <SectionTitle>Quality &amp; risk</SectionTitle>
+            <div className="kpi-3" style={{ marginBottom: 20 }}>
+              <StatCard
+                label="Denial Rate"
+                value={`${displayStats.denialRate}%`}
+                icon="🚫"
+                accent="#ef4444"
+                sub={`${displayStats.deniedCount + displayStats.costDeniedCount} of ${displayStats.total} denied`}
+              />
+              <StatCard
+                label="Reassignment Rate"
+                value={`${displayStats.reassignmentRate}%`}
+                icon="🔄"
+                accent="#f59e0b"
+                sub={`${displayStats.reassignedCount} of ${displayStats.everAssignedCount} assigned jobs`}
+              />
+              <StatCard
+                label="First-Time Fix Rate"
+                value={
+                  displayStats.everCompletedCount
+                    ? `${displayStats.firstTimeFixRate}%`
+                    : "—"
+                }
+                icon="🎯"
+                accent="#22c55e"
+                sub="Closed without a reopen"
+              />
+            </div>
+
+            {/* 1. Recent denial reasons — global feed, not period-scoped,
+                so it always shows the most recent activity regardless of
+                which Overview period is selected. Scoped to "denied"
+                (incoming → denied) only. */}
+            <SectionTitle>Recent denial reasons</SectionTitle>
+            <Card style={{ padding: "4px 20px 8px", marginBottom: 20 }}>
+              {stats.recentDenials.length === 0 ? (
+                <p
+                  style={{
+                    textAlign: "center",
+                    padding: "32px 0",
+                    color: "#94a3b8",
+                    fontSize: 13,
+                  }}
+                >
+                  No denial reasons recorded yet.
+                </p>
+              ) : (
+                stats.recentDenials.map((r, i) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      padding: "12px 0",
+                      borderBottom:
+                        i < stats.recentDenials.length - 1
+                          ? "1px solid #f1f5f9"
+                          : "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#0f172a",
+                        }}
+                      >
+                        {r.reporter || "Unknown reporter"} · {r.category}
+                      </span>
+                      <Badge
+                        bg={STATUS_META[r.status]?.bg}
+                        text={STATUS_META[r.status]?.text}
+                      >
+                        {STATUS_META[r.status]?.label ?? r.status}
+                      </Badge>
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: "#64748b",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {r.resolvedDenialReason}
+                    </p>
+                  </div>
+                ))
+              )}
+            </Card>
+
+            {/* 4. Overdue breakdown by priority — split out of the single
+                "Overdue" number above so an overdue emergency doesn't get
+                flattened together with an overdue routine job. */}
+            <SectionTitle>Overdue by priority</SectionTitle>
+            <div className="kpi-3" style={{ marginBottom: 20 }}>
+              {Object.entries(displayStats.overdueByPriority).map(([k, v]) => {
+                const m = PRIORITY_META[k];
+                return (
+                  <StatCard
+                    key={k}
+                    label={`${m.label} Overdue`}
+                    value={v}
+                    icon="⏰"
+                    accent={m.color}
+                    sub={
+                      k === "emergency" && v > 0
+                        ? "Needs immediate attention"
+                        : undefined
+                    }
+                  />
+                );
+              })}
             </div>
 
             <SectionTitle>People</SectionTitle>
@@ -2881,6 +3208,177 @@ export default function Dashboard({
                 )}
               </Card>
             </div>
+
+            {/* 2. Pipeline stage duration — where jobs actually spend
+                their time, broken into the four main handoffs, so a
+                bottleneck ("materials confirmation is slow") shows up
+                directly instead of hiding inside one end-to-end average. */}
+            <SectionTitle>Pipeline stage duration</SectionTitle>
+            <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
+              {displayStats.stageDurations.some((s) => s.days != null) ? (
+                (() => {
+                  const maxDays = Math.max(
+                    ...displayStats.stageDurations.map((s) => s.days ?? 0),
+                    0.0001,
+                  );
+                  return (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                      }}
+                    >
+                      {displayStats.stageDurations.map((s) => {
+                        const isBottleneck =
+                          s.days != null && s.days === maxDays;
+                        const pct =
+                          s.days != null
+                            ? Math.round((s.days / maxDays) * 100)
+                            : 0;
+                        return (
+                          <div key={s.label}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginBottom: 4,
+                                gap: 8,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: "#374151",
+                                }}
+                              >
+                                {s.label}
+                                {isBottleneck && (
+                                  <span
+                                    style={{
+                                      marginLeft: 6,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      color: "#9a3412",
+                                      background: "#ffedd5",
+                                      borderRadius: 5,
+                                      padding: "1px 6px",
+                                    }}
+                                  >
+                                    ⚠ bottleneck
+                                  </span>
+                                )}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: "#64748b",
+                                  fontFamily: "monospace",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {s.days != null ? `${s.days.toFixed(1)}d` : "—"}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                height: 5,
+                                borderRadius: 999,
+                                background: "#f1f5f9",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  height: "100%",
+                                  borderRadius: 999,
+                                  width: `${pct}%`,
+                                  background: isBottleneck
+                                    ? "#ef4444"
+                                    : "#3b82f6",
+                                  transition: "width .5s ease",
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
+              ) : (
+                <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                  No stage timing data yet.
+                </p>
+              )}
+            </Card>
+
+            {/* 5. Location hotspots — recurring problem areas, not just
+                one-off repairs. */}
+            <SectionTitle>Location hotspots</SectionTitle>
+            <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
+              {displayStats.topLocations.length > 0 ? (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                >
+                  {displayStats.topLocations.map((loc, i) => {
+                    const maxCount = displayStats.topLocations[0].count;
+                    const pct = Math.round((loc.count / maxCount) * 100);
+                    const c = CAT_COLORS[i % CAT_COLORS.length];
+                    return (
+                      <div key={loc.location}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginBottom: 4,
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#374151",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {loc.location}
+                          </span>
+                          <span style={{ fontSize: 12, color: "#64748b" }}>
+                            {loc.count}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            height: 5,
+                            borderRadius: 999,
+                            background: "#f1f5f9",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              borderRadius: 999,
+                              width: `${pct}%`,
+                              background: c,
+                              transition: "width .5s ease",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                  No location data yet.
+                </p>
+              )}
+            </Card>
 
             <SectionTitle>Submissions last 6 months</SectionTitle>
             <Card style={{ padding: "18px 20px" }}>

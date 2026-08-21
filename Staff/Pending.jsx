@@ -241,7 +241,7 @@ function ReportCard({
   getDenialNote,
   onCancelReport,
   onCloseReport,
-  onDeleteReport,
+  onDismissReport,
 }) {
   const overdueLabel = useLiveTimeAgo(report.dateDue);
   const denialNote = getDenialNote(report);
@@ -261,7 +261,7 @@ function ReportCard({
     user?.role === "staff" &&
     report?.reporterId === user?.ID &&
     report?.status === "reopened";
-  const canDelete =
+  const canDismiss =
     user?.role === "staff" &&
     report?.reporterId === user?.ID &&
     report?.status === "denied";
@@ -501,20 +501,20 @@ function ReportCard({
           </div>
         )}
 
-        {/* Staff can dismiss a denied report themselves. This is now the
-            ONLY way a denied report ever gets removed — there is no
-            auto-expiry, TTL policy, or background cleanup of any kind. It
-            stays visible indefinitely until the reporting staff member
-            deletes it manually. */}
-        {canDelete && (
+        {/* Staff can dismiss a denied report from their own list. This is
+            a SOFT delete — the report doc is kept (flagged
+            dismissedByReporter) rather than removed from Firestore, so it
+            still counts toward denial-rate and other Dashboard metrics.
+            It just stops showing up here. */}
+        {canDismiss && (
           <div className="border-t border-gray-100 pt-4 mt-4">
             <button
               type="button"
-              onClick={() => onDeleteReport?.(report)}
+              onClick={() => onDismissReport?.(report)}
               className="w-full rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90"
               style={{ backgroundColor: "#6B7280" }}
             >
-              Delete Report
+              Dismiss Report
             </button>
           </div>
         )}
@@ -583,6 +583,13 @@ export default function Pending() {
       async (snap) => {
         const data = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
+          // Denied reports the reporter has already dismissed are kept in
+          // Firestore (see the soft-delete `dismissedByReporter` flow —
+          // firestore.rules and handleDismissReport below) purely so
+          // Dashboard.jsx's denial-rate metrics keep counting them. They
+          // just shouldn't clutter this list anymore, so filter them out
+          // client-side rather than excluding them from the query itself.
+          .filter((r) => !(r.status === "denied" && r.dismissedByReporter))
           .sort((a, b) => getLastActivityDate(b) - getLastActivityDate(a));
         setReports(data);
         setLoading(false);
@@ -678,9 +685,18 @@ export default function Pending() {
     }
   };
 
-  // Staff dismissing a denied report. This is now the ONLY way a denied
-  // report is ever removed — there is no automatic expiry of any kind.
-  const handleDeleteReport = async (report) => {
+  // Staff dismissing a denied report. This is a SOFT delete: the report
+  // doc is flagged (dismissedByReporter) and kept in Firestore instead of
+  // being removed, so Dashboard.jsx's denial-rate / recentDenials metrics
+  // (which read the full `reports` collection) keep counting it forever.
+  // The onSnapshot listener above filters dismissed reports out of this
+  // list client-side, so it still disappears from the reporter's view —
+  // it just isn't gone from the system's records.
+  //
+  // The associated "before" photo, if any, is still hard-deleted here —
+  // nothing depends on it existing once the report is dismissed, so
+  // there's no reason to keep paying storage for it.
+  const handleDismissReport = async (report) => {
     if (
       !report?.id ||
       report.status !== "denied" ||
@@ -690,22 +706,20 @@ export default function Pending() {
       return;
 
     const confirmed = window.confirm(
-      "Delete this denied report? This action is permanent and can't be undone.",
+      "Dismiss this denied report? It'll disappear from your list here, but stays on record for reporting purposes.",
     );
 
     if (!confirmed) return;
 
     try {
-      // Best-effort — a denied report may not have an attached photo at
-      // all. This has to run BEFORE the reports/{id} delete: the
-      // reportImages delete rule looks up the parent report doc to check
-      // ownership/status, so once the report is gone that lookup — and
-      // the delete — would fail.
       await deleteDoc(doc(db, "reportImages", report.id)).catch(() => {});
-      await deleteDoc(doc(db, "reports", report.id));
+      await updateDoc(doc(db, "reports", report.id), {
+        dismissedByReporter: true,
+        dateDismissed: serverTimestamp(),
+      });
     } catch (error) {
-      console.error("Error deleting report:", error);
-      alert("Failed to delete report. Please try again.");
+      console.error("Error dismissing report:", error);
+      alert("Failed to dismiss report. Please try again.");
     }
   };
 
@@ -832,7 +846,7 @@ export default function Pending() {
               getDenialNote={getDenialNote}
               onCancelReport={handleCancelReport}
               onCloseReport={handleCloseReport}
-              onDeleteReport={handleDeleteReport}
+              onDismissReport={handleDismissReport}
             />
           ))}
         </div>
