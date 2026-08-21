@@ -223,7 +223,7 @@ function BirthdayBanner({ name, onDismiss }) {
             Happy Birthday, {name}! 🎂
           </p>
           <p className="text-xs md:text-sm text-white/85 mt-0.5">
-            Wishing you a fantastic day — from all of us here.
+            Wishing you a fantastic day from all of us here.
           </p>
         </div>
         <button
@@ -1835,17 +1835,17 @@ export default function Home({
   // ─── Status messages — explains what's currently happening at each stage ────
   const STATUS_MESSAGES = {
     incoming: "Waiting for admin approval.",
-    approved: "Approved by admin — waiting for the Estate Manager review.",
-    pending: "Material request sent to admin — awaiting approval.",
-    confirmed: "Material request approved — awaiting procurement.",
-    procured: "Materials procured — waiting for technician assignment.",
-    assigned: "Assigned to a technician — awaiting their response.",
+    approved: "Approved by admin, waiting for the Estate Manager review.",
+    pending: "Material request sent to admin, awaiting approval.",
+    confirmed: "Material request approved, awaiting procurement.",
+    procured: "Materials procured, waiting for technician assignment.",
+    assigned: "Assigned to a technician, awaiting their response.",
     rejected:
-      "Technician declined this job — waiting for Estate Manager reassignment.",
+      "Technician declined this job, waiting for Estate Manager reassignment.",
     accepted: "Technician accepted the job and is currently working on it.",
     dropped:
-      "Worker dropped this job — waiting for Estate Manager reassignment.",
-    reopened: "Reporter wasn't satisfied — back with the Estate Manager.",
+      "Worker dropped this job, waiting for Estate Manager reassignment.",
+    reopened: "Reporter wasn't satisfied, back with the Estate Manager.",
     closed: "Report closed.",
   };
 

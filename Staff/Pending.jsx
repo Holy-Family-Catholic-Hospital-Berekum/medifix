@@ -94,7 +94,7 @@ const STATUS_MESSAGES = {
     "Your work has been assigned to the right technician, it will be attended to shortly.",
   denied: "Your report was not approved. See the reason below.",
   reopened:
-    "You reopened this job — it's back with the Estate Manager for further action.",
+    "You reopened this job. It's back with the Estate Manager for further action.",
 };
 
 function getGreeting() {

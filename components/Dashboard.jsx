@@ -102,7 +102,7 @@ async function generateUniqueRegistrationId() {
   // volume, but fail loudly rather than silently overwriting an existing
   // active PIN if it ever does happen.
   throw new Error(
-    "Could not generate a unique registration PIN — please try again.",
+    "Could not generate a unique registration PIN please try again.",
   );
 }
 
@@ -900,7 +900,7 @@ function WorkerCard({ w, rank }) {
                   borderRadius: 5,
                   padding: "1px 6px",
                 }}
-                title="Jobs this worker has had reopened, ever — still counted after they were redone and closed"
+                title="Jobs this worker has had reopened"
               >
                 🔁 {w.reworked} reopened
               </span>
@@ -1222,7 +1222,7 @@ function EmergencyOverdueBanner({ count }) {
       <span style={{ fontSize: 22, flexShrink: 0 }}>🚨</span>
       <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 700 }}>
         {count} emergency-priority report{count === 1 ? " is" : "s are"} overdue
-        right now — needs immediate attention.
+        right now, needs immediate attention.
       </span>
     </div>
   );
@@ -2746,7 +2746,7 @@ export default function Dashboard({
         )}
         {usersError && (
           <InlineNotice tone="error">
-            Couldn't load user data — worker names, ratings, and the Users tab
+            Couldn't load user data. Worker names, ratings, and the Users tab
             may be incomplete.{" "}
             <button
               type="button"
@@ -2916,7 +2916,7 @@ export default function Dashboard({
                 value={displayStats.completed ?? 0}
                 icon="⏳"
                 accent="#22c55e"
-                sub="Work done — reporter hasn't given feedback yet"
+                sub="Work done, reporter hasn't given feedback yet"
               />
               <StatCard
                 label="Jobs Declined by Worker"
@@ -3492,7 +3492,7 @@ export default function Dashboard({
                     margin: "0 0 16px",
                   }}
                 >
-                  Monthly spend — last 6 months
+                  Monthly spend last 6 months
                 </p>
                 {stats.costTrend.some((d) => d.value > 0) ? (
                   <BarChart

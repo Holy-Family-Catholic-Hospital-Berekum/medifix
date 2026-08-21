@@ -138,7 +138,7 @@ function BirthdayBanner({ name, onDismiss }) {
             Happy Birthday, {name}! 🎂
           </p>
           <p className="text-xs md:text-sm text-white/85 mt-0.5">
-            Wishing you a fantastic day — from all of us here.
+            Wishing you a fantastic day from all of us here.
           </p>
         </div>
         <button

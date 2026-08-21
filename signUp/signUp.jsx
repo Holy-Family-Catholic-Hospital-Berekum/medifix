@@ -640,7 +640,7 @@ export default function SignUp() {
 
       await signOut(auth);
       alert(
-        "Account created! We've sent a verification link to your email — please verify it before logging in.",
+        "Account created! We've sent a verification link to your email, please verify it before logging in.",
       );
       resetForm();
       switchMode("login");
@@ -701,7 +701,7 @@ export default function SignUp() {
         await signOut(auth);
         setUnverifiedEmail("");
         setResetFeedback(
-          "Your email is already verified — you can log in now.",
+          "Your email is already verified, you can log in now.",
         );
         return;
       }

@@ -52,7 +52,7 @@ export const TRANSITIONS = {
   "*->dropped": {
     targets: [{ audience: "role", role: "estate", route: () => "/edr" }],
     title: "Job Dropped",
-    body: "A technician dropped a job — it needs reassignment.",
+    body: "A technician dropped a job. It needs reassignment.",
   },
   "assigned->rejected": {
     targets: [{ audience: "role", role: "estate", route: () => "/er" }],

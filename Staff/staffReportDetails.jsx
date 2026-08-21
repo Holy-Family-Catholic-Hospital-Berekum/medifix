@@ -512,7 +512,7 @@ export default function StaffReportDetails({
                       loading || !feedback.trim() ? "not-allowed" : "pointer",
                   }}
                 >
-                  {loading ? "Submitting…" : "✅ Resolved — Submit Feedback"}
+                  {loading ? "Submitting…" : "✅ Resolved. Submit Feedback"}
                 </button>
 
                 <button
@@ -520,7 +520,7 @@ export default function StaffReportDetails({
                   onClick={() => setShowReopenForm(true)}
                   className="w-full py-2.5 rounded-lg border border-red-300 text-red-600 font-bold text-sm hover:bg-red-50 transition"
                 >
-                  ❌ Not satisfied — Reopen this job
+                  ❌ Not satisfied? Reopen this job
                 </button>
               </>
             ) : (
