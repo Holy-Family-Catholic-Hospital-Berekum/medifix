@@ -78,11 +78,13 @@ export async function markOverdueReports(user) {
     // later page load. `newStatus: "overdue"` is a synthetic value used
     // purely to key into the "*->overdue" rule in resolvedTargets.js — it
     // is never written back to the report's real `status` field.
+
     overdueReports.forEach(({ docSnap, data }) => {
       notifyOnStatusChange(data.status, "overdue", {
         id: docSnap.id,
         reporterId: data.reporterId,
         assignedTo: data.assignedTo,
+        priorityLevel: data.priorityLevel,
       }).catch((err) =>
         console.error(
           `notifyOnStatusChange failed for overdue report ${docSnap.id}:`,
