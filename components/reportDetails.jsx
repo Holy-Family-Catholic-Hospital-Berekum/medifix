@@ -347,6 +347,9 @@ export default function ReportDetailsContainer({
   // New: reason a worker gives when dropping a job they can't finish.
   const [dropReason, setDropReason] = useState("");
 
+  // New: reason a worker gives when rejecting a freshly assigned job.
+  const [rejectReason, setRejectReason] = useState("");
+
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   useEffect(() => {
@@ -363,14 +366,16 @@ export default function ReportDetailsContainer({
     }
   }, [displayDetails]);
 
-  // Reset the completion-photo picker and drop reason whenever the panel
-  // closes so stale input doesn't carry over to the next report opened.
+  // Reset the completion-photo picker, drop reason, and reject reason
+  // whenever the panel closes so stale input doesn't carry over to the
+  // next report opened.
   useEffect(() => {
     if (!displayDetails) {
       setCompletionImage(null);
       setCompletionImagePreview(null);
       setUploadError("");
       setDropReason("");
+      setRejectReason("");
     }
   }, [displayDetails]);
 
@@ -722,15 +727,26 @@ export default function ReportDetailsContainer({
     }
   };
 
+  // A reject reason is now required — saved into `rejectReason`/`rejectedBy`
+  // fields on the report (same shape as the drop-job fields below) and
+  // shown to estate/admin in the report details.
   const handleRejectJob = async () => {
     if (!canUserAcceptOrRejectJob(user, report)) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      alert("Please provide a reason for rejecting this job.");
+      return;
+    }
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
         status: "rejected",
+        rejectReason: reason,
+        rejectedBy: user?.name || user?.role || "",
         dateRejected: serverTimestamp(),
       });
       alert("Job rejected.");
+      setRejectReason("");
       setDisplayDetails(false);
       notifyOnStatusChange("assigned", "rejected", report);
     } catch (error) {
@@ -1010,23 +1026,6 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* Denial reason — pulled from the report's `notes` array (see
-          getDenialNote above). Only ever set/shown while status is
-          "denied". Visible to whichever role is viewing this panel,
-          including the reporter (staff). */}
-      {denialReason && (
-        <div className="flex flex-col gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Denial Reason:
-          </h2>
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <p className="text-red-700 md:text-lg">{denialReason}</p>
-          </div>
-        </div>
-      )}
-
       {report.dateApproved && (
         <div className="flex items-center gap-2">
           <h2
@@ -1049,6 +1048,19 @@ export default function ReportDetailsContainer({
           </h2>
           <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateCostAdded)}
+          </p>
+        </div>
+      )}
+
+      {report.dateCostDenied && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Materials Denied:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateCostDenied)}
           </p>
         </div>
       )}
@@ -1105,6 +1117,40 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
+      {/* New: Reject Reason / Rejected By — the worker's reason for
+          rejecting a freshly assigned job, kept visible to estate/admin
+          so it's available as context when reassigning to someone new. */}
+      {report.rejectReason && (
+        <div className="flex flex-col gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Reject Reason:
+          </h2>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <p className="text-red-700 md:text-lg">{report.rejectReason}</p>
+            {report.rejectedBy && (
+              <p className="text-red-500 text-sm mt-1">
+                — Rejected by {report.rejectedBy}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {report.dateReAssigned && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Re-Assigned:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateReAssigned)}
+          </p>
+        </div>
+      )}
+
       {report.dateAccepted && (
         <div className="flex items-center gap-2">
           <h2
@@ -1118,9 +1164,10 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* New: Date Dropped / Drop Reason — the previous worker's reason
-          for being unable to finish, kept visible to estate/admin so it's
-          available as context when reassigning to someone new. */}
+      {/* New: Date Dropped / Drop Reason / Dropped By — the previous
+          worker's reason for being unable to finish, kept visible to
+          estate/admin so it's available as context when reassigning to
+          someone new. */}
       {report.dateDropped && (
         <div className="flex items-center gap-2">
           <h2
@@ -1142,6 +1189,11 @@ export default function ReportDetailsContainer({
           </h2>
           <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
             <p className="text-orange-700 md:text-lg">{report.dropReason}</p>
+            {report.droppedBy && (
+              <p className="text-orange-500 text-sm mt-1">
+                — Dropped by {report.droppedBy}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -1200,32 +1252,6 @@ export default function ReportDetailsContainer({
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
             <p className="text-amber-700 md:text-lg">{report.reopenReason}</p>
           </div>
-        </div>
-      )}
-
-      {report.dateReAssigned && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Re-Assigned:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateReAssigned)}
-          </p>
-        </div>
-      )}
-
-      {report.dateCostDenied && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Materials Denied:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateCostDenied)}
-          </p>
         </div>
       )}
 
@@ -1631,11 +1657,22 @@ export default function ReportDetailsContainer({
               {report.instructions}
             </div>
           )}
+          <textarea
+            placeholder="Reason for rejecting this job (required)..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            className="w-full p-2 border border-gray-400 rounded"
+            rows="3"
+          />
           <div className="flex gap-2">
             <button
               onClick={handleRejectJob}
-              disabled={loading}
-              className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-1"
+              disabled={loading || !rejectReason.trim()}
+              className={`font-bold py-2 px-4 rounded flex-1 text-white transition ${
+                loading || !rejectReason.trim()
+                  ? "bg-red-300 cursor-not-allowed"
+                  : "bg-red-500 hover:bg-red-700 cursor-pointer"
+              }`}
             >
               {loading ? "Processing..." : "Reject Job"}
             </button>
