@@ -10,11 +10,10 @@ import {
   deleteDoc,
   updateDoc,
   serverTimestamp,
-  arrayUnion,
   doc,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
-import { formatDate, createAlert } from "../src/utils";
+import { formatDate } from "../src/utils";
 
 const ORANGE = "#FF8825";
 
@@ -672,14 +671,6 @@ export default function Pending() {
       await updateDoc(doc(db, "reports", report.id), {
         status: "closed",
         dateClosed: serverTimestamp(),
-        alerts: arrayUnion(
-          createAlert(
-            "Staff closed the reopened report",
-            "staff",
-            "estate",
-            report.status,
-          ),
-        ),
       });
     } catch (error) {
       console.error("Error closing report:", error);

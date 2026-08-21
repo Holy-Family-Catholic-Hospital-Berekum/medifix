@@ -1835,6 +1835,81 @@ export default function Home({
     closed: "Report closed.",
   };
 
+  // ─── Status → display-date mapping for report cards ───────────────────────
+  // Each status shows the date most relevant to *that* status, instead of
+  // always showing dateSent.
+  const STATUS_DATE_FIELD = {
+    incoming: "dateSent",
+    approved: "dateApproved",
+    pending: "dateCostAdded",
+    costDenied: "dateCostDenied",
+    confirmed: "dateConfirmed",
+    procured: "dateProcured",
+    assigned: "dateAssigned", // dateReAssigned is checked separately below
+    rejected: "dateRejected",
+    accepted: "dateAccepted",
+    reopened: "dateReopened",
+    completed: "dateCompleted",
+    closed: "dateClosed",
+  };
+
+  const STATUS_DATE_LABEL = {
+    incoming: "Sent",
+    approved: "Approved",
+    denied: "Denied",
+    pending: "Materials Added",
+    costDenied: "Request Denied",
+    confirmed: "Confirmed",
+    procured: "Procured",
+    assigned: "Assigned",
+    rejected: "Rejected",
+    accepted: "Accepted",
+    reopened: "Reopened",
+    completed: "Completed",
+    closed: "Closed",
+  };
+
+  // Denied reports don't have their own dedicated date field — the denial
+  // timestamp lives inside the last "denial" entry of `notes` (see
+  // getDenialNote in reportDetails.jsx / staffReportDetails.jsx) as a plain
+  // client-side Date, not a Firestore Timestamp.
+  function getDenialDate(report) {
+    const denialNotes = (report.notes || []).filter(
+      (n) => n?.type === "denial",
+    );
+    if (!denialNotes.length) return null;
+    return denialNotes[denialNotes.length - 1].date || null;
+  }
+
+  function getDisplayDate(report) {
+    const label = STATUS_DATE_LABEL[report.status] || "Sent";
+
+    let raw;
+    if (report.status === "denied") {
+      raw = getDenialDate(report);
+    } else if (report.status === "assigned") {
+      // Prefer the more recent reassignment date when one exists.
+      raw = report.dateReAssigned || report.dateAssigned;
+    } else {
+      const field = STATUS_DATE_FIELD[report.status];
+      raw = field ? report[field] : null;
+    }
+
+    // Fall back to dateSent whenever the status-specific field is missing —
+    // e.g. an older report written before a field existed.
+    if (!raw) raw = report.dateSent;
+
+    const jsDate = raw?.toDate
+      ? raw.toDate()
+      : raw instanceof Date
+        ? raw
+        : null;
+    return {
+      label,
+      value: jsDate ? jsDate.toLocaleDateString() : "—",
+    };
+  }
+
   function getStatusMessage(report) {
     if (report.status === "closed") return "Report closed by staff.";
     if (report.status === "completed")
@@ -1974,6 +2049,7 @@ export default function Home({
   // ─── Report Card ───────────────────────────────────────────────────────────
   const ReportCard = ({ report, reportDate }) => {
     const cfg = cardConfig(report.status, report.priorityLevel, theme);
+    const { label: dateLabel, value: dateValue } = getDisplayDate(report);
     return (
       <div className="relative w-full  max-w-[250px] md:max-w-[300px] flex justify-center">
         {/* Feedback badge */}
@@ -2034,15 +2110,15 @@ export default function Home({
               className={theme.cardStatusText}
             />
           )}
-          {/* Date */}
+          {/* Date — status-specific label/value, see getDisplayDate above */}
           <div className="flex items-center gap-2">
             <span
               className={`text-[10px] ${theme.cardDateLabel} uppercase tracking-wider font-semibold`}
             >
-              Sent
+              {dateLabel}
             </span>
             <span className={`text-xs ${theme.cardDateValue} font-mono`}>
-              {report[reportDate]?.toDate?.().toLocaleDateString()}
+              {dateValue}
             </span>
           </div>
 
