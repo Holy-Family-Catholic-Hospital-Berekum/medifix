@@ -453,16 +453,24 @@ function buildPeriodStats(subset) {
       days: avgStageDays("dateSent", "dateApproved"),
     },
     {
-      label: "Approved → Assigned",
-      days: avgStageDays("dateApproved", "dateAssigned"),
+      label: "Approved → Materials Request",
+      days: avgStageDays("dateApproved", "dateCostAdded"),
     },
     {
-      label: "Assigned → Accepted",
-      days: avgStageDays("dateAssigned", "dateAccepted"),
+      label: "Materials Request → Procured",
+      days: avgStageDays("dateCostAdded", "dateProcured"),
+    },
+    {
+      label: "Procured → Assigned",
+      days: avgStageDays("dateProcured", "dateAssigned"),
     },
     {
       label: "Accepted → Completed",
       days: avgStageDays("dateAccepted", "dateCompleted"),
+    },
+    {
+      label: "Completed → Closed",
+      days: avgStageDays("dateCompleted", "dateClosed"),
     },
   ];
 
