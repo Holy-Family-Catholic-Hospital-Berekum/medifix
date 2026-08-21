@@ -29,7 +29,8 @@ import {
   canUserSubmitCost,
   canUserMarkProcured,
   getTotalCost,
-  canUserAcceptOrRejectJob, // add this
+  canUserAcceptOrRejectJob,
+  canUserDropJob, // add this
 } from "../src/utils";
 
 const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
@@ -342,6 +343,10 @@ export default function ReportDetailsContainer({
 
   const [uploadError, setUploadError] = useState("");
   const [maintenanceCost, setMaintenanceCost] = useState("");
+
+  // New: reason a worker gives when dropping a job they can't finish.
+  const [dropReason, setDropReason] = useState("");
+
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   useEffect(() => {
@@ -358,13 +363,14 @@ export default function ReportDetailsContainer({
     }
   }, [displayDetails]);
 
-  // Reset the completion-photo picker whenever the panel closes so a stale
-  // photo doesn't carry over to the next report opened.
+  // Reset the completion-photo picker and drop reason whenever the panel
+  // closes so stale input doesn't carry over to the next report opened.
   useEffect(() => {
     if (!displayDetails) {
       setCompletionImage(null);
       setCompletionImagePreview(null);
       setUploadError("");
+      setDropReason("");
     }
   }, [displayDetails]);
 
@@ -606,12 +612,16 @@ export default function ReportDetailsContainer({
     }
     setLoading(true);
     try {
-      // If the report already has an assigned worker on it (e.g. that
-      // worker rejected the job, or staff reopened a completed report),
-      // this is a reassignment rather than a first-time assignment — we
-      // track that separately via dateReAssigned so the history shows
+      // If the report already has (or previously had) an assigned worker
+      // — e.g. that worker rejected/dropped the job, or staff reopened a
+      // completed report — this is a reassignment rather than a first-time
+      // assignment. We track that via dateReAssigned so the history shows
       // both the original assignment date and the reassignment date.
-      const isReassignment = Boolean(report.assignedTo);
+      // `droppedBy` is checked too because dropping clears `assignedTo`
+      // back to null, so `report.assignedTo` alone can't tell us this was
+      // previously assigned to someone.
+      const isReassignment =
+        Boolean(report.assignedTo) || Boolean(report.droppedBy);
 
       const updatePayload = {
         assignedTo: formData.selectedWorker,
@@ -726,6 +736,37 @@ export default function ReportDetailsContainer({
     } catch (error) {
       console.error("Error rejecting job:", error);
       alert("Failed to reject job");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // New: worker drops a job they've already accepted (or a reopened job)
+  // but can't finish. Clears assignedTo so it goes back to the estate's
+  // reassignment pool, and requires a reason so estate has context.
+  const handleDropWork = async () => {
+    if (!canUserDropJob(user, report)) return;
+    const reason = dropReason.trim();
+    if (!reason) {
+      alert("Please provide a reason for dropping this job.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        status: "dropped",
+        assignedTo: null,
+        dropReason: reason,
+        droppedBy: user?.name || user?.role || "",
+        dateDropped: serverTimestamp(),
+      });
+      alert("Job dropped. It's been returned to Estate for reassignment.");
+      setDropReason("");
+      setDisplayDetails(false);
+      notifyOnStatusChange(report.status, "dropped", report);
+    } catch (error) {
+      console.error("Error dropping job:", error);
+      alert("Failed to drop job");
     } finally {
       setLoading(false);
     }
@@ -1074,6 +1115,34 @@ export default function ReportDetailsContainer({
           <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateAccepted)}
           </p>
+        </div>
+      )}
+
+      {/* New: Date Dropped / Drop Reason — the previous worker's reason
+          for being unable to finish, kept visible to estate/admin so it's
+          available as context when reassigning to someone new. */}
+      {report.dateDropped && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Dropped:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateDropped)}
+          </p>
+        </div>
+      )}
+      {report.dropReason && (
+        <div className="flex flex-col gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Drop Reason:
+          </h2>
+          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+            <p className="text-orange-700 md:text-lg">{report.dropReason}</p>
+          </div>
         </div>
       )}
 
@@ -1434,6 +1503,12 @@ export default function ReportDetailsContainer({
           <h3 className="font-bold text-gray-800">
             Estate Actions - Assign Worker
           </h3>
+          {report.status === "dropped" && (
+            <p className="text-sm text-orange-600 bg-orange-50 rounded px-3 py-2">
+              This job was dropped by the previously assigned worker. Review the
+              drop reason above before reassigning.
+            </p>
+          )}
           <label className="block text-sm font-medium text-gray-700">
             Select a registered worker
           </label>
@@ -1572,6 +1647,36 @@ export default function ReportDetailsContainer({
               {loading ? "Processing..." : "Accept Job"}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* WORKER ACTIONS - Drop Job */}
+      {canUserDropJob(user, report) && (
+        <div className="bg-white rounded-lg p-5 space-y-3">
+          <h3 className="font-bold text-gray-800">Worker Actions — Drop Job</h3>
+          <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
+            If you're unable to complete this job, you can drop it. It will be
+            unassigned from you and returned to Estate for reassignment to
+            another worker.
+          </p>
+          <textarea
+            placeholder="Reason for dropping this job (required)..."
+            value={dropReason}
+            onChange={(e) => setDropReason(e.target.value)}
+            className="w-full p-2 border border-gray-400 rounded"
+            rows="3"
+          />
+          <button
+            onClick={handleDropWork}
+            disabled={loading || !dropReason.trim()}
+            className={`font-bold py-2 px-4 rounded w-full text-white transition ${
+              loading || !dropReason.trim()
+                ? "bg-orange-300 cursor-not-allowed"
+                : "bg-orange-600 hover:bg-orange-800 cursor-pointer"
+            }`}
+          >
+            {loading ? "Processing..." : "Drop Job"}
+          </button>
         </div>
       )}
 

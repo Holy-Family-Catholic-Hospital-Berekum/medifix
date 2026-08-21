@@ -52,6 +52,19 @@ const icons = {
     </svg>
   ),
 
+  dropped: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    </svg>
+  ),
+
   completed: (
     <svg
       viewBox="0 0 24 24"
@@ -97,12 +110,14 @@ export default function SlideInRight({
   assignedRedirect,
   rejectedRedirect,
   acceptedRedirect,
+  droppedRedirect,
   completedWithFeedback,
   newAssignedCount,
   newRejectedCount,
   newAcceptedCount,
   newCompletedCount,
   newReopenedCount,
+  newDroppedCount,
   closedWithFeedback,
   newClosedCount,
   closedRedirect,
@@ -183,6 +198,12 @@ export default function SlideInRight({
       count: newReopenedCount,
     },
     {
+      label: "Dropped",
+      redirect: droppedRedirect,
+      icon: icons.dropped,
+      count: newDroppedCount,
+    },
+    {
       label: "Completed",
       redirect: completedRedirect,
       icon: icons.completed,
@@ -203,7 +224,6 @@ export default function SlideInRight({
       count: newRejectedCount,
     },
   ];
-
   return (
     <>
       {/* Backdrop */}
@@ -380,7 +400,7 @@ export default function SlideInRight({
 
           {/* Management */}
           {isManagementRole && dashboardRedirect && (
-            <div >
+            <div>
               <p className="px-3 mb-3 text-[10px] uppercase tracking-[0.25em] font-bold text-white/25">
                 Management
               </p>

@@ -24,6 +24,7 @@ export default function Assigned() {
       logoBGColor="md:bg-blue-500"
       closedRedirect={"/ecl"}
       homeRedirect="/eh"
+      droppedRedirect={"/edr"}
       dashboardRedirect={"/ed"}
       role={"estate"}
     />

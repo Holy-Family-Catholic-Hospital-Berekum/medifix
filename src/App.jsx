@@ -16,6 +16,7 @@ import Rejected from "../Estate-manager/estateRejected";
 import EstateInProgress from "../Estate-manager/estateInProgress";
 import EstateReOpened from "../Estate-manager/estateReOpened";
 import EstateClosed from "../Estate-manager/estateClosed";
+import EstateDropped from "../Estate-manager/estateDropped";
 
 import AdminHome from "../Admin/adminHome";
 import AdminInProgress from "../Admin/adminInProgress";
@@ -200,6 +201,14 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
             <EstateInProgress />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/edr"
+        element={
+          <ProtectedRoute allowedRoles={["estate"]}>
+            <EstateDropped />
           </ProtectedRoute>
         }
       />

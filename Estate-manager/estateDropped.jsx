@@ -1,16 +1,16 @@
 import Home from "../components/Home";
 
-export default function EstateReOpened() {
+export default function EstateDropped() {
   return (
     <Home
       bgColor="bg-[#eff6ff]"
-      firstReportsStatus="reopened"
+      firstReportsStatus="dropped"
       primaryColor="text-red-800"
-      title1="Reopened Jobs"
+      title1="Dropped Works"
       secColor={"bg-yellow-500"}
       titleBgColor={"bg-yellow-500"}
       reportCardHoverColor={"hover:bg-yellow-600"}
-      reportDate1="dateReopened"
+      reportDate1="dateDropped"
       titleBorderColor={"border-red-800"}
       navBarColor="bg-red-800"
       slideInBgColor="bg-yellow-500"
@@ -21,10 +21,10 @@ export default function EstateReOpened() {
       rejectedRedirect={"/er"}
       acceptedRedirect={"/eip"}
       reopenedRedirect={"/ero"}
-      logoBGColor="md:bg-yellow-500"
-      closedRedirect={"/ecl"}
       droppedRedirect={"/edr"}
+      logoBGColor="md:bg-yellow-500"
       homeRedirect="/eh"
+      closedRedirect={"/ecl"}
       dashboardRedirect={"/ed"}
       role={"estate"}
     />

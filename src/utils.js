@@ -1628,6 +1628,14 @@ export const canUserAcceptOrRejectJob = (user, report) => {
   );
 };
 
+export function canUserDropJob(user, report) {
+  return (
+    user?.role === "worker" &&
+    report?.assignedTo === user?.ID &&
+    ["accepted", "reopened"].includes(report?.status)
+  );
+}
+
 // Completing work now requires the worker to have accepted the job first.
 export const canUserComplete = (user, report) => {
   return (

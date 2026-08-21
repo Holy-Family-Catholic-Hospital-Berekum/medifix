@@ -1312,6 +1312,7 @@ const BADGE_STATUS_LIST = [
   "rejected",
   "accepted",
   "reopened",
+  "dropped",
   "completed",
   "closed",
 ];
@@ -1566,6 +1567,7 @@ export default function Home({
   rejectedRedirect,
   acceptedRedirect,
   reopenedRedirect,
+  droppedRedirect,
   title1,
   title2,
   reportDate1,
@@ -1722,6 +1724,9 @@ export default function Home({
     const newReopenedCount = allBadgeReports.filter(
       (r) => r.status === "reopened" && isNewForUser(r),
     ).length;
+    const newDroppedCount = allBadgeReports.filter(
+      (r) => r.status === "dropped" && isNewForUser(r),
+    ).length;
     const newCompletedCount = allBadgeReports.filter(
       (r) => r.status === "completed" && isNewForUser(r),
     ).length;
@@ -1743,12 +1748,16 @@ export default function Home({
     const reopenedCount = allBadgeReports.filter(
       (r) => r.status === "reopened",
     ).length;
+    const droppedCount = allBadgeReports.filter(
+      (r) => r.status === "dropped",
+    ).length;
 
     return {
       newAssignedCount,
       newRejectedCount,
       newAcceptedCount,
       newReopenedCount,
+      newDroppedCount,
       newCompletedCount,
       newClosedCount,
       completedWithFeedback,
@@ -1756,6 +1765,7 @@ export default function Home({
       rejectedCount,
       acceptedCount,
       reopenedCount,
+      droppedCount,
     };
   }, [allBadgeReports, isNewForUser, hasFeedback]);
 
@@ -1764,6 +1774,7 @@ export default function Home({
     newRejectedCount,
     newAcceptedCount,
     newReopenedCount,
+    newDroppedCount,
     newCompletedCount,
     newClosedCount,
     completedWithFeedback,
@@ -1771,6 +1782,7 @@ export default function Home({
     rejectedCount,
     acceptedCount,
     reopenedCount,
+    droppedCount,
   } = badgeCounts;
 
   const displayReportDetails = (report) => {
@@ -2255,9 +2267,11 @@ export default function Home({
         rejectedRedirect={rejectedRedirect}
         acceptedRedirect={acceptedRedirect}
         reopenedRedirect={reopenedRedirect}
+        droppedRedirect={droppedRedirect}
         rejectedCount={rejectedCount}
         acceptedCount={acceptedCount}
         reopenedCount={reopenedCount}
+        droppedCount={droppedCount}
         completedRedirect={completedRedirect}
         completedWithFeedback={completedWithFeedback}
         dashboardRedirect={dashboardRedirect}
@@ -2266,6 +2280,7 @@ export default function Home({
         newRejectedCount={newRejectedCount}
         newAcceptedCount={newAcceptedCount}
         newReopenedCount={newReopenedCount}
+        newDroppedCount={newDroppedCount}
         newCompletedCount={newCompletedCount}
         closedRedirect={closedRedirect}
         newClosedCount={newClosedCount}
@@ -2385,6 +2400,29 @@ export default function Home({
                   {newAcceptedCount > 0 && (
                     <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
                       {newAcceptedCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          )}
+
+          {droppedRedirect && (
+            <NavLink
+              to={droppedRedirect}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                  />
+                  Dropped
+                  {newDroppedCount > 0 && (
+                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                      {newDroppedCount}
                     </span>
                   )}
                 </>
