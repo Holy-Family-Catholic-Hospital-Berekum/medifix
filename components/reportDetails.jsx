@@ -62,6 +62,23 @@ const compressImageToBase64 = (file) => {
   });
 };
 
+// Denial reasons now live in the report's `notes` array instead of the old
+// `alerts` field (alerts were being written but never really read anywhere
+// useful, so they were dropped from the flow). A note entry looks like:
+// { type: "denial", content: "<reason>", date: <JS Date>, by: "<name>" }
+//
+// NOTE: the date on this entry is a plain `new Date()`, not
+// serverTimestamp() — Firestore rejects serverTimestamp() sentinels inside
+// array elements passed to arrayUnion(), so a client-side Date is the only
+// option here.
+function getDenialNote(report) {
+  if (!report || report.status !== "denied") return null;
+  const denialNotes = (report.notes || []).filter((n) => n?.type === "denial");
+  return denialNotes.length
+    ? denialNotes[denialNotes.length - 1].content
+    : null;
+}
+
 // Read-only star display for the technician rating, so any role viewing
 // this panel (not just the staff member who submitted it) can see it.
 function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
@@ -421,6 +438,7 @@ export default function ReportDetailsContainer({
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
   const report = currentReport[0];
+  const denialReason = getDenialNote(report);
 
   const assignedWorker = workers.find((w) => w.ID === report.assignedTo);
 
@@ -451,10 +469,29 @@ export default function ReportDetailsContainer({
 
   const handleDeny = async () => {
     if (!canUserApprove(user, report)) return;
+
+    // A denial reason is now required — it's saved into the report's
+    // `notes` array (see getDenialNote above) and shown to the reporter,
+    // replacing the old `alerts`-based approach.
+    const reason = formData.note.trim();
+    if (!reason) {
+      alert("Please provide a reason for denying this report.");
+      return;
+    }
+
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
         status: "denied",
+        // NOTE: this MUST be a plain `new Date()`, not serverTimestamp() —
+        // Firestore rejects serverTimestamp() sentinels inside array
+        // elements passed to arrayUnion().
+        notes: arrayUnion({
+          type: "denial",
+          content: reason,
+          date: new Date(),
+          by: user?.name || user?.role || "",
+        }),
       });
 
       alert("Report denied!");
@@ -569,10 +606,19 @@ export default function ReportDetailsContainer({
     }
     setLoading(true);
     try {
+      // If the report already has an assigned worker on it (e.g. that
+      // worker rejected the job, or staff reopened a completed report),
+      // this is a reassignment rather than a first-time assignment — we
+      // track that separately via dateReAssigned so the history shows
+      // both the original assignment date and the reassignment date.
+      const isReassignment = Boolean(report.assignedTo);
+
       const updatePayload = {
         assignedTo: formData.selectedWorker,
         status: "assigned",
-        dateAssigned: serverTimestamp(),
+        ...(isReassignment
+          ? { dateReAssigned: serverTimestamp() }
+          : { dateAssigned: serverTimestamp() }),
       };
 
       if (formData.instructions.trim()) {
@@ -585,7 +631,9 @@ export default function ReportDetailsContainer({
       const msg =
         report.status === "approved"
           ? "Work assigned directly (no materials required)!"
-          : "Work assigned to worker!";
+          : isReassignment
+            ? "Work reassigned to worker!"
+            : "Work assigned to worker!";
       alert(msg);
       setFormData({ ...formData, selectedWorker: "", instructions: "" });
       setDisplayDetails(false);
@@ -917,8 +965,24 @@ export default function ReportDetailsContainer({
             src={reportImagesData.image}
             alt="Report attachment"
             className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
-            onClick={() => window.open(reportImagesData.image, "_blank")}
           />
+        </div>
+      )}
+
+      {/* Denial reason — pulled from the report's `notes` array (see
+          getDenialNote above). Only ever set/shown while status is
+          "denied". Visible to whichever role is viewing this panel,
+          including the reporter (staff). */}
+      {denialReason && (
+        <div className="flex flex-col gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Denial Reason:
+          </h2>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <p className="text-red-700 md:text-lg">{denialReason}</p>
+          </div>
         </div>
       )}
 
@@ -999,18 +1063,7 @@ export default function ReportDetailsContainer({
           </p>
         </div>
       )}
-      {report.dateReAssigned && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Re-Assigned:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateReAssigned)}
-          </p>
-        </div>
-      )}
+
       {report.dateAccepted && (
         <div className="flex items-center gap-2">
           <h2
@@ -1049,6 +1102,47 @@ export default function ReportDetailsContainer({
           </h2>
           <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
             {formatDate(report.dateCompleted)}
+          </p>
+        </div>
+      )}
+
+      {/* Reopen reason + date reopened — the report already carries these
+          as dedicated fields (set when staff reopens a completed job), this
+          panel just wasn't showing them before. */}
+      {report.dateReopened && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Reopened:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateReopened)}
+          </p>
+        </div>
+      )}
+      {report.reopenReason && (
+        <div className="flex flex-col gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Reopen Reason:
+          </h2>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <p className="text-amber-700 md:text-lg">{report.reopenReason}</p>
+          </div>
+        </div>
+      )}
+
+      {report.dateReAssigned && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+          >
+            Date Re-Assigned:
+          </h2>
+          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
+            {formatDate(report.dateReAssigned)}
           </p>
         </div>
       )}
@@ -1164,9 +1258,6 @@ export default function ReportDetailsContainer({
             src={reportImagesData.completionImage}
             alt="Completed work"
             className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
-            onClick={() =>
-              window.open(reportImagesData.completionImage, "_blank")
-            }
           />
         </div>
       )}
@@ -1178,12 +1269,15 @@ export default function ReportDetailsContainer({
             Admin Actions - Approve/Deny
           </h3>
           <textarea
-            placeholder="Add optional note..."
+            placeholder="Add a note… (required if denying)"
             value={formData.note}
             onChange={(e) => setFormData({ ...formData, note: e.target.value })}
             className="w-full p-2 border border-gray-400 rounded"
             rows="3"
           />
+          <p className="text-xs text-gray-400 -mt-2">
+            A reason is required to deny a report — it's shown to the reporter.
+          </p>
           <div className="flex gap-2">
             <button
               onClick={handleDeny}

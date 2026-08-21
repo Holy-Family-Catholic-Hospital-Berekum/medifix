@@ -124,19 +124,6 @@ export const formatDate = (timestamp) => {
 };
 
 /**
- * Create an alert object for notifications
- */
-export const createAlert = (content, sentBy, sentTo, type) => {
-  return {
-    content,
-    sentBy,
-    sentTo,
-    date: new Date().toISOString(),
-    type,
-  };
-};
-
-/**
  * Generate a PDF report with a materials table and signatures
  */
 export const generatePDFReport = (

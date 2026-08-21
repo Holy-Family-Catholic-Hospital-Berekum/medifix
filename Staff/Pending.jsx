@@ -617,10 +617,12 @@ export default function Pending() {
 
   const getDenialNote = (report) => {
     if (report.status !== "denied") return null;
-    return (
-      report.alerts?.find((a) => a.sentTo === user?.ID && a.type === "incoming")
-        ?.content || null
+    const denialNotes = (report.notes || []).filter(
+      (n) => n?.type === "denial",
     );
+    return denialNotes.length
+      ? denialNotes[denialNotes.length - 1].content
+      : null;
   };
 
   const handleCancelReport = async (report) => {

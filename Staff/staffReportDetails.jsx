@@ -13,8 +13,20 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "../src/firebase";
-import { formatDate, canUserSendFeedback, createAlert } from "../src/utils";
+import { formatDate, canUserSendFeedback } from "../src/utils";
 import PhoneCallButton from "../components/phoneCallButton";
+
+// Denial reasons now live in the report's `notes` array instead of the old
+// `alerts` field (alerts were being written but never really read anywhere
+// useful, so they were dropped from the flow). A note entry looks like:
+// { type: "denial", content: "<reason>", date: <JS Date>, by: "<name>" }
+function getDenialNote(report) {
+  if (!report || report.status !== "denied") return null;
+  const denialNotes = (report.notes || []).filter((n) => n?.type === "denial");
+  return denialNotes.length
+    ? denialNotes[denialNotes.length - 1].content
+    : null;
+}
 
 function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
   const [hovered, setHovered] = useState(0);
@@ -148,6 +160,7 @@ export default function StaffReportDetails({
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
   const report = currentReport[0];
+  const denialReason = getDenialNote(report);
 
   const handleReopenReport = async () => {
     if (!canUserSendFeedback(user, report)) return; // same reporter/status gate as confirming
@@ -168,9 +181,6 @@ export default function StaffReportDetails({
         status: "reopened",
         dateReopened: serverTimestamp(),
         reopenReason: reopenReason.trim(),
-        alerts: arrayUnion(
-          createAlert(reopenReason.trim(), "staff", "estate", report.status),
-        ),
       });
 
       // Tell the parent the report moved out of "completed" so it can drop
@@ -276,6 +286,19 @@ export default function StaffReportDetails({
           </p>
         </div>
 
+        {/* denial reason — read from report.notes (see getDenialNote
+            above). Only present while status is "denied". */}
+        {denialReason && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-lg md:text-xl whitespace-nowrap">
+              Denial Reason:
+            </h2>
+            <div className="bg-white/10 rounded-xl px-4 py-3">
+              <p className="text-blue-100 md:text-lg">{denialReason}</p>
+            </div>
+          </div>
+        )}
+
         {report.dateApproved && (
           <div className="flex items-center gap-2">
             <h2 className="text-lg md:text-xl">Date Approved:</h2>
@@ -303,6 +326,19 @@ export default function StaffReportDetails({
           </div>
         )}
 
+        {/* date reassigned — this panel was missing it even though the
+            field is already tracked on the report */}
+        {report.dateReAssigned && (
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg md:text-xl whitespace-nowrap">
+              Date Re-Assigned:
+            </h2>
+            <p className="text-blue-100 md:text-lg">
+              {formatDate(report.dateReAssigned)}
+            </p>
+          </div>
+        )}
+
         {report.dateCompleted && (
           <div className="flex items-center gap-2">
             <h2 className="text-lg md:text-xl">Date Completed:</h2>
@@ -318,6 +354,19 @@ export default function StaffReportDetails({
             <p className="text-blue-100 md:text-lg">
               {formatDate(report.dateReopened)}
             </p>
+          </div>
+        )}
+
+        {/* reopen reason — this panel was showing the date but not the
+            reason itself */}
+        {report.reopenReason && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-lg md:text-xl whitespace-nowrap">
+              Reopen Reason:
+            </h2>
+            <div className="bg-white/10 rounded-xl px-4 py-3">
+              <p className="text-blue-100 md:text-lg">{report.reopenReason}</p>
+            </div>
           </div>
         )}
 
@@ -368,9 +417,6 @@ export default function StaffReportDetails({
                     src={reportImagesData.image}
                     alt="Reported issue"
                     className="w-full max-h-64 object-contain rounded-xl border border-white/20 bg-black/10 cursor-pointer"
-                    onClick={() =>
-                      window.open(reportImagesData.image, "_blank")
-                    }
                   />
                 ) : (
                   <div className="w-full h-32 flex items-center justify-center rounded-xl border border-dashed border-white/30 text-orange-100 text-xs">
@@ -388,9 +434,6 @@ export default function StaffReportDetails({
                     src={reportImagesData.completionImage}
                     alt="Completed work"
                     className="w-full max-h-64 object-contain rounded-xl border border-white/20 bg-black/10 cursor-pointer"
-                    onClick={() =>
-                      window.open(reportImagesData.completionImage, "_blank")
-                    }
                   />
                 ) : (
                   <div className="w-full h-32 flex items-center justify-center rounded-xl border border-dashed border-white/30 text-orange-100 text-xs">
