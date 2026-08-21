@@ -5,10 +5,10 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
-import { db, auth } from "../src/firebase";
+import { db, auth, appCheck } from "../src/firebase";
+import { getToken as getAppCheckToken } from "firebase/app-check";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -300,28 +300,9 @@ const CSS = `
 `;
 
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 30_000; // 30 seconds
+const LOCKOUT_MS = 30_000;
 const STORAGE_KEY = "phix_login_attempts";
-const VALID_REG_TYPES = [
-  "staff",
-  "worker",
-  "estate",
-  "admin",
-  "manager",
-  "procurement",
-];
 
-// A 6-digit PIN only has 1,000,000 possible values — far fewer than the
-// old nanoid — so this expiry window (not just uniqueness) is what keeps
-// a leaked or guessed PIN from being claimable indefinitely. Must match
-// what's advertised to the generating admin/manager in GenIDModal
-// (Dashboard.jsx: "Expires in 48 hours if not used to register.").
-const REG_ID_EXPIRY_MS = 48 * 60 * 60 * 1000; // 48 hours
-
-// Where Firebase sends the user after they click the verification link
-// in their email. Falls back to the current origin's login route so this
-// keeps working across environments (localhost, staging, prod) without
-// hardcoding a domain.
 const VERIFICATION_ACTION_SETTINGS = {
   url:
     typeof window !== "undefined"
@@ -346,19 +327,11 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [resetFeedback, setResetFeedback] = useState("");
-
-  // ── email verification state ─────────────────────────────────────────────────
-  // Set when a login attempt succeeds against Auth but the account's email
-  // isn't verified yet. Drives the "Resend verification email" affordance
-  // on the login form. Cleared on successful login, mode switch, or resend.
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
-
-  // ── attempt-limiting state ───────────────────────────────────────────────────
   const [loginAttempts, setLoginAttempts] = useState(0);
-  const [lockoutUntil, setLockoutUntil] = useState(null); // epoch ms
-  const [countdown, setCountdown] = useState(0); // seconds remaining
+  const [lockoutUntil, setLockoutUntil] = useState(null);
+  const [countdown, setCountdown] = useState(0);
 
-  // Restore persisted lockout on mount
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
     if (!saved) return;
@@ -370,7 +343,6 @@ export default function SignUp() {
     }
   }, []);
 
-  // Live countdown ticker
   useEffect(() => {
     if (!lockoutUntil) return;
     const tick = () => {
@@ -499,26 +471,19 @@ export default function SignUp() {
     }, 280);
   };
 
-  // ── sign up ──────────────────────────────────────────────────────────────────
+  // ── sign up ──────────────────────────────────────────────────────────────
   //
-  // ORDERING IS DELIBERATE AND SECURITY-RELEVANT — read before changing it.
+  // ORDERING IS STILL DELIBERATE — read before changing it.
   //
-  // Previously the registration ID was claimed (used: false -> true)
-  // BEFORE the Firebase Auth account existed, while the client was still
-  // fully unauthenticated. If account creation then failed for any reason
-  // (most commonly auth/email-already-in-use), the code tried to release
-  // the ID back to unused — but Firestore's rules only ever permitted an
-  // unauthenticated client to flip used false->true, never true->false
-  // (allowing the reverse for anyone unauthenticated would let an
-  // attacker un-use ANY registration code and hand it to someone else).
-  // That release call silently failed, permanently burning a valid
-  // registration ID on every failed signup attempt.
-  //
-  // The fix: create the Auth account FIRST. If that fails, the
-  // registration ID was never touched — nothing to roll back. The ID is
-  // only claimed once we have a real (if still unverified) Auth session,
-  // tagged with `claimedBy: uid` — see firestore.rules for the
-  // corresponding narrowly-scoped self-release rule this now relies on.
+  // 1) Create the Auth account first. Nothing has touched the
+  //    registration ID yet, so a failure here needs no cleanup.
+  // 2) Claim the PIN via the server-side /api/claim-registration-id route
+  //    (Admin SDK + App Check + auth + IP/uid rate limiting). The client
+  //    SDK can no longer write `used` directly at all — see
+  //    firestore.rules, the client-facing claim branch is gone.
+  // 3) Write the profile doc. If this fails, release the claim (the
+  //    narrowly-scoped self-release rule still allows this, since it's
+  //    the exact uid that claimed it and users/{uid} doesn't exist yet).
   const handleSubmit = async () => {
     if (!canProceed || loading) return;
     setLoading(true);
@@ -527,8 +492,7 @@ export default function SignUp() {
     let createdUser = null;
 
     try {
-      // 1) Create the Auth account first. No registration ID has been
-      // touched yet, so a failure here needs no cleanup at all.
+      // 1) Create the Auth account.
       let userCredential;
       try {
         userCredential = await createUserWithEmailAndPassword(
@@ -548,57 +512,55 @@ export default function SignUp() {
         return;
       }
       createdUser = userCredential.user;
-      const uid = createdUser.uid;
 
-      // 2) Now that there's a real (unverified) session, atomically
-      // check-and-claim the registration ID, tagged to this uid.
+      // 2) Claim the registration ID server-side.
       const regDocRef = doc(db, "registrationIDs", trimmedId);
       let regType;
       try {
-        await runTransaction(db, async (tx) => {
-          const regSnap = await tx.get(regDocRef);
-          if (!regSnap.exists()) {
-            throw new Error("REG_NOT_FOUND");
-          }
-          const regData = regSnap.data();
-          if (regData.used === true) {
-            throw new Error("REG_ALREADY_USED");
-          }
-          const createdAtMs = regData.createdAt?.toMillis
-            ? regData.createdAt.toMillis()
-            : null;
-          if (
-            createdAtMs == null ||
-            Date.now() - createdAtMs > REG_ID_EXPIRY_MS
-          ) {
-            throw new Error("REG_EXPIRED");
-          }
-          const type = regData.type?.toLowerCase();
-          if (!VALID_REG_TYPES.includes(type)) {
-            throw new Error("REG_INVALID_TYPE");
-          }
-          regType = type;
-          tx.update(regDocRef, { used: true, claimedBy: uid });
+        const idToken = await createdUser.getIdToken();
+        const { token: appCheckToken } = await getAppCheckToken(
+          appCheck,
+          false,
+        );
+
+        const res = await fetch("/api/claim-registration-id", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+            "X-Firebase-AppCheck": appCheckToken,
+          },
+          body: JSON.stringify({ pin: trimmedId }),
         });
-      } catch (txError) {
-        if (txError.message === "REG_NOT_FOUND") {
-          alert(
-            "Invalid registration ID. Please request one from the Admin or IT Manager.",
-          );
-        } else if (txError.message === "REG_ALREADY_USED") {
-          alert("This registration ID has already been used.");
-        } else if (txError.message === "REG_EXPIRED") {
-          alert(
-            "This registration ID has expired. Please request a new one from the Admin or IT Manager.",
-          );
-        } else if (txError.message === "REG_INVALID_TYPE") {
-          alert("Invalid registration ID type. Contact the IT Manager.");
-        } else {
-          console.error("Registration ID claim failed:", txError);
-          alert("Unable to verify registration ID. Please try again later.");
+        const json = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 429) {
+            alert(
+              json.error ||
+                "Too many attempts. Please wait a few minutes and try again.",
+            );
+          } else {
+            alert(
+              json.error ||
+                "Unable to verify registration ID. Please try again later.",
+            );
+          }
+          try {
+            await deleteUser(createdUser);
+          } catch (e) {
+            console.error(
+              "Failed to clean up account after invalid registration ID:",
+              e,
+            );
+          }
+          return;
         }
-        // The ID was never successfully claimed, so there's nothing to
-        // release — just clean up the orphaned Auth account.
+
+        regType = json.role;
+      } catch (txError) {
+        console.error("Registration ID claim failed:", txError);
+        alert("Unable to verify registration ID. Please try again later.");
         try {
           await deleteUser(createdUser);
         } catch (e) {
@@ -612,16 +574,13 @@ export default function SignUp() {
 
       // 3) Write the profile doc.
       try {
-        await setDoc(doc(db, "users", uid), {
+        await setDoc(doc(db, "users", createdUser.uid), {
           name: name.trim(),
           email: email.trim(),
           location: location.trim(),
           profession: profession.trim(),
           ID: trimmedId,
           phoneNumber: phoneNumber.trim(),
-          // Stored as "YYYY-MM-DD" (native <input type="date"> format) so
-          // it sorts/compares easily. Used later to detect and celebrate
-          // birthdays in-app.
           birthdate: birthdate.trim(),
           role: regType,
           deactivated: false,
@@ -629,11 +588,6 @@ export default function SignUp() {
         });
       } catch (profileError) {
         console.error("Firestore profile write failed:", profileError);
-        // Release the registration-ID claim WHILE we still hold the
-        // authenticated session that claimed it — the release rule
-        // requires that exact uid, and requires users/{uid} to still not
-        // exist. Both are only true right now, before deleteUser signs
-        // this session out below.
         try {
           await updateDoc(regDocRef, { used: false });
         } catch (releaseError) {
@@ -651,21 +605,13 @@ export default function SignUp() {
         return;
       }
 
-      // 4) Everything succeeded — send the verification email now, not
-      // earlier, so a rolled-back attempt (steps 2 or 3 failing) never
-      // sends a verification link for an account that's about to be
-      // deleted.
+      // 4) Success — verification email, then sign out until verified.
       try {
         await sendEmailVerification(createdUser, VERIFICATION_ACTION_SETTINGS);
       } catch (verifyError) {
         console.error("Failed to send verification email:", verifyError);
       }
 
-      // Sign the newly-created (but unverified) user back out immediately.
-      // createUserWithEmailAndPassword leaves them signed in by default,
-      // but they shouldn't have an authenticated session until they've
-      // clicked the link in their inbox — handleLogin enforces the same
-      // gate, this just avoids a dangling unverified session in between.
       await signOut(auth);
       alert(
         "Account created! We've sent a verification link to your email — please verify it before logging in.",
@@ -677,7 +623,7 @@ export default function SignUp() {
     }
   };
 
-  // ── login ────────────────────────────────────────────────────────────────────
+  // ── login ────────────────────────────────────────────────────────────────
   const handleForgotPassword = async () => {
     const emailToReset = loginId.trim();
     if (!emailToReset) {
@@ -709,11 +655,6 @@ export default function SignUp() {
     }
   };
 
-  // Resends the verification email for an account that failed the
-  // emailVerified gate in handleLogin. sendEmailVerification requires an
-  // authenticated user, so this briefly signs back in with the password
-  // already entered, sends the email, then signs back out — mirroring the
-  // sign-out-until-verified invariant enforced everywhere else.
   const handleResendVerification = async () => {
     if (!unverifiedEmail) return;
     if (!loginPassword.trim()) {
@@ -731,8 +672,6 @@ export default function SignUp() {
         loginPassword,
       );
       if (cred.user.emailVerified) {
-        // Verified since the last attempt (e.g. they clicked the link
-        // just now) — no need to resend, let them know they can log in.
         await signOut(auth);
         setUnverifiedEmail("");
         setResetFeedback(
@@ -763,7 +702,6 @@ export default function SignUp() {
       alert("Please fill in both email and password.");
       return;
     }
-    // Block if locked out
     if (lockoutUntil && Date.now() < lockoutUntil) return;
     if (loading) return;
     setLoading(true);
@@ -776,9 +714,6 @@ export default function SignUp() {
         loginPassword,
       );
 
-      // ── email verification gate ──
-      // Checked before the Firestore lookup so an unverified account never
-      // reaches the deactivated check or the role-based redirect below.
       if (!userCredential.user.emailVerified) {
         await auth.signOut();
         setUnverifiedEmail(loginId.trim());
@@ -803,7 +738,6 @@ export default function SignUp() {
         );
         return;
       }
-      // ✅ Success — clear attempt counter
       setLoginAttempts(0);
       setLockoutUntil(null);
       localStorage.removeItem(STORAGE_KEY);
@@ -830,7 +764,6 @@ export default function SignUp() {
       setLoginAttempts(next);
 
       if (next >= MAX_ATTEMPTS) {
-        // Trigger lockout
         const until = Date.now() + LOCKOUT_MS;
         setLockoutUntil(until);
         localStorage.setItem(
