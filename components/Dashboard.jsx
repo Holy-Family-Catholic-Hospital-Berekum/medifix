@@ -24,6 +24,11 @@ import { generateDashboardStatsPDF } from "../src/utils";
 // needs action — but it also must never show as overdue (per product
 // decision: reopened jobs don't carry a due-date countdown), so overdue
 // exclusion is a separate, slightly larger list.
+// "dropped" is also intentionally NOT terminal, for the same reason as
+// "rejected": a worker dropping a job just returns it to Estate for
+// reassignment, it doesn't reset or pause the original due date, so it's
+// deliberately left OUT of OVERDUE_EXCLUDED_STATUSES (same treatment as
+// "rejected") — a dropped job can still show as overdue.
 const TERMINAL_STATUSES = ["completed", "closed", "denied"];
 const OVERDUE_EXCLUDED_STATUSES = ["completed", "closed", "denied", "reopened"];
 
@@ -150,6 +155,18 @@ const STATUS_META = {
     color: "#f43f5e",
     bg: "#ffe4e6",
     text: "#881337",
+  },
+  // New: worker accepted a job, then dropped it before finishing — cleared
+  // back to unassigned and returned to Estate for reassignment. Given its
+  // own distinct orange tone (matching the orange bg-orange-50/text-orange-700
+  // treatment ReportDetailsContainer.jsx already uses for the drop reason
+  // banner) so it doesn't get visually confused with "Job Rejected" (rose),
+  // even though both land the report back with Estate for reassignment.
+  dropped: {
+    label: "Dropped",
+    color: "#ea580c",
+    bg: "#fff7ed",
+    text: "#9a3412",
   },
   completed: {
     label: "Completed",
@@ -289,9 +306,7 @@ function getDenialReasonText(report) {
 // allowed inside arrayUnion() array elements) and fall back to dateSent if
 // that's ever missing.
 function getDenialSortDate(report) {
-  const denialNotes = (report.notes || []).filter(
-    (n) => n?.type === "denial",
-  );
+  const denialNotes = (report.notes || []).filter((n) => n?.type === "denial");
   if (denialNotes.length) {
     const raw = denialNotes[denialNotes.length - 1].date;
     const d = raw?.toDate ? raw.toDate() : new Date(raw);
@@ -313,6 +328,10 @@ function buildPeriodStats(subset) {
   const closed = subset.filter((r) => r.status === "closed").length;
   const reopened = subset.filter((r) => r.status === "reopened").length;
   const rejectedJobs = subset.filter((r) => r.status === "rejected").length;
+  // New: current live count of reports sitting in "dropped" — same shape
+  // as rejectedJobs above (a snapshot of THIS status within the selected
+  // period, not a cumulative/ever-dropped count).
+  const droppedJobs = subset.filter((r) => r.status === "dropped").length;
   const overdue = subset.filter(isOverdueEligible).length;
   const active = subset.filter((r) => isActive(r.status)).length;
 
@@ -451,7 +470,12 @@ function buildPeriodStats(subset) {
   // Distinct from "Jobs Declined by Worker" (a live count of reports
   // currently sitting in "rejected") — this is the share of every job
   // that was EVER assigned that needed a reassignment at some point,
-  // whether that was triggered by a worker rejecting it or by a reopen.
+  // whether that was triggered by a worker rejecting it, a worker
+  // dropping it, or a reopen. dateReAssigned is set by
+  // ReportDetailsContainer.jsx's handleAssignWorker whenever
+  // report.assignedTo OR report.droppedBy is already present — so a
+  // dropped-then-reassigned job is already captured here without any
+  // change needed in this function.
   const everAssignedCount = subset.filter((r) => r.dateAssigned).length;
   const reassignedCount = subset.filter((r) => r.dateReAssigned).length;
   const reassignmentRate = everAssignedCount
@@ -500,6 +524,7 @@ function buildPeriodStats(subset) {
     closed,
     reopened,
     rejectedJobs,
+    droppedJobs,
     overdue,
     active,
     byStatus,
@@ -1730,6 +1755,11 @@ export default function Dashboard({
     const rejectedJobsCount = reports.filter(
       (r) => r.status === "rejected",
     ).length;
+    // New: current live count of reports sitting in "dropped" — mirrors
+    // rejectedJobsCount above.
+    const droppedJobsCount = reports.filter(
+      (r) => r.status === "dropped",
+    ).length;
     const overdue = reports.filter(isOverdueEligible).length;
     const active = reports.filter((r) => isActive(r.status)).length;
 
@@ -2161,6 +2191,7 @@ export default function Dashboard({
       closed,
       reopenedCount,
       rejectedJobsCount,
+      droppedJobsCount,
       overdue,
       active,
       byStatus,
@@ -2509,14 +2540,15 @@ export default function Dashboard({
         .act-btn { opacity:0; transition:opacity .15s; }
         tr:hover .act-btn { opacity:1; }
         .kpi-5   { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+        .kpi-4   { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
         .kpi-3   { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
         .kpi-6   { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; }
         .two-col { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
         .user-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
         .worker-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-        @media(max-width:900px){ .kpi-5{grid-template-columns:repeat(3,1fr);} .kpi-6{grid-template-columns:repeat(3,1fr);} }
-        @media(max-width:640px){ .kpi-5{grid-template-columns:repeat(2,1fr);} .kpi-3{grid-template-columns:repeat(2,1fr);} .kpi-6{grid-template-columns:repeat(2,1fr);} .two-col{grid-template-columns:1fr;} .worker-metrics{grid-template-columns:repeat(2,1fr);} }
-        @media(max-width:400px){ .kpi-5{grid-template-columns:1fr;} .kpi-3{grid-template-columns:1fr;} .kpi-6{grid-template-columns:1fr;} }
+        @media(max-width:900px){ .kpi-5{grid-template-columns:repeat(3,1fr);} .kpi-6{grid-template-columns:repeat(3,1fr);} .kpi-4{grid-template-columns:repeat(2,1fr);} }
+        @media(max-width:640px){ .kpi-5{grid-template-columns:repeat(2,1fr);} .kpi-3{grid-template-columns:repeat(2,1fr);} .kpi-6{grid-template-columns:repeat(2,1fr);} .kpi-4{grid-template-columns:repeat(2,1fr);} .two-col{grid-template-columns:1fr;} .worker-metrics{grid-template-columns:repeat(2,1fr);} }
+        @media(max-width:400px){ .kpi-5{grid-template-columns:1fr;} .kpi-3{grid-template-columns:1fr;} .kpi-6{grid-template-columns:1fr;} .kpi-4{grid-template-columns:1fr;} }
       `}</style>
 
       <div
@@ -2869,7 +2901,9 @@ export default function Dashboard({
             </div>
 
             <SectionTitle>Job lifecycle</SectionTitle>
-            <div className="kpi-3" style={{ marginBottom: 20 }}>
+            {/* kpi-3 → kpi-4 to make room for the new "Jobs Dropped by
+                Worker" card alongside the existing three. */}
+            <div className="kpi-4" style={{ marginBottom: 20 }}>
               <StatCard
                 label="Reopened"
                 value={displayStats.reopened ?? 0}
@@ -2889,6 +2923,16 @@ export default function Dashboard({
                 value={displayStats.rejectedJobs ?? 0}
                 icon="🙅"
                 accent="#f43f5e"
+                sub="Awaiting reassignment"
+              />
+              {/* New: current count of reports sitting in "dropped" — a
+                  worker accepted the job, then couldn't finish it. Distinct
+                  from "Declined" (rejected before ever being accepted). */}
+              <StatCard
+                label="Jobs Dropped by Worker"
+                value={displayStats.droppedJobs ?? 0}
+                icon="📤"
+                accent="#ea580c"
                 sub="Awaiting reassignment"
               />
             </div>
