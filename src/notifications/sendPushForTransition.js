@@ -67,6 +67,11 @@ export async function sendPushForTransition({
   const oneSignalIds = [];
 
   for (const target of transition.targets) {
+    // Optional per-target gate — e.g. only notify admin on an overdue
+    // report when it's emergency/urgent priority. Targets without a
+    // `when` always run, exactly as before.
+    if (target.when && !target.when(report)) continue;
+
     const targetUids = await resolveTargetUids(db, target, report);
     if (targetUids.size === 0) continue;
     matchedAnyUsers = true;

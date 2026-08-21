@@ -1,3 +1,4 @@
+// src/notifications/resolvedTargets.js
 export const TRANSITIONS = {
   "*->incoming": {
     targets: [{ audience: "role", role: "admin", route: () => "/ah" }],
@@ -54,11 +55,6 @@ export const TRANSITIONS = {
     title: "Job Dropped",
     body: "A technician dropped a job. It needs reassignment.",
   },
-  "assigned->rejected": {
-    targets: [{ audience: "role", role: "estate", route: () => "/er" }],
-    title: "Assignment Rejected",
-    body: "The technician declined the job.",
-  },
   "accepted->completed": {
     targets: [{ audience: "reporter", route: () => "/Completed" }],
     title: "Job Completed",
@@ -89,6 +85,15 @@ export const TRANSITIONS = {
     targets: [
       { audience: "role", role: "estate", route: () => "/eh" },
       { audience: "assignedWorker", route: () => "/wa" },
+      {
+        audience: "role",
+        role: "admin",
+        route: () => "/ah",
+        // Admin only needs to hear about this when it's high-stakes —
+        // an overdue routine report doesn't need to escalate to admin.
+        when: (report) =>
+          ["emergency", "urgent"].includes(report?.priorityLevel),
+      },
     ],
     title: "Report Overdue",
     body: "This report has passed its due date.",
