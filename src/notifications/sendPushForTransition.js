@@ -56,16 +56,17 @@ export async function sendPushForTransition({
     };
   }
 
-  // title/body on a transition can be a plain string OR a function of the
-  // report (e.g. overdue copy that needs to mention priorityLevel) — see
-  // resolveText below. An explicit title/body passed in by the caller
-  // always wins over both.
-  const finalTitle = title || resolveText(transition.title, report);
-  const finalBody = body || resolveText(transition.body, report);
+  // Transition-level title/body — used as the fallback for any target that
+  // doesn't define its own. Can be a plain string or a function of the
+  // report (e.g. overdue copy that needs to mention priorityLevel/status).
+  const transitionTitle = resolveText(transition.title, report);
+  const transitionBody = resolveText(transition.body, report);
 
   // Each target audience gets its own send call, since each one deep-links
   // to a different role-specific route (e.g. a closed report notifies both
-  // the worker and estate manager, but they land on different pages).
+  // the worker and estate manager, but they land on different pages) —
+  // and, as of the overdue rework, can also need entirely different
+  // wording (e.g. the reporter's copy differs from the current holder's).
   let totalRecipients = 0;
   let matchedAnyUsers = false;
   const oneSignalIds = [];
@@ -83,6 +84,15 @@ export async function sendPushForTransition({
     const targetUrl = APP_BASE_URL
       ? `${APP_BASE_URL}${target.route(report)}`
       : undefined;
+
+    // Precedence: an explicit title/body passed in by the caller (e.g. a
+    // one-off override from notifyOnStatusChange) wins for every target;
+    // otherwise a target-specific title/body wins; otherwise fall back to
+    // the transition-level default.
+    const finalTitle =
+      title || resolveText(target.title, report) || transitionTitle;
+    const finalBody =
+      body || resolveText(target.body, report) || transitionBody;
 
     const allIds = [...targetUids];
     for (let i = 0; i < allIds.length; i += MAX_TARGETS) {
@@ -193,8 +203,8 @@ function stringifyDataValues(obj) {
   return out;
 }
 
-// Lets a transition's title/body be a static string OR a function of the
-// report (e.g. overdue copy that needs to mention priorityLevel).
+// Lets a title/body (transition-level OR target-level) be a static string
+// OR a function of the report.
 function resolveText(value, report) {
   return typeof value === "function" ? value(report) : value;
 }

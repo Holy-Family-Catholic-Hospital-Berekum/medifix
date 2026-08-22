@@ -1,4 +1,65 @@
 // src/notifications/resolvedTargets.js
+
+// Maps a report's current status to the role/person it's sitting with —
+// used to make overdue notifications tell people WHERE the report
+// actually is right now, since a report moves through several roles and
+// the person who last saw it (or the reporter) has no way to know who
+// holds it once it's overdue. Keep this in sync with utils.js's
+// canUserApprove/canUserConfirmCost/canUserMarkProcured/
+// canUserAssignWorker/canUserAcceptOrRejectJob/canUserAddCost — each entry
+// here should match whoever those functions say can currently act on the
+// report in that status.
+const STATUS_HOLDER = {
+  incoming: "Admin",
+  approved: "the Estate Manager",
+  pending: "Admin",
+  confirmed: "Procurement",
+  procured: "the Estate Manager",
+  assigned: "the assigned technician",
+  accepted: "the assigned technician",
+  dropped: "the Estate Manager",
+  rejected: "the Estate Manager",
+  costDenied: "the Estate Manager",
+};
+
+function holderLabel(status) {
+  return STATUS_HOLDER[status] || "the responsible team";
+}
+
+// Human-readable status text for notification copy — "pending" on its own
+// reads ambiguously, so a couple of statuses get friendlier phrasing.
+const STATUS_LABEL = {
+  incoming: "incoming",
+  approved: "approved",
+  pending: "pending materials confirmation",
+  confirmed: "confirmed and awaiting procurement",
+  procured: "procured",
+  assigned: "assigned",
+  accepted: "accepted by technician and in progress",
+  rejected: "rejected by the assigned technician",
+  dropped: "dropped by the technician",
+  costDenied: "materials request denied",
+};
+
+function statusLabel(status) {
+  return STATUS_LABEL[status] || status || "in progress";
+}
+
+function priorityPhrase(priorityLevel, subject) {
+  if (!priorityLevel)
+    return subject === "reporter" ? "Your report" : "A report";
+  const article = /^[aeiou]/i.test(priorityLevel) ? "An" : "A";
+  return subject === "reporter"
+    ? `Your ${priorityLevel} report`
+    : `${article} ${priorityLevel} report`;
+}
+
+// Shared "where things stand" clause, reused by both the holder-facing and
+// reporter-facing overdue copy so the two stay consistent with each other.
+function overdueStatusClause(report) {
+  return `It's currently ${statusLabel(report?.status)} and with ${holderLabel(report?.status)}.`;
+}
+
 export const TRANSITIONS = {
   "*->incoming": {
     targets: [{ audience: "role", role: "admin", route: () => "/ah" }],
@@ -84,28 +145,40 @@ export const TRANSITIONS = {
   "*->overdue": {
     targets: [
       { audience: "role", role: "estate", route: () => "/eh" },
+      // resolveTargetUids already no-ops when report.assignedTo is unset
+      // (empty customId → empty uid set → target skipped), so no extra
+      // `when` gate is needed here for reports with no worker yet.
       { audience: "assignedWorker", route: () => "/wa" },
       {
         audience: "role",
         role: "admin",
         route: () => "/ah",
-        // Admin only needs to hear about this when it's high-stakes —
-        // an overdue routine report doesn't need to escalate to admin.
+        // Admin only needs to hear about this when it's high-stakes — an
+        // overdue routine report doesn't need to escalate to admin.
         when: (report) =>
           ["emergency", "urgent"].includes(report?.priorityLevel),
       },
+      {
+        // The reporter is never one of the roles above (estate/worker/
+        // admin) that a report is ever technically "with", so they get
+        // their own audience entry and their own wording — pointing them
+        // at whoever currently holds the report instead of just saying
+        // "overdue" with no context.
+        audience: "reporter",
+        route: () => "/History",
+        title: "Your Report Is Overdue",
+        body: (report) =>
+          `${priorityPhrase(report?.priorityLevel, "reporter")} has passed its deadline. ` +
+          `${overdueStatusClause(report)} You may contact them for further action.`,
+      },
     ],
     title: "Report Overdue",
-    // Body is a function so it can reflect this specific report's
-    // priorityLevel — e.g. "An emergency report has passed its deadline.
-    // Attention needed." Falls back to generic copy if priorityLevel is
-    // ever missing on the report object passed in.
-    body: (report) => {
-      const priority = report?.priorityLevel;
-      if (!priority) return "This report has passed its due date.";
-      const article = /^[aeiou]/i.test(priority) ? "An" : "A";
-      return `${article} ${priority} report has passed its deadline. Attention needed.`;
-    },
+    // Default body for every target that doesn't define its own (estate,
+    // assignedWorker, admin) — tells them what's overdue, its priority,
+    // and — since a report can be overdue while sitting with a DIFFERENT
+    // role than the one reading this — who currently holds it.
+    body: (report) =>
+      `${priorityPhrase(report?.priorityLevel)} has passed its deadline. ${overdueStatusClause(report)}`,
   },
 };
 

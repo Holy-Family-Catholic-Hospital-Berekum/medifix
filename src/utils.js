@@ -36,6 +36,8 @@ export async function markOverdueReports(user) {
       "assigned",
       "accepted",
       "costDenied",
+      "rejected",
+      "dropped",
     ];
 
     const snapshot = await getDocs(

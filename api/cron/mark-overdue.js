@@ -30,6 +30,8 @@ const ACTIVE_STATUSES = [
   "assigned",
   "accepted",
   "costDenied",
+  "rejected",
+  "dropped",
 ];
 
 // Accepts either an Authorization: Bearer header (preferred — what
