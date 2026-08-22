@@ -56,8 +56,12 @@ export async function sendPushForTransition({
     };
   }
 
-  const finalTitle = title || transition.title;
-  const finalBody = body || transition.body || "";
+  // title/body on a transition can be a plain string OR a function of the
+  // report (e.g. overdue copy that needs to mention priorityLevel) — see
+  // resolveText below. An explicit title/body passed in by the caller
+  // always wins over both.
+  const finalTitle = title || resolveText(transition.title, report);
+  const finalBody = body || resolveText(transition.body, report);
 
   // Each target audience gets its own send call, since each one deep-links
   // to a different role-specific route (e.g. a closed report notifies both
@@ -187,4 +191,10 @@ function stringifyDataValues(obj) {
     out[key] = typeof value === "string" ? value : JSON.stringify(value);
   }
   return out;
+}
+
+// Lets a transition's title/body be a static string OR a function of the
+// report (e.g. overdue copy that needs to mention priorityLevel).
+function resolveText(value, report) {
+  return typeof value === "function" ? value(report) : value;
 }

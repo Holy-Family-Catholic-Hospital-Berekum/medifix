@@ -96,7 +96,16 @@ export const TRANSITIONS = {
       },
     ],
     title: "Report Overdue",
-    body: "This report has passed its due date.",
+    // Body is a function so it can reflect this specific report's
+    // priorityLevel — e.g. "An emergency report has passed its deadline.
+    // Attention needed." Falls back to generic copy if priorityLevel is
+    // ever missing on the report object passed in.
+    body: (report) => {
+      const priority = report?.priorityLevel;
+      if (!priority) return "This report has passed its due date.";
+      const article = /^[aeiou]/i.test(priority) ? "An" : "A";
+      return `${article} ${priority} report has passed its deadline. Attention needed.`;
+    },
   },
 };
 
