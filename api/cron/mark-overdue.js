@@ -112,6 +112,7 @@ export default async function handler(req, res) {
             reporterId: data.reporterId,
             assignedTo: data.assignedTo,
             priorityLevel: data.priorityLevel, // needed by the *->overdue
+            status: data.status,
           }, // "admin only if emergency/urgent" rule in resolvedTargets.js
         }),
       ),

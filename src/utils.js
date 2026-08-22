@@ -87,6 +87,7 @@ export async function markOverdueReports(user) {
         reporterId: data.reporterId,
         assignedTo: data.assignedTo,
         priorityLevel: data.priorityLevel,
+        status: data.status,
       }).catch((err) =>
         console.error(
           `notifyOnStatusChange failed for overdue report ${docSnap.id}:`,
