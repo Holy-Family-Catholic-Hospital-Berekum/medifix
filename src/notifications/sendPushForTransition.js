@@ -102,6 +102,12 @@ export async function sendPushForTransition({
         title: finalTitle,
         body: finalBody,
         data: { reportId: report.id, status: newStatus, targetUrl },
+        // Median's native SDK reads targetUrl out of `data` above for
+        // true in-app navigation. Browsers and installed PWAs go through
+        // OneSignal's own Web Push SDK, which ignores `data` on click and
+        // instead opens whatever `web_url` is set to — without this,
+        // web/PWA clicks just fall back to the site root (home page).
+        webUrl: targetUrl,
       });
       totalRecipients += result.recipients;
       oneSignalIds.push(result.id);
@@ -159,7 +165,7 @@ async function resolveTargetUids(db, target, report) {
   return uids;
 }
 
-async function sendViaOneSignal({ externalIds, title, body, data }) {
+async function sendViaOneSignal({ externalIds, title, body, data, webUrl }) {
   const payload = {
     app_id: ONESIGNAL_APP_ID,
     include_aliases: { external_id: externalIds.map(String) },
@@ -171,6 +177,10 @@ async function sendViaOneSignal({ externalIds, title, body, data }) {
     ...(data && typeof data === "object"
       ? { data: stringifyDataValues(data) }
       : {}),
+    // web_url is scoped to web push only (per OneSignal's API) — it does
+    // NOT affect native iOS/Android delivery, so Median's in-app
+    // navigation via data.targetUrl is untouched by this.
+    ...(webUrl ? { web_url: webUrl } : {}),
   };
 
   const res = await fetch("https://onesignal.com/api/v1/notifications", {
