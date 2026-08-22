@@ -165,7 +165,7 @@ export const TRANSITIONS = {
         // at whoever currently holds the report instead of just saying
         // "overdue" with no context.
         audience: "reporter",
-        route: () => "/History",
+        route: () => "/Pending",
         title: "Your Report Is Overdue",
         body: (report) =>
           `${priorityPhrase(report?.priorityLevel, "reporter")} has passed its deadline. ` +
