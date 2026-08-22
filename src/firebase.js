@@ -34,7 +34,6 @@ export const appCheck = initializeAppCheck(app, {
 });
 
 export const auth = getAuth(app);
-window.auth = auth;
 const db = getFirestore(app);
 
 export { db };

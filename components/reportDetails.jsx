@@ -40,12 +40,25 @@ const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
 
 // ADD this (same pattern as ReportForm's compressImage):
 const compressImageToBase64 = (file) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+
+    reader.onerror = () => reject(new Error("Could not read the image file."));
     reader.readAsDataURL(file);
+
     reader.onload = (event) => {
       const img = new Image();
+
+      // Without this, a corrupt/unsupported file leaves the promise
+      // pending forever — the "mark as completed" button would spin
+      // indefinitely with no error shown.
+      img.onerror = () =>
+        reject(
+          new Error("Could not process the image. Please try another photo."),
+        );
+
       img.src = event.target.result;
+
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const maxWidth = 800;
