@@ -159,11 +159,20 @@ export const TRANSITIONS = {
           ["emergency", "urgent"].includes(report?.priorityLevel),
       },
       {
+        // Procurement only holds a report while it's "confirmed" (see
+        // STATUS_HOLDER above) — gated so procurement isn't notified for
+        // every overdue report, only the ones actually sitting with them.
+        audience: "role",
+        role: "procurement",
+        route: () => "/ph",
+        when: (report) => report?.status === "confirmed",
+      },
+      {
         // The reporter is never one of the roles above (estate/worker/
-        // admin) that a report is ever technically "with", so they get
-        // their own audience entry and their own wording — pointing them
-        // at whoever currently holds the report instead of just saying
-        // "overdue" with no context.
+        // admin/procurement) that a report is ever technically "with", so
+        // they get their own audience entry and their own wording —
+        // pointing them at whoever currently holds the report instead of
+        // just saying "overdue" with no context.
         audience: "reporter",
         route: () => "/Pending",
         title: "Your Report Is Overdue",
@@ -174,9 +183,9 @@ export const TRANSITIONS = {
     ],
     title: "Report Overdue",
     // Default body for every target that doesn't define its own (estate,
-    // assignedWorker, admin) — tells them what's overdue, its priority,
-    // and — since a report can be overdue while sitting with a DIFFERENT
-    // role than the one reading this — who currently holds it.
+    // assignedWorker, admin, procurement) — tells them what's overdue, its
+    // priority, and — since a report can be overdue while sitting with a
+    // DIFFERENT role than the one reading this — who currently holds it.
     body: (report) =>
       `${priorityPhrase(report?.priorityLevel)} has passed its deadline. ${overdueStatusClause(report)}`,
   },
