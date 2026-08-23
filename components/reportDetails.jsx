@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { notifyOnStatusChange } from "../src/notifications/notifyOnStatusChange";
 import PhoneCallButton from "./phoneCallButton";
 import {
@@ -91,6 +91,67 @@ function getDenialNote(report) {
   return denialNotes.length
     ? denialNotes[denialNotes.length - 1].content
     : null;
+}
+
+// ─── Auto-scroll targeting ─────────────────────────────────────────────────
+// Maps (role, report status) → which action section to auto-scroll to when
+// the details panel opens. Deliberately omits any (role, status) pair where
+// the viewer is seeing the report for the first time at a stage that
+// requires reading the full report before deciding — e.g. admin+incoming
+// (approve/deny needs context) or estate+approved (materials-needed vs.
+// direct-assign needs context). Every entry here is either a repeat
+// exposure (the role already reviewed this report earlier in its
+// lifecycle) or a mechanical action that doesn't need the incident
+// description to perform.
+//
+// "assignWorker" doubles as the reassignment target for estate on
+// rejected/dropped/reopened reports — same section, since reassigning is
+// just picking a (possibly different) worker via the same UI.
+//
+// Note: worker's Drop Job section (dropJob) has a ref for future use but
+// is intentionally NOT wired up as an auto-scroll target here — it shares
+// its visible statuses (accepted/reopened) with Complete Work, and
+// completing the job is treated as the expected default action, not
+// dropping it. Only one target can be chosen per view.
+function getScrollTarget(user, report, refs) {
+  if (!user || !report) return null;
+
+  // Unread feedback takes priority over the status-based target below,
+  // for any role that didn't write it themselves — staff write their own
+  // feedback via a separate flow (StaffReportDetails.jsx) and don't need
+  // to be scrolled to their own past input.
+  if (
+    report.feedback &&
+    user.role !== "staff" &&
+    !report.feedbackViewedBy?.includes(user.ID)
+  ) {
+    return refs.feedback;
+  }
+
+  const SCROLL_MAP = {
+    admin: {
+      pending: refs.confirmCost,
+    },
+    estate: {
+      procured: refs.assignWorker, // reassignment/assignment section
+      rejected: refs.assignWorker, // reassignment section
+      dropped: refs.assignWorker, // reassignment section
+      reopened: refs.assignWorker, // reassignment section
+      costDenied: refs.addMaterials,
+      completed: refs.submitCost,
+      closed: refs.submitCost,
+    },
+    procurement: {
+      confirmed: refs.markProcured,
+    },
+    worker: {
+      assigned: refs.acceptReject,
+      accepted: refs.completeWork,
+      reopened: refs.completeWork,
+    },
+  };
+
+  return SCROLL_MAP[user.role]?.[report.status] ?? null;
 }
 
 // Read-only star display for the technician rating, so any role viewing
@@ -365,6 +426,20 @@ export default function ReportDetailsContainer({
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
+  // ── Auto-scroll refs ──────────────────────────────────────────────────
+  const panelRef = useRef(null);
+  const feedbackRef = useRef(null);
+  const approveDenyRef = useRef(null);
+  const addMaterialsRef = useRef(null);
+  const confirmCostRef = useRef(null);
+  const markProcuredRef = useRef(null);
+  const assignWorkerRef = useRef(null);
+  const submitCostRef = useRef(null);
+  const acceptRejectRef = useRef(null);
+  const completeWorkRef = useRef(null);
+  const dropJobRef = useRef(null);
+  const sendFeedbackRef = useRef(null);
+
   useEffect(() => {
     if (displayDetails) {
       setVisible(true);
@@ -458,6 +533,42 @@ export default function ReportDetailsContainer({
       cancelled = true;
     };
   }, [displayDetails, currentReport]);
+
+  // ── Auto-scroll to the section the viewer is expected to act on next ──
+  // See getScrollTarget above for the exact (role, status) rules. Waits
+  // for the panel's own slide-in transition to (mostly) finish before
+  // scrolling, so it doesn't visually fight the entrance animation. Falls
+  // back to scrolling the panel to the top when there's no target, so a
+  // previous report's scroll position never leaks into the next one
+  // opened.
+  useEffect(() => {
+    if (!displayDetails || !currentReport || currentReport.length === 0) return;
+    const rep = currentReport[0];
+
+    const t = setTimeout(() => {
+      const target = getScrollTarget(user, rep, {
+        feedback: feedbackRef,
+        approveDeny: approveDenyRef,
+        addMaterials: addMaterialsRef,
+        confirmCost: confirmCostRef,
+        markProcured: markProcuredRef,
+        assignWorker: assignWorkerRef,
+        submitCost: submitCostRef,
+        acceptReject: acceptRejectRef,
+        completeWork: completeWorkRef,
+        dropJob: dropJobRef,
+      });
+
+      if (target?.current) {
+        target.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (panelRef.current) {
+        panelRef.current.scrollTo({ top: 0, behavior: "auto" });
+      }
+    }, 350);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayDetails, currentReport?.[0]?.id, currentReport?.[0]?.status]);
 
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
@@ -1329,7 +1440,7 @@ export default function ReportDetailsContainer({
       )}
 
       {report.feedback && (
-        <div className="flex gap-2">
+        <div ref={feedbackRef} className="flex gap-2">
           <h2
             className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
           >
@@ -1372,7 +1483,7 @@ export default function ReportDetailsContainer({
 
       {/* ADMIN ACTIONS - Approve/Deny */}
       {canUserApprove(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
+        <div ref={approveDenyRef} className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">
             Admin Actions - Approve/Deny
           </h3>
@@ -1408,7 +1519,10 @@ export default function ReportDetailsContainer({
       {/* ESTATE ACTIONS - Add Materials */}
 
       {canUserAddCost(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-4">
+        <div
+          ref={addMaterialsRef}
+          className="bg-white rounded-lg p-5 space-y-4"
+        >
           <h3 className="font-bold text-gray-800">
             {report.status === "costDenied"
               ? "Estate Actions - Resubmit Materials"
@@ -1447,7 +1561,7 @@ export default function ReportDetailsContainer({
 
       {/* ADMIN ACTIONS - Confirm/Deny Materials */}
       {canUserConfirmCost(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-4">
+        <div ref={confirmCostRef} className="bg-white rounded-lg p-5 space-y-4">
           <h3 className="font-bold text-gray-800">
             Admin Actions - Review & Confirm Materials
           </h3>
@@ -1493,7 +1607,10 @@ export default function ReportDetailsContainer({
 
       {/* PROCUREMENT ACTIONS - Enter Cost & Mark Procured */}
       {canUserMarkProcured(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-4">
+        <div
+          ref={markProcuredRef}
+          className="bg-white rounded-lg p-5 space-y-4"
+        >
           <h3 className="font-bold text-gray-800">
             Procurement Actions - Purchase Materials
           </h3>
@@ -1536,9 +1653,13 @@ export default function ReportDetailsContainer({
         </div>
       )}
 
-      {/* ESTATE ACTIONS - Assign Worker */}
+      {/* ESTATE ACTIONS - Assign Worker (also the reassignment section for
+          rejected/dropped/reopened reports — see getScrollTarget above) */}
       {canUserAssignWorker(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
+        <div
+          ref={assignWorkerRef}
+          className="bg-white rounded-lg p-5 space-y-3"
+        >
           <h3 className="font-bold text-gray-800">
             Estate Actions - Assign Worker
           </h3>
@@ -1626,7 +1747,7 @@ export default function ReportDetailsContainer({
 
       {/* ESTATE ACTIONS - Submit Maintenance Cost */}
       {canUserSubmitCost(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
+        <div ref={submitCostRef} className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">
             Estate Actions - Submit Maintenance Cost
           </h3>
@@ -1660,7 +1781,10 @@ export default function ReportDetailsContainer({
 
       {/* WORKER ACTIONS - Accept / Reject */}
       {canUserAcceptOrRejectJob(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
+        <div
+          ref={acceptRejectRef}
+          className="bg-white rounded-lg p-5 space-y-3"
+        >
           <h3 className="font-bold text-gray-800">
             Worker Actions — Respond to Assignment
           </h3>
@@ -1702,7 +1826,7 @@ export default function ReportDetailsContainer({
 
       {/* WORKER ACTIONS - Drop Job */}
       {canUserDropJob(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
+        <div ref={dropJobRef} className="bg-white rounded-lg p-5 space-y-3">
           <h3 className="font-bold text-gray-800">Worker Actions — Drop Job</h3>
           <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
             If you're unable to complete this job, you can drop it. It will be
@@ -1732,7 +1856,10 @@ export default function ReportDetailsContainer({
 
       {/* WORKER ACTIONS - Complete Work */}
       {canUserComplete(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-4">
+        <div
+          ref={completeWorkRef}
+          className="bg-white rounded-lg p-5 space-y-4"
+        >
           <h3 className="font-bold text-gray-800">
             Worker Actions — Complete Work
           </h3>
@@ -1784,7 +1911,10 @@ export default function ReportDetailsContainer({
 
       {/* STAFF ACTIONS - Send Feedback */}
       {canUserSendFeedback(user, report) && (
-        <div className="bg-white rounded-lg p-5 space-y-3">
+        <div
+          ref={sendFeedbackRef}
+          className="bg-white rounded-lg p-5 space-y-3"
+        >
           <h3 className="font-bold text-gray-800">
             Staff Actions - Send Feedback
           </h3>
@@ -1836,6 +1966,7 @@ export default function ReportDetailsContainer({
 
   return (
     <div
+      ref={panelRef}
       className={`fixed top-0 md:top-[10%] py-24 md:py-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden right-0 w-full md:max-w-[700px] h-screen md:max-h-[80%] md:right-5 md:rounded-xl ${reportDetailsBgColor} z-80 md:shadow-xl ${theme.detailsBg} overflow-y-auto ${
         closing ? "slide-out-right" : "slide-in-right"
       }`}

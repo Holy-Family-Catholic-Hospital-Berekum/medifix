@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { notifyOnStatusChange } from "../src/notifications/notifyOnStatusChange";
 import {
   updateDoc,
@@ -26,6 +26,18 @@ function getDenialNote(report) {
   return denialNotes.length
     ? denialNotes[denialNotes.length - 1].content
     : null;
+}
+
+// Staff only get one actionable section in this panel: giving feedback on
+// a completed job. Scroll to it only if they haven't already given
+// feedback — once given, the panel just shows their own past input, which
+// doesn't need to be jumped to (they already know what they wrote).
+function getStaffScrollTarget(report, refs) {
+  if (!report) return null;
+  if (report.status === "completed" && !report.feedback) {
+    return refs.feedbackForm;
+  }
+  return null;
 }
 
 function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
@@ -78,6 +90,10 @@ export default function StaffReportDetails({
   const [rating, setRating] = useState(0);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
+
+  // ── Auto-scroll refs ──────────────────────────────────────────────────
+  const panelRef = useRef(null);
+  const feedbackFormRef = useRef(null);
 
   useEffect(() => {
     if (displayDetails) {
@@ -156,6 +172,27 @@ export default function StaffReportDetails({
       cancelled = true;
     };
   }, [displayDetails, currentReport]);
+
+  // ── Auto-scroll to the feedback form when opening a completed report
+  // that doesn't have feedback yet. See getStaffScrollTarget above.
+  useEffect(() => {
+    if (!displayDetails || !currentReport || currentReport.length === 0) return;
+    const rep = currentReport[0];
+
+    const t = setTimeout(() => {
+      const target = getStaffScrollTarget(rep, {
+        feedbackForm: feedbackFormRef,
+      });
+      if (target?.current) {
+        target.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (panelRef.current) {
+        panelRef.current.scrollTo({ top: 0, behavior: "auto" });
+      }
+    }, 350);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayDetails, currentReport?.[0]?.id, currentReport?.[0]?.status]);
 
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
@@ -237,6 +274,7 @@ export default function StaffReportDetails({
 
   return (
     <div
+      ref={panelRef}
       className={`fixed top-0 md:top-[12%] py-24 md:py-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden right-0 w-full md:max-w-[700px] h-screen md:max-h-[80%] md:right-5 md:rounded-xl bg-[#FF8825] z-80 md:shadow-xl overflow-y-auto ${
         closing ? "slide-out-right" : "slide-in-right"
       }`}
@@ -476,7 +514,10 @@ export default function StaffReportDetails({
 
         {/* feedback form — only shown if feedback not yet given */}
         {canUserSendFeedback(user, report) && (
-          <div className="bg-white rounded-xl p-5 space-y-4">
+          <div
+            ref={feedbackFormRef}
+            className="bg-white rounded-xl p-5 space-y-4"
+          >
             <h3 className="font-bold text-gray-800">How did the work go?</h3>
             <p className="text-xs text-gray-400">
               Your feedback helps us improve maintenance quality.
