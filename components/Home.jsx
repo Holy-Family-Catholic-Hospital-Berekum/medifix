@@ -53,22 +53,25 @@ function Countdown({ dateDue, status, bgColor }) {
   if (TERMINAL_STATUSES.includes(status) || !t) return null;
   if (t.overdue)
     return (
-      <span className="text-[10px] font-black text-red-300 bg-red-950/70 border border-red-700/50 px-2 py-0.5 rounded-full tracking-wider uppercase">
-        ⚠ Overdue
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-300 bg-red-950/70 border border-red-700/40 px-2 py-0.5 rounded-full tracking-wide">
+        <span className="material-symbols-outlined text-[12px] leading-none">
+          warning
+        </span>
+        Overdue
       </span>
     );
   return (
     <div
-      className={`flex items-center gap-1 ${bgColor} border border-white/10 px-2 py-1 rounded-lg`}
+      className={`flex items-center gap-1.5 ${bgColor} border border-white/10 px-2 py-1 rounded-lg`}
     >
       {t.days > 0 && (
         <span className="text-[12px] font-mono text-slate-900">{t.days}d</span>
       )}
-      <span className="text-[11px] font-mono font-bold text-white tabular-nums">
+      <span className="text-[11px] font-mono font-semibold text-white tabular-nums">
         {String(t.hours).padStart(2, "0")}:{String(t.mins).padStart(2, "0")}:
         {String(t.secs).padStart(2, "0")}
       </span>
-      <span className="text-[9px] text-white/80 uppercase tracking-wider">
+      <span className="text-[9px] text-white/75 uppercase tracking-wide">
         left
       </span>
     </div>
@@ -203,6 +206,9 @@ function getFirstName(userObj) {
   return userObj?.name?.trim().split(" ")[0] || "there";
 }
 
+// Quiet, dismissible toast — no confetti, no bounce. A single restrained
+// fade/slide on entry is enough to draw the eye without turning a work
+// dashboard into a party popper.
 function BirthdayBanner({ name, onDismiss }) {
   const [entered, setEntered] = useState(false);
   useEffect(() => {
@@ -213,88 +219,34 @@ function BirthdayBanner({ name, onDismiss }) {
   return (
     <div className="fixed top-0 inset-x-0 z-[120] flex justify-center px-4 pt-4 pointer-events-none">
       <div
-        className={`pointer-events-auto relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl border border-white/30 bg-gradient-to-r from-pink-500 via-fuchsia-500 to-orange-400 text-white px-5 py-4 flex items-center gap-3 transition-all duration-500 ${
-          entered ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
+        className={`pointer-events-auto relative max-w-md w-full rounded-xl overflow-hidden shadow-md border border-white/20 bg-slate-900/95 text-white px-4 py-3 flex items-center gap-3 transition-all duration-300 ${
+          entered ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"
         }`}
       >
-        <span className="text-3xl animate-bounce">🎉</span>
+        <span className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+          <span className="material-symbols-outlined text-[18px] leading-none">
+            cake
+          </span>
+        </span>
         <div className="flex-1 min-w-0">
-          <p className="font-black text-sm md:text-base leading-tight">
-            Happy Birthday, {name}! 🎂
+          <p className="font-semibold text-sm leading-tight">
+            Happy birthday, {name}
           </p>
-          <p className="text-xs md:text-sm text-white/85 mt-0.5">
-            Wishing you a fantastic day from all of us here.
+          <p className="text-xs text-white/70 mt-0.5">
+            Wishing you a great day from the whole team.
           </p>
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          className="text-white/80 hover:text-white text-lg font-bold px-1 flex-shrink-0"
+          className="text-white/60 hover:text-white transition-colors flex-shrink-0"
           aria-label="Dismiss birthday message"
         >
-          ✕
+          <span className="material-symbols-outlined text-[18px] leading-none">
+            close
+          </span>
         </button>
-        <span className="absolute -top-2 left-8 text-base animate-pulse pointer-events-none">
-          ✨
-        </span>
-        <span className="absolute -bottom-2 right-12 text-base animate-pulse [animation-delay:0.3s] pointer-events-none">
-          🎈
-        </span>
       </div>
-    </div>
-  );
-}
-
-const CONFETTI_COLORS = [
-  "#f43f5e",
-  "#fb923c",
-  "#facc15",
-  "#4ade80",
-  "#38bdf8",
-  "#a78bfa",
-  "#f472b6",
-];
-
-// Falls from just under the navbar for as long as it's mounted. Home
-// unmounts it after 10s via a timeout, independent of the banner's
-// dismiss state, so refreshing on your birthday always re-triggers it.
-function BirthdayConfetti() {
-  const [pieces] = useState(() =>
-    Array.from({ length: 70 }, (_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      delay: Math.random() * 1.5,
-      duration: 3 + Math.random() * 2.5,
-      width: 6 + Math.random() * 6,
-      height: 10 + Math.random() * 8,
-      color:
-        CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
-      drift: (Math.random() - 0.5) * 200,
-    })),
-  );
-
-  return (
-    <div className="fixed top-16 md:top-20 inset-x-0 bottom-0 z-[90] overflow-hidden pointer-events-none">
-      <style>{`
-        @keyframes confetti-fall {
-          0% { transform: translateY(-20px) translateX(0) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(100vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
-        }
-      `}</style>
-      {pieces.map((p) => (
-        <span
-          key={p.id}
-          className="absolute top-0 rounded-sm"
-          style={{
-            left: `${p.left}%`,
-            width: p.width,
-            height: p.height,
-            backgroundColor: p.color,
-            animation: `confetti-fall ${p.duration}s ease-in ${p.delay}s forwards`,
-            "--drift": `${p.drift}px`,
-          }}
-        />
-      ))}
     </div>
   );
 }
@@ -308,7 +260,7 @@ function Preloader({ theme }) {
   } = theme;
   return (
     <div className="flex flex-col justify-center items-center w-full py-24 gap-5">
-      <div className="relative w-14 h-14">
+      <div className="relative w-10 h-10">
         <div className="absolute inset-0 rounded-full border-2 border-white/10" />
         <div
           className={`absolute inset-0 rounded-full border-2 border-transparent ${spinnerOuter} animate-spin`}
@@ -317,9 +269,9 @@ function Preloader({ theme }) {
           className={`absolute inset-2 rounded-full border border-transparent ${spinnerInner} animate-spin [animation-direction:reverse] [animation-duration:0.7s]`}
         />
       </div>
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1.5">
         <p
-          className={`text-xs font-semibold tracking-[0.3em] uppercase ${textColor} animate-pulse`}
+          className={`text-xs font-medium tracking-[0.2em] uppercase ${textColor}`}
         >
           Loading reports
         </p>
@@ -338,926 +290,232 @@ function Preloader({ theme }) {
 }
 
 // ─── Card priority config — uses theme accent colors ─────────────────────────
+// Priority is signalled with a left accent bar + a small static dot + a
+// text label. No blurred colour glow — a plain, slightly elevated shadow
+// keeps every card visually calm regardless of priority.
 const cardConfig = (status, priority, theme) => {
   const {
     cardEmergencyBorder,
-    cardEmergencyGlow,
     cardEmergencyBadge,
     cardEmergencyDot,
     cardEmergencyAccent,
     cardEmergencyPriority,
     cardUrgentBorder,
-    cardUrgentGlow,
     cardUrgentBadge,
     cardUrgentDot,
     cardUrgentAccent,
     cardUrgentPriority,
     cardNormalBorder,
-    cardNormalGlow,
     cardNormalBadge,
     cardNormalDot,
     cardNormalAccent,
     cardNormalPriority,
-    cardBg = "bg-zinc-900/70",
+    cardBg = "bg-white/70",
   } = theme;
 
   if (!TERMINAL_STATUSES.includes(status) && priority === "emergency")
     return {
-      border: cardEmergencyBorder || "border-red-600/60",
-      glow: cardEmergencyGlow || "shadow-[0_0_20px_rgba(220,38,38,0.25)]",
+      border: cardEmergencyBorder || "border-red-300",
       badge: cardEmergencyBadge || "bg-red-600 text-white",
-      dot:
-        cardEmergencyDot || "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]",
-      accent: cardEmergencyAccent || "from-red-600/20 to-transparent",
-      priorityColor: cardEmergencyPriority || "text-red-400",
+      dot: cardEmergencyDot || "bg-red-500",
+      accent: cardEmergencyAccent || "bg-red-500",
+      priorityColor: cardEmergencyPriority || "text-red-600",
       cardBg,
     };
   if (!TERMINAL_STATUSES.includes(status) && priority === "urgent")
     return {
-      border: cardUrgentBorder || "border-orange-500/50",
-      glow: cardUrgentGlow || "shadow-[0_0_16px_rgba(249,115,22,0.2)]",
-      badge: cardUrgentBadge || "bg-orange-500 text-white",
-      dot:
-        cardUrgentDot || "bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.7)]",
-      accent: cardUrgentAccent || "from-orange-500/15 to-transparent",
-      priorityColor: cardUrgentPriority || "text-orange-400",
+      border: cardUrgentBorder || "border-amber-300",
+      badge: cardUrgentBadge || "bg-amber-500 text-white",
+      dot: cardUrgentDot || "bg-amber-400",
+      accent: cardUrgentAccent || "bg-amber-400",
+      priorityColor: cardUrgentPriority || "text-amber-600",
       cardBg,
     };
   return {
-    border: cardNormalBorder || "border-emerald-700/40",
-    glow: cardNormalGlow || "shadow-[0_0_12px_rgba(16,185,129,0.1)]",
+    border: cardNormalBorder || "border-emerald-300",
     badge: cardNormalBadge || "bg-emerald-600 text-white",
-    dot:
-      cardNormalDot || "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.6)]",
-    accent: cardNormalAccent || "from-emerald-600/10 to-transparent",
-    priorityColor: cardNormalPriority || "text-emerald-400",
+    dot: cardNormalDot || "bg-emerald-400",
+    accent: cardNormalAccent || "bg-emerald-400",
+    priorityColor: cardNormalPriority || "text-emerald-600",
     cardBg,
   };
 };
 
-let emergency;
-let urgent;
-let routine;
-
-// ─── Default theme (can be overridden per role) ───────────────────────────────
-export const THEMES = {
-  admin: {
+// ─── Shared theme tokens ─────────────────────────────────────────────────────
+// Every role theme is a light, neutral surface (white / slate) with a single
+// accent colour carrying the role's identity — instead of five independently
+// hand-tuned palettes with their own gradients, glows and opacities. This
+// keeps every screen calm and legible, and means a new role only needs one
+// accent choice, not sixty bespoke values.
+//
+// NOTE: Tailwind's class scanner needs complete, literal class strings in
+// the source — so each theme below is still written out in full (not
+// assembled from partial fragments at runtime), it's just far shorter
+// because the values themselves are restrained and consistent.
+function makeTheme({ accent, accentDark, accentSoft, ring }) {
+  return {
     // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-gradient-to-br from-emerald-50 via-lime-50 to-green-100",
-
-    sidebarBg:
-      "bg-gradient-to-br from-emerald-200/55 via-green-100/45 to-lime-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-emerald-200/35",
-
-    sidebarBorder:
-      "border border-white/30 shadow-[0_8px_32px_rgba(16,185,129,0.18)]",
-
+    pageBg: "bg-slate-50",
+    sidebarBg: "bg-white/90 backdrop-blur-xl",
+    sidebarBorder: "border border-slate-200 shadow-sm",
     contentBg: "bg-transparent",
 
     // ─── Navbar ──────────────────────────────────────────
-    navBg:
-      "bg-gradient-to-r from-emerald-500/90 via-green-500/85 to-lime-400/80 backdrop-blur-2xl",
+    navBg: `bg-gradient-to-r ${accent}`,
+    navBorder: "border border-white/10 shadow-sm",
+    logoFrom: "from-white",
+    logoTo: "to-white",
+    logoSub: "text-white/70",
 
-    navBorder:
-      "border border-white/20 shadow-[0_8px_32px_rgba(16,185,129,0.18)]",
-
-    logoFrom: "from-emerald-950",
-    logoTo: "to-lime-600",
-    logoSub: "text-emerald-950/60",
-
-    liveColor: "bg-lime-400",
-
-    liveShadow: "shadow-[0_0_10px_2px_rgba(163,230,53,0.7)]",
-
-    liveText: "text-emerald-950",
+    liveColor: "bg-white",
+    liveShadow: "shadow-[0_0_6px_1px_rgba(255,255,255,0.6)]",
+    liveText: "text-white",
 
     linkActive: "text-white",
-    linkHover: "hover:text-lime-100",
-    linkBar: "bg-lime-300",
+    linkHover: "hover:text-white/80",
+    linkBar: "bg-white",
 
     logoutBorder: "border-white/20",
-    logoutText: "text-emerald-950",
+    logoutText: "text-white",
 
-    logoutHoverBorder: "hover:border-red-400/50",
-    logoutHoverText: "hover:text-red-500",
-    logoutHoverBg: "hover:bg-red-500/5",
+    logoutHoverBorder: "hover:border-red-300/60",
+    logoutHoverText: "hover:text-red-100",
+    logoutHoverBg: "hover:bg-red-500/10",
 
-    accent: "shadow-[0_1px_0_0_rgba(134,239,172,0.25)]",
-
-    glowLine: "via-emerald-300/40",
+    accent: "shadow-[0_1px_0_0_rgba(255,255,255,0.15)]",
+    glowLine: "via-white/30",
 
     // ─── Sidebar nav ─────────────────────────────────────
-    sideNavActive:
-      "text-emerald-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
-
+    sideNavActive: `text-slate-900 ${accentSoft} border border-slate-200 shadow-sm`,
     sideNavIdle:
-      "text-emerald-900/80 hover:text-emerald-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
-
-    sideNavDotActive: "bg-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.95)]",
-
-    sideNavDotIdle: "bg-emerald-500/40 group-hover:bg-emerald-500",
-
-    sideNavLabel: "text-emerald-950/50",
+      "text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent",
+    sideNavDotActive: accentDark,
+    sideNavDotIdle: "bg-slate-300 group-hover:bg-slate-400",
+    sideNavLabel: "text-slate-400",
 
     // ─── Section headers ─────────────────────────────────
-    sectionAccentBar: "from-emerald-500 to-lime-400",
-
-    sectionLabel: "text-emerald-700/70",
-
-    sectionTitle: "text-emerald-950",
-
-    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
-
-    sectionCountBorder: "border-white/30",
-
-    sectionCountDot: "bg-lime-400 shadow-[0_0_6px_rgba(163,230,53,0.8)]",
-
-    sectionCountText: "text-emerald-950",
-
-    sectionDivider: "border-emerald-300/40",
+    sectionAccentBar: accent,
+    sectionLabel: "text-slate-400",
+    sectionTitle: "text-slate-900",
+    sectionCountBg: "bg-white border border-slate-200",
+    sectionCountBorder: "border-slate-200",
+    sectionCountDot: accentDark,
+    sectionCountText: "text-slate-700",
+    sectionDivider: "border-slate-200",
 
     // ─── Cards ───────────────────────────────────────────
-    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
-
-    cardNormalBorder: "border-emerald-400/50",
-
-    cardNormalGlow: "shadow-[0_0_18px_rgba(16,185,129,0.14)]",
-
-    cardNormalDot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
-
-    cardNormalAccent: "from-emerald-500/15 to-transparent",
-
-    cardNormalPriority: "text-emerald-700",
-
-    cardEmergencyBorder: "border-red-400/60",
-
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
-
-    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
-
-    cardEmergencyAccent: "from-red-500/20 to-transparent",
-
-    cardEmergencyPriority: "text-red-500",
-
-    cardUrgentBorder: "border-yellow-400/60",
-
-    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
-
-    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
-
-    cardUrgentAccent: "from-yellow-400/20 to-transparent",
-
-    cardUrgentPriority: "text-yellow-600",
-
-    cardDateLabel: "text-emerald-900/60",
-
-    cardDateValue: "text-emerald-950",
-
-    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
-
-    cardStatusBorder: "border-white/20",
-
-    cardStatusText: "text-emerald-900",
-
-    // ─── Feedback badge ──────────────────────────────────
-    feedbackBadge: "bg-lime-300 text-emerald-950 shadow-lg",
-
-    // ─── Mobile toggle ───────────────────────────────────
-    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
-
-    mobileToggleBorder: "border-white/30",
-
-    mobileToggleText: "text-emerald-950",
-
-    mobileToggleHover: "hover:bg-white/40",
-
-    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
-
-    mobileBottomBorder: "border-white/30",
-
-    mobileBottomDot: "bg-lime-400",
-
-    mobileBottomText: "text-emerald-950",
-
-    // ─── Bottom sheet ────────────────────────────────────
-    sheetBg:
-      "bg-gradient-to-br from-emerald-100/95 to-lime-50/95 backdrop-blur-2xl",
-
-    sheetBorder: "border-white/30",
-
-    sheetTopBar: "from-emerald-400 via-lime-400",
-
-    titleColor: "text-emerald-950",
-
-    emptyText: "text-emerald-700/50",
-
-    // ─── Slide panel ─────────────────────────────────────
-    slideBg:
-      "bg-gradient-to-br from-emerald-100/95 to-lime-50/95 backdrop-blur-2xl",
-
-    slideBorder: "border-white/30",
-
-    slideTopBar: "from-emerald-400 via-lime-400",
-
-    linkActiveBg: "bg-white/35 backdrop-blur-xl",
-
-    linkActiveBorder: "border-white/40",
-
-    linkActiveText: "text-emerald-950",
-
-    linkIdleBorder: "border-white/10",
-
-    linkIdleText: "text-emerald-900/50",
-
-    linkHoverText: "hover:text-emerald-950",
-
-    linkHoverBorder: "hover:border-white/30",
-
-    linkHoverBg: "hover:bg-white/20",
-
-    // ─── Spinner ─────────────────────────────────────────
-    spinnerOuter: "border-t-emerald-500",
-
-    spinnerInner: "border-t-lime-400/70",
-
-    dotColor: "bg-lime-400",
-
-    textColor: "text-emerald-700/70",
-
-    // ─── Report details ──────────────────────────────────
-    detailsBg: "bg-gradient-to-br from-emerald-100 to-lime-50",
-
-    detailsCloseText: "text-emerald-950",
-
-    detailsLabelColor: "text-emerald-900",
-
-    detailsValueColor: "text-emerald-700",
-  },
-
-  estate: {
-    // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-100",
-
-    sidebarBg:
-      "bg-gradient-to-br from-sky-200/55 via-blue-100/45 to-cyan-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-sky-200/35",
-
-    sidebarBorder:
-      "border border-white/30 shadow-[0_8px_32px_rgba(14,165,233,0.18)]",
-
-    contentBg: "bg-transparent",
-
-    // ─── Navbar ──────────────────────────────────────────
-    navBg:
-      "bg-gradient-to-r from-sky-500/90 via-blue-500/85 to-cyan-400/80 backdrop-blur-2xl",
-
-    navBorder:
-      "border border-white/20 shadow-[0_8px_32px_rgba(14,165,233,0.18)]",
-
-    logoFrom: "from-sky-950",
-    logoTo: "to-cyan-500",
-    logoSub: "text-sky-950/60",
-
-    liveColor: "bg-cyan-300",
-
-    liveShadow: "shadow-[0_0_10px_2px_rgba(103,232,249,0.7)]",
-
-    liveText: "text-sky-950",
-
-    linkActive: "text-white",
-    linkHover: "hover:text-cyan-100",
-    linkBar: "bg-cyan-200",
-
-    logoutBorder: "border-white/20",
-    logoutText: "text-sky-950",
-
-    logoutHoverBorder: "hover:border-red-400/50",
-    logoutHoverText: "hover:text-red-500",
-    logoutHoverBg: "hover:bg-red-500/5",
-
-    accent: "shadow-[0_1px_0_0_rgba(125,211,252,0.25)]",
-
-    glowLine: "via-sky-300/40",
-
-    // ─── Sidebar nav ─────────────────────────────────────
-    sideNavActive:
-      "text-sky-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
-
-    sideNavIdle:
-      "text-sky-900/80 hover:text-sky-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
-
-    sideNavDotActive: "bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.95)]",
-
-    sideNavDotIdle: "bg-sky-500/40 group-hover:bg-sky-500",
-
-    sideNavLabel: "text-sky-950/50",
-
-    // ─── Section headers ─────────────────────────────────
-    sectionAccentBar: "from-sky-500 to-cyan-400",
-
-    sectionLabel: "text-sky-700/70",
-
-    sectionTitle: "text-sky-950",
-
-    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
-
-    sectionCountBorder: "border-white/30",
-
-    sectionCountDot: "bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.8)]",
-
-    sectionCountText: "text-sky-950",
-
-    sectionDivider: "border-sky-300/40",
-
-    // ─── Cards ───────────────────────────────────────────
-    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
-
-    cardNormalBorder: "border-green-400/50",
-
-    cardNormalGlow: "shadow-[0_0_18px_rgba(34,197,94,0.14)]",
-
-    cardNormalDot: "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]",
-
-    cardNormalAccent: "from-green-500/15 to-transparent",
-
-    cardNormalPriority: "text-green-700",
-
-    cardEmergencyBorder: "border-red-400/60",
-
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
-
-    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
-
-    cardEmergencyAccent: "from-red-500/20 to-transparent",
-
-    cardEmergencyPriority: "text-red-500",
-
-    cardUrgentBorder: "border-yellow-400/60",
-
-    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
-
-    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
-
-    cardUrgentAccent: "from-yellow-400/20 to-transparent",
-
-    cardUrgentPriority: "text-yellow-600",
-
-    cardDateLabel: "text-sky-900/60",
-
-    cardDateValue: "text-sky-950",
-
-    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
-
-    cardStatusBorder: "border-white/20",
-
-    cardStatusText: "text-sky-900",
-
-    // ─── Feedback badge ──────────────────────────────────
-    feedbackBadge: "bg-cyan-300 text-sky-950 shadow-lg",
-
-    // ─── Mobile toggle ───────────────────────────────────
-    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
-
-    mobileToggleBorder: "border-white/30",
-
-    mobileToggleText: "text-sky-950",
-
-    mobileToggleHover: "hover:bg-white/40",
-
-    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
-
-    mobileBottomBorder: "border-white/30",
-
-    mobileBottomDot: "bg-cyan-300",
-
-    mobileBottomText: "text-sky-950",
-
-    // ─── Bottom sheet ────────────────────────────────────
-    sheetBg:
-      "bg-gradient-to-br from-sky-100/95 to-cyan-50/95 backdrop-blur-2xl",
-
-    sheetBorder: "border-white/30",
-
-    sheetTopBar: "from-sky-400 via-cyan-400",
-
-    titleColor: "text-sky-950",
-
-    emptyText: "text-sky-700/50",
-
-    // ─── Slide panel ─────────────────────────────────────
-    slideBg:
-      "bg-gradient-to-br from-sky-100/95 to-cyan-50/95 backdrop-blur-2xl",
-
-    slideBorder: "border-white/30",
-
-    slideTopBar: "from-sky-400 via-cyan-400",
-
-    linkActiveBg: "bg-white/35 backdrop-blur-xl",
-
-    linkActiveBorder: "border-white/40",
-
-    linkActiveText: "text-sky-950",
-
-    linkIdleBorder: "border-white/10",
-
-    linkIdleText: "text-sky-900/50",
-
-    linkHoverText: "hover:text-sky-950",
-
-    linkHoverBorder: "hover:border-white/30",
-
-    linkHoverBg: "hover:bg-white/20",
-
-    // ─── Spinner ─────────────────────────────────────────
-    spinnerOuter: "border-t-sky-500",
-
-    spinnerInner: "border-t-cyan-400/70",
-
-    dotColor: "bg-cyan-300",
-
-    textColor: "text-sky-700/70",
-
-    // ─── Report details ──────────────────────────────────
-    detailsBg: "bg-gradient-to-br from-sky-100 to-cyan-50",
-
-    detailsCloseText: "text-sky-950",
-
-    detailsLabelColor: "text-sky-900",
-
-    detailsValueColor: "text-sky-700",
-  },
-
-  worker: {
-    // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-100",
-
-    sidebarBg:
-      "bg-gradient-to-br from-amber-200/55 via-yellow-100/45 to-orange-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-amber-200/35",
-
-    sidebarBorder:
-      "border border-white/30 shadow-[0_8px_32px_rgba(245,158,11,0.18)]",
-
-    contentBg: "bg-transparent",
-
-    // ─── Navbar ──────────────────────────────────────────
-    navBg:
-      "bg-gradient-to-r from-amber-400/90 via-yellow-400/85 to-orange-300/80 backdrop-blur-2xl",
-
-    navBorder:
-      "border border-white/20 shadow-[0_8px_32px_rgba(245,158,11,0.18)]",
-
-    logoFrom: "from-amber-950",
-    logoTo: "to-orange-500",
-    logoSub: "text-amber-950/60",
-
-    liveColor: "bg-orange-300",
-
-    liveShadow: "shadow-[0_0_10px_2px_rgba(253,186,116,0.7)]",
-
-    liveText: "text-amber-950",
-
-    linkActive: "text-white",
-    linkHover: "hover:text-yellow-100",
-    linkBar: "bg-yellow-100",
-
-    logoutBorder: "border-white/20",
-    logoutText: "text-amber-950",
-
-    logoutHoverBorder: "hover:border-red-400/50",
-    logoutHoverText: "hover:text-red-500",
-    logoutHoverBg: "hover:bg-red-500/5",
-
-    accent: "shadow-[0_1px_0_0_rgba(253,224,71,0.25)]",
-
-    glowLine: "via-yellow-200/40",
-
-    // ─── Sidebar nav ─────────────────────────────────────
-    sideNavActive:
-      "text-amber-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
-
-    sideNavIdle:
-      "text-amber-900/80 hover:text-amber-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
-
-    sideNavDotActive: "bg-orange-300 shadow-[0_0_8px_rgba(253,186,116,0.95)]",
-
-    sideNavDotIdle: "bg-amber-500/40 group-hover:bg-amber-500",
-
-    sideNavLabel: "text-amber-950/50",
-
-    // ─── Section headers ─────────────────────────────────
-    sectionAccentBar: "from-amber-400 to-orange-300",
-
-    sectionLabel: "text-amber-700/70",
-
-    sectionTitle: "text-amber-950",
-
-    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
-
-    sectionCountBorder: "border-white/30",
-
-    sectionCountDot: "bg-orange-300 shadow-[0_0_6px_rgba(253,186,116,0.8)]",
-
-    sectionCountText: "text-amber-950",
-
-    sectionDivider: "border-amber-300/40",
-
-    // ─── Cards ───────────────────────────────────────────
-    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
-
-    // Routine / Normal
-    normalTimeLeftBg: "bg-green-500",
-
-    cardNormalBorder: "border-green-400/50",
-
-    cardNormalGlow: "shadow-[0_0_18px_rgba(34,197,94,0.14)]",
-
-    cardNormalDot: "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]",
-
-    cardNormalAccent: "from-green-500/15 to-transparent",
-
-    cardNormalPriority: "text-green-700",
-
-    // Emergency
-    cardEmergencyBorder: "border-red-400/60",
-
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
-
-    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
-
-    cardEmergencyAccent: "from-red-500/20 to-transparent",
-
-    cardEmergencyPriority: "text-red-500",
-
-    // Urgent
-    cardUrgentBorder: "border-yellow-400/60",
-
-    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
-
-    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
-
-    cardUrgentAccent: "from-yellow-400/20 to-transparent",
-
-    cardUrgentPriority: "text-yellow-600",
-
-    cardDateLabel: "text-amber-900/60",
-
-    cardDateValue: "text-amber-950",
-
-    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
-
-    cardStatusBorder: "border-white/20",
-
-    cardStatusText: "text-amber-900",
-
-    // ─── Feedback badge ──────────────────────────────────
-    feedbackBadge: "bg-orange-300 text-amber-950 shadow-lg",
-
-    // ─── Mobile toggle ───────────────────────────────────
-    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
-
-    mobileToggleBorder: "border-white/30",
-
-    mobileToggleText: "text-amber-950",
-
-    mobileToggleHover: "hover:bg-white/40",
-
-    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
-
-    mobileBottomBorder: "border-white/30",
-
-    mobileBottomDot: "bg-orange-300",
-
-    mobileBottomText: "text-amber-950",
-
-    // ─── Bottom sheet ────────────────────────────────────
-    sheetBg:
-      "bg-gradient-to-br from-amber-100/95 to-yellow-50/95 backdrop-blur-2xl",
-
-    sheetBorder: "border-white/30",
-
-    sheetTopBar: "from-amber-400 via-orange-300",
-
-    titleColor: "text-amber-950",
-
-    emptyText: "text-amber-700/50",
-
-    // ─── Slide panel ─────────────────────────────────────
-    slideBg:
-      "bg-gradient-to-br from-amber-100/95 to-yellow-50/95 backdrop-blur-2xl",
-
-    slideBorder: "border-white/30",
-
-    slideTopBar: "from-amber-400 via-orange-300",
-
-    linkActiveBg: "bg-white/35 backdrop-blur-xl",
-
-    linkActiveBorder: "border-white/40",
-
-    linkActiveText: "text-amber-950",
-
-    linkIdleBorder: "border-white/10",
-
-    linkIdleText: "text-amber-900/50",
-
-    linkHoverText: "hover:text-amber-950",
-
-    linkHoverBorder: "hover:border-white/30",
-
-    linkHoverBg: "hover:bg-white/20",
-
-    // ─── Spinner ─────────────────────────────────────────
-    spinnerOuter: "border-t-amber-500",
-
-    spinnerInner: "border-t-orange-300/70",
-
-    dotColor: "bg-orange-300",
-
-    textColor: "text-amber-700/70",
-
-    // ─── Report details ──────────────────────────────────
-    detailsBg: "bg-gradient-to-br from-amber-100 to-yellow-50",
-
-    detailsCloseText: "text-amber-950",
-
-    detailsLabelColor: "text-amber-900",
-
-    detailsValueColor: "text-amber-700",
-  },
-  manager: {
-    // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-gradient-to-br from-orange-50 via-amber-50 to-orange-100",
-
-    sidebarBg:
-      "bg-gradient-to-br from-orange-200/55 via-amber-100/45 to-orange-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-orange-200/35",
-
-    sidebarBorder:
-      "border border-white/30 shadow-[0_8px_32px_rgba(255,136,37,0.18)]",
-
-    contentBg: "bg-transparent",
-
-    // ─── Navbar ──────────────────────────────────────────
-    navBg:
-      "bg-gradient-to-r from-[#FF8825]/90 via-[#FF9F52]/85 to-[#FFB878]/80 backdrop-blur-2xl",
-
-    navBorder:
-      "border border-white/20 shadow-[0_8px_32px_rgba(255,136,37,0.18)]",
-
-    logoFrom: "from-[#7C3A00]",
-    logoTo: "to-[#FF8825]",
-    logoSub: "text-[#7C3A00]/60",
-
-    liveColor: "bg-[#FFD166]",
-    liveShadow: "shadow-[0_0_10px_2px_rgba(255,209,102,0.7)]",
-    liveText: "text-[#7C3A00]",
-
-    linkActive: "text-white",
-    linkHover: "hover:text-[#FFE3C2]",
-    linkBar: "bg-[#FFD166]",
-
-    logoutBorder: "border-white/20",
-    logoutText: "text-[#7C3A00]",
-
-    logoutHoverBorder: "hover:border-red-400/50",
-    logoutHoverText: "hover:text-red-500",
-    logoutHoverBg: "hover:bg-red-500/5",
-
-    accent: "shadow-[0_1px_0_0_rgba(255,209,102,0.25)]",
-    glowLine: "via-[#FFCB91]/40",
-
-    // ─── Sidebar nav ─────────────────────────────────────
-    sideNavActive:
-      "text-[#7C3A00] bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
-
-    sideNavIdle:
-      "text-[#7C3A00]/80 hover:text-[#7C3A00] hover:bg-white/20 backdrop-blur-md border border-transparent",
-
-    sideNavDotActive: "bg-[#FFD166] shadow-[0_0_8px_rgba(255,209,102,0.95)]",
-    sideNavDotIdle: "bg-[#FF8825]/40 group-hover:bg-[#FF8825]",
-    sideNavLabel: "text-[#7C3A00]/50",
-
-    // ─── Section headers ─────────────────────────────────
-    sectionAccentBar: "from-[#FF8825] to-[#FFB878]",
-    sectionLabel: "text-[#7C3A00]/70",
-    sectionTitle: "text-[#7C3A00]",
-    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
-    sectionCountBorder: "border-white/30",
-    sectionCountDot: "bg-[#FFD166] shadow-[0_0_6px_rgba(255,209,102,0.8)]",
-    sectionCountText: "text-[#7C3A00]",
-    sectionDivider: "border-orange-300/40",
-
-    // ─── Cards ───────────────────────────────────────────
-    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
-
-    cardNormalBorder: "border-emerald-400/50",
-    cardNormalGlow: "shadow-[0_0_18px_rgba(16,185,129,0.14)]",
-    cardNormalDot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
-    cardNormalAccent: "from-emerald-500/15 to-transparent",
-    cardNormalPriority: "text-emerald-700",
-
-    cardEmergencyBorder: "border-red-400/60",
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(239,68,68,0.22)]",
-    cardEmergencyDot: "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
-    cardEmergencyAccent: "from-red-500/20 to-transparent",
-    cardEmergencyPriority: "text-red-500",
-
-    cardUrgentBorder: "border-yellow-400/60",
-    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
-    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
-    cardUrgentAccent: "from-yellow-400/20 to-transparent",
-    cardUrgentPriority: "text-yellow-600",
-
-    cardDateLabel: "text-[#7C3A00]/60",
-    cardDateValue: "text-[#7C3A00]",
-    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
-    cardStatusBorder: "border-white/20",
-    cardStatusText: "text-[#7C3A00]/90",
-
-    // ─── Feedback badge ──────────────────────────────────
-    feedbackBadge: "bg-[#FFD166] text-[#7C3A00] shadow-lg",
-
-    // ─── Mobile toggle ───────────────────────────────────
-    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
-    mobileToggleBorder: "border-white/30",
-    mobileToggleText: "text-[#7C3A00]",
-    mobileToggleHover: "hover:bg-white/40",
-
-    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
-    mobileBottomBorder: "border-white/30",
-    mobileBottomDot: "bg-[#FFD166]",
-    mobileBottomText: "text-[#7C3A00]",
-
-    // ─── Bottom sheet ────────────────────────────────────
-    sheetBg:
-      "bg-gradient-to-br from-orange-100/95 to-amber-50/95 backdrop-blur-2xl",
-    sheetBorder: "border-white/30",
-    sheetTopBar: "from-[#FF8825] via-[#FFB878]",
-    titleColor: "text-[#7C3A00]",
-    emptyText: "text-[#7C3A00]/50",
-
-    // ─── Slide panel ─────────────────────────────────────
-    slideBg:
-      "bg-gradient-to-br from-orange-100/95 to-amber-50/95 backdrop-blur-2xl",
-    slideBorder: "border-white/30",
-    slideTopBar: "from-[#FF8825] via-[#FFB878]",
-
-    linkActiveBg: "bg-white/35 backdrop-blur-xl",
-    linkActiveBorder: "border-white/40",
-    linkActiveText: "text-[#7C3A00]",
-    linkIdleBorder: "border-white/10",
-    linkIdleText: "text-[#7C3A00]/50",
-    linkHoverText: "hover:text-[#7C3A00]",
-    linkHoverBorder: "hover:border-white/30",
-    linkHoverBg: "hover:bg-white/20",
-
-    // ─── Spinner ─────────────────────────────────────────
-    spinnerOuter: "border-t-[#FF8825]",
-    spinnerInner: "border-t-[#FFB878]/70",
-    dotColor: "bg-[#FFD166]",
-    textColor: "text-[#7C3A00]/70",
-
-    // ─── Report details ──────────────────────────────────
-    detailsBg: "bg-gradient-to-br from-orange-100 to-amber-50",
-    detailsCloseText: "text-[#7C3A00]",
-    detailsLabelColor: "text-[#7C3A00]/90",
-    detailsValueColor: "text-[#7C3A00]/70",
-  },
-
-  procurement: {
-    // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-gradient-to-br from-rose-50 via-red-50 to-orange-50",
-
-    sidebarBg:
-      "bg-gradient-to-br from-rose-200/55 via-red-100/45 to-orange-100/40 backdrop-blur-2xl supports-[backdrop-filter]:bg-rose-200/35",
-
-    sidebarBorder:
-      "border border-white/30 shadow-[0_8px_32px_rgba(225,29,72,0.18)]",
-
-    contentBg: "bg-transparent",
-
-    // ─── Navbar ──────────────────────────────────────────
-    navBg:
-      "bg-gradient-to-r from-rose-600/90 via-red-500/85 to-rose-400/80 backdrop-blur-2xl",
-
-    navBorder:
-      "border border-white/20 shadow-[0_8px_32px_rgba(225,29,72,0.18)]",
-
-    logoFrom: "from-rose-950",
-    logoTo: "to-amber-500",
-    logoSub: "text-rose-950/60",
-
-    liveColor: "bg-amber-300",
-    liveShadow: "shadow-[0_0_10px_2px_rgba(252,211,77,0.7)]",
-    liveText: "text-rose-950",
-
-    linkActive: "text-white",
-    linkHover: "hover:text-rose-100",
-    linkBar: "bg-amber-300",
-
-    logoutBorder: "border-white/20",
-    logoutText: "text-rose-950",
-
-    logoutHoverBorder: "hover:border-red-800/50",
-    logoutHoverText: "hover:text-red-800",
-    logoutHoverBg: "hover:bg-red-800/5",
-
-    accent: "shadow-[0_1px_0_0_rgba(252,211,77,0.25)]",
-    glowLine: "via-rose-300/40",
-
-    // ─── Sidebar nav ─────────────────────────────────────
-    sideNavActive:
-      "text-rose-950 bg-white/35 backdrop-blur-xl border border-white/40 shadow-lg",
-
-    sideNavIdle:
-      "text-rose-900/80 hover:text-rose-950 hover:bg-white/20 backdrop-blur-md border border-transparent",
-
-    sideNavDotActive: "bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.95)]",
-    sideNavDotIdle: "bg-rose-500/40 group-hover:bg-rose-500",
-    sideNavLabel: "text-rose-950/50",
-
-    // ─── Section headers ─────────────────────────────────
-    sectionAccentBar: "from-rose-600 to-amber-400",
-    sectionLabel: "text-rose-700/70",
-    sectionTitle: "text-rose-950",
-    sectionCountBg: "bg-white/30 backdrop-blur-xl border border-white/40",
-    sectionCountBorder: "border-white/30",
-    sectionCountDot: "bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.8)]",
-    sectionCountText: "text-rose-950",
-    sectionDivider: "border-rose-300/40",
-
-    // ─── Cards ───────────────────────────────────────────
-    cardBg: "bg-white/25 backdrop-blur-2xl border border-white/20",
-
-    cardNormalBorder: "border-emerald-400/50",
-    cardNormalGlow: "shadow-[0_0_18px_rgba(16,185,129,0.14)]",
-    cardNormalDot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
-    cardNormalAccent: "from-emerald-500/15 to-transparent",
-    cardNormalPriority: "text-emerald-700",
-
-    cardEmergencyBorder: "border-red-500/60",
-    cardEmergencyGlow: "shadow-[0_0_20px_rgba(220,38,38,0.24)]",
-    cardEmergencyDot: "bg-red-500 shadow-[0_0_8px_rgba(220,38,38,0.85)]",
-    cardEmergencyAccent: "from-red-600/20 to-transparent",
+    cardBg: "bg-white border border-slate-200",
+
+    cardNormalBorder: "border-l-emerald-400",
+    cardNormalBadge: "bg-emerald-600 text-white",
+    cardNormalDot: "bg-emerald-400",
+    cardNormalAccent: "bg-emerald-400",
+    cardNormalPriority: "text-emerald-600",
+
+    cardEmergencyBorder: "border-l-red-500",
+    cardEmergencyBadge: "bg-red-600 text-white",
+    cardEmergencyDot: "bg-red-500",
+    cardEmergencyAccent: "bg-red-500",
     cardEmergencyPriority: "text-red-600",
 
-    cardUrgentBorder: "border-yellow-400/60",
-    cardUrgentGlow: "shadow-[0_0_20px_rgba(250,204,21,0.18)]",
-    cardUrgentDot: "bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]",
-    cardUrgentAccent: "from-yellow-400/20 to-transparent",
-    cardUrgentPriority: "text-yellow-600",
+    cardUrgentBorder: "border-l-amber-400",
+    cardUrgentBadge: "bg-amber-500 text-white",
+    cardUrgentDot: "bg-amber-400",
+    cardUrgentAccent: "bg-amber-400",
+    cardUrgentPriority: "text-amber-600",
 
-    cardDateLabel: "text-rose-900/60",
-    cardDateValue: "text-rose-950",
-    cardStatusBg: "bg-white/25 backdrop-blur-lg border border-white/30",
-    cardStatusBorder: "border-white/20",
-    cardStatusText: "text-rose-900",
+    cardDateLabel: "text-slate-400",
+    cardDateValue: "text-slate-700",
+
+    cardStatusBg: "bg-slate-100",
+    cardStatusBorder: "border-slate-200",
+    cardStatusText: "text-slate-600",
 
     // ─── Feedback badge ──────────────────────────────────
-    feedbackBadge: "bg-amber-300 text-rose-950 shadow-lg",
+    feedbackBadge: `${ring} text-white shadow-sm`,
 
     // ─── Mobile toggle ───────────────────────────────────
-    mobileToggleBg: "bg-white/25 backdrop-blur-xl",
-    mobileToggleBorder: "border-white/30",
-    mobileToggleText: "text-rose-950",
-    mobileToggleHover: "hover:bg-white/40",
+    mobileToggleBg: "bg-white",
+    mobileToggleBorder: "border-slate-200",
+    mobileToggleText: "text-slate-700",
+    mobileToggleHover: "hover:bg-slate-50",
 
-    mobileBottomBg: "bg-white/25 backdrop-blur-2xl",
-    mobileBottomBorder: "border-white/30",
-    mobileBottomDot: "bg-amber-300",
-    mobileBottomText: "text-rose-950",
+    mobileBottomBg: "bg-white",
+    mobileBottomBorder: "border-slate-200",
+    mobileBottomDot: accentDark,
+    mobileBottomText: "text-slate-700",
 
     // ─── Bottom sheet ────────────────────────────────────
-    sheetBg:
-      "bg-gradient-to-br from-rose-100/95 to-orange-50/95 backdrop-blur-2xl",
-    sheetBorder: "border-white/30",
-    sheetTopBar: "from-rose-500 via-amber-300",
-    titleColor: "text-rose-950",
-    emptyText: "text-rose-700/50",
+    sheetBg: "bg-white",
+    sheetBorder: "border-slate-200",
+    sheetTopBar: accent,
+    titleColor: "text-slate-900",
+    emptyText: "text-slate-400",
 
     // ─── Slide panel ─────────────────────────────────────
-    slideBg:
-      "bg-gradient-to-br from-rose-100/95 to-orange-50/95 backdrop-blur-2xl",
-    slideBorder: "border-white/30",
-    slideTopBar: "from-rose-500 via-amber-300",
+    slideBg: "bg-white",
+    slideBorder: "border-slate-200",
+    slideTopBar: accent,
 
-    linkActiveBg: "bg-white/35 backdrop-blur-xl",
-    linkActiveBorder: "border-white/40",
-    linkActiveText: "text-rose-950",
-    linkIdleBorder: "border-white/10",
-    linkIdleText: "text-rose-900/50",
-    linkHoverText: "hover:text-rose-950",
-    linkHoverBorder: "hover:border-white/30",
-    linkHoverBg: "hover:bg-white/20",
+    linkActiveBg: accentSoft,
+    linkActiveBorder: "border-slate-200",
+    linkActiveText: "text-slate-900",
+
+    linkIdleBorder: "border-transparent",
+    linkIdleText: "text-slate-500",
+
+    linkHoverText: "hover:text-slate-900",
+    linkHoverBorder: "hover:border-slate-200",
+    linkHoverBg: "hover:bg-slate-50",
 
     // ─── Spinner ─────────────────────────────────────────
-    spinnerOuter: "border-t-rose-600",
-    spinnerInner: "border-t-amber-400/70",
-    dotColor: "bg-amber-300",
-    textColor: "text-rose-700/70",
+    spinnerOuter: `border-t-${ring.replace("bg-", "")}`,
+    spinnerInner: "border-t-slate-300",
+    dotColor: ring,
+    textColor: "text-slate-400",
 
     // ─── Report details ──────────────────────────────────
-    detailsBg: "bg-gradient-to-br from-rose-100 to-orange-50",
-    detailsCloseText: "text-rose-950",
-    detailsLabelColor: "text-rose-900",
-    detailsValueColor: "text-rose-700",
-  },
+    detailsBg: "bg-white",
+    detailsCloseText: "text-slate-500",
+    detailsLabelColor: "text-slate-500",
+    detailsValueColor: "text-slate-800",
+  };
+}
+
+// Per-role identity lives in exactly four values. Everything else is
+// derived by makeTheme() above, so the whole theme system fits on one
+// screen instead of being spread across hundreds of hand-tuned lines.
+export const THEMES = {
+  admin: makeTheme({
+    accent: "from-emerald-600 to-emerald-500",
+    accentDark: "bg-emerald-500",
+    accentSoft: "bg-emerald-50",
+    ring: "bg-emerald-500",
+  }),
+  estate: makeTheme({
+    accent: "from-sky-600 to-sky-500",
+    accentDark: "bg-sky-500",
+    accentSoft: "bg-sky-50",
+    ring: "bg-sky-500",
+  }),
+  worker: makeTheme({
+    accent: "from-amber-500 to-amber-400",
+    accentDark: "bg-amber-500",
+    accentSoft: "bg-amber-50",
+    ring: "bg-amber-500",
+  }),
+  manager: makeTheme({
+    accent: "from-orange-500 to-orange-400",
+    accentDark: "bg-orange-500",
+    accentSoft: "bg-orange-50",
+    ring: "bg-orange-500",
+  }),
+  procurement: makeTheme({
+    accent: "from-rose-600 to-rose-500",
+    accentDark: "bg-rose-500",
+    accentSoft: "bg-rose-50",
+    ring: "bg-rose-500",
+  }),
 };
 
 // ─── Pagination controls ───────────────────────────────────────────────────
@@ -1271,13 +529,13 @@ const PaginationControls = ({ page, totalPages, onChange, theme }) => {
         type="button"
         disabled={page <= 1}
         onClick={() => onChange(page - 1)}
-        className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110`}
+        className={`flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50`}
       >
         <span className="material-symbols-outlined text-sm">chevron_left</span>
         Prev
       </button>
       <span
-        className={`text-xs font-mono font-semibold tracking-wide ${theme.sectionCountText}`}
+        className={`text-xs font-mono font-medium tracking-wide ${theme.sectionCountText}`}
       >
         {page} / {totalPages}
       </span>
@@ -1285,7 +543,7 @@ const PaginationControls = ({ page, totalPages, onChange, theme }) => {
         type="button"
         disabled={page >= totalPages}
         onClick={() => onChange(page + 1)}
-        className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110`}
+        className={`flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50`}
       >
         Next
         <span className="material-symbols-outlined text-sm">chevron_right</span>
@@ -1626,18 +884,6 @@ export default function Home({
     localStorage.setItem(dismissKey, "1");
   };
 
-  const [showConfetti, setShowConfetti] = useState(false);
-
-  // Confetti runs for exactly 10s from mount/refresh, regardless of
-  // whether the banner has been dismissed for the day — so it replays
-  // every time the page opens/refreshes on the birthday.
-  useEffect(() => {
-    if (!user?.birthdate || !isBirthdayToday(user.birthdate)) return;
-    setShowConfetti(true);
-    const t = setTimeout(() => setShowConfetti(false), 10000);
-    return () => clearTimeout(t);
-  }, []);
-
   const handleClose = () => {
     setTimeout(() => SetShowReportsHiddenOnMobile(false), 300);
   };
@@ -1963,10 +1209,10 @@ export default function Home({
 
   const hasUnreadItems = pageNewCount > 0 || pageFeedbackCount > 0;
 
-  // Clears every "🆕 New" and "💬 Feedback" badge across this user's
-  // reports for the statuses shown on this page (bounded to the badge
-  // data's fetch window — see BADGE_FETCH_LIMIT). Two separate batches are
-  // used because the Firestore rules only allow a report update to touch
+  // Clears every "New" and "Feedback" badge across this user's reports for
+  // the statuses shown on this page (bounded to the badge data's fetch
+  // window — see BADGE_FETCH_LIMIT). Two separate batches are used because
+  // the Firestore rules only allow a report update to touch
   // lastViewedStatus OR feedbackViewedBy in a single write, never both
   // together. Each batch is further chunked to stay under Firestore's
   // 500-operation-per-batch hard limit.
@@ -2050,8 +1296,8 @@ export default function Home({
 
   const PRIORITY_BG = {
     emergency: "bg-red-500",
-    urgent: "bg-yellow-400",
-    routine: "bg-green-500",
+    urgent: "bg-amber-400",
+    routine: "bg-emerald-500",
   };
 
   const WorkStartedLabel = ({ dateAccepted, className }) => {
@@ -2063,36 +1309,38 @@ export default function Home({
   };
 
   // ─── Report Card ───────────────────────────────────────────────────────────
+  // A single restrained hover state (subtle lift, no scale/rotate stacking),
+  // a left accent bar instead of a full glow, and status badges that appear
+  // once via a short fade/scale-in rather than looping forever.
   const ReportCard = ({ report, reportDate }) => {
     const cfg = cardConfig(report.status, report.priorityLevel, theme);
     const { label: dateLabel, value: dateValue } = getDisplayDate(report);
     return (
-      <div className="relative w-full  max-w-[250px] md:max-w-[300px] flex justify-center">
+      <div className="relative w-full max-w-[250px] md:max-w-[300px] flex justify-center">
         {/* Feedback badge */}
         {hasFeedback(report) && (
           <span
-            className={`absolute -top-1 -right-1 ${theme.feedbackBadge} text-[10px] font-black px-2 py-0.5 rounded-full  animate-bounce z-10 tracking-wide`}
+            className={`absolute -top-2 -right-2 ${theme.feedbackBadge} text-[10px] font-semibold pl-1.5 pr-2 py-0.5 rounded-full z-10 tracking-wide flex items-center gap-0.5 animate-badge-in`}
           >
-            💬 Feedback
+            <span className="material-symbols-outlined text-[12px] leading-none">
+              chat_bubble
+            </span>
+            Feedback
           </span>
         )}
 
         {isNewForUser(report) && (
-          <span className="absolute -top-1 -left-1 bg-sky-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce z-10 tracking-wide">
-            🆕 New
+          <span className="absolute -top-2 -left-2 bg-sky-600 text-white text-[10px] font-semibold pl-1.5 pr-2 py-0.5 rounded-full z-10 tracking-wide flex items-center gap-0.5 animate-badge-in">
+            <span className="material-symbols-outlined text-[12px] leading-none">
+              fiber_new
+            </span>
+            New
           </span>
         )}
         <div
-          className={`relative group select-none ${cfg.border} ${cfg.glow} ${theme.cardBg} flex flex-col gap-3 cursor-pointer transition-all border-${theme.secColor} duration-300 hover:scale-[1.03] hover:-translate-y-1 rounded-2xl w-full max-w-[250px] md:max-w-[280px] p-4 overflow-hidden`}
+          className={`relative group select-none border-l-4 ${cfg.border} ${theme.cardBg} flex flex-col gap-3 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 rounded-xl w-full max-w-[250px] md:max-w-[280px] p-4 overflow-hidden`}
           onClick={() => displayReportDetails(report)}
         >
-          {/* Top gradient line */}
-          <div
-            className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${cfg.accent}`}
-          />
-          <div
-            className={`absolute top-0 left-0 right-0 h-16 bg-gradient-to-b ${cfg.accent} pointer-events-none rounded-t-2xl`}
-          />
           {/* Priority row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -2100,22 +1348,21 @@ export default function Home({
                 className={`w-2 h-2 rounded-full ${cfg.dot} flex-shrink-0`}
               />
               <span
-                className={`text-xs font-black tracking-widest uppercase ${cfg.priorityColor}`}
+                className={`text-xs font-semibold tracking-wide uppercase ${cfg.priorityColor}`}
               >
                 {report.priorityLevel}
               </span>
             </div>
             <span
-              className={`text-[10px] ${theme.cardStatusBg} border ${theme.cardStatusBorder} ${theme.cardStatusText} px-2 py-0.5 rounded-full font-mono tracking-wider uppercase`}
+              className={`text-[10px] ${theme.cardStatusBg} border ${theme.cardStatusBorder} ${theme.cardStatusText} px-2 py-0.5 rounded-full font-mono tracking-wide uppercase`}
             >
               {report.status}
             </span>
           </div>
-          <div className="h-px bg-white/5" />
-          <div className="h-px bg-white/5" />
+          <div className="h-px bg-slate-100" />
           {getStatusMessage(report) && (
             <p
-              className={`text-[12px] leading-relaxed font-bold -mt-1 ${theme.cardDateLabel} `}
+              className={`text-[12px] leading-relaxed font-medium -mt-1 ${theme.cardDateLabel}`}
             >
               {getStatusMessage(report)}
             </p>
@@ -2129,7 +1376,7 @@ export default function Home({
           {/* Date — status-specific label/value, see getDisplayDate above */}
           <div className="flex items-center gap-2">
             <span
-              className={`text-[10px] ${theme.cardDateLabel} uppercase tracking-wider font-semibold`}
+              className={`text-[10px] ${theme.cardDateLabel} uppercase tracking-wide font-medium`}
             >
               {dateLabel}
             </span>
@@ -2139,12 +1386,15 @@ export default function Home({
           </div>
 
           {report.overdue && (
-            <div className="flex flex-col gap-1 bg-red-950/50 border border-red-800/40 rounded-xl px-3 py-2">
-              <span className="text-[10px] font-black text-red-500 tracking-widest uppercase flex items-center gap-1">
-                <span>⚠</span> Overdue
+            <div className="flex flex-col gap-1 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <span className="text-[10px] font-semibold text-red-600 tracking-wide uppercase flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] leading-none">
+                  warning
+                </span>
+                Overdue
               </span>
               {report.dateDue && !TERMINAL_STATUSES.includes(report.status) && (
-                <span className="text-[10px] text-yellow-400/90 font-mono">
+                <span className="text-[10px] text-amber-700 font-mono">
                   Due {timeAgo(report.dateDue)}
                 </span>
               )}
@@ -2154,11 +1404,9 @@ export default function Home({
             <Countdown
               dateDue={report.dateDue}
               status={report.status}
-              bgColor={PRIORITY_BG[report.priorityLevel] ?? "bg-green-800"}
+              bgColor={PRIORITY_BG[report.priorityLevel] ?? "bg-emerald-700"}
             />
           )}
-          {/* Hover shimmer */}
-          <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bg-gradient-to-br from-white/[0.03] to-transparent" />
         </div>
       </div>
     );
@@ -2185,12 +1433,12 @@ export default function Home({
         />
         <div>
           <p
-            className={`text-[10px] ${theme.sectionLabel} tracking-[0.3em] uppercase font-semibold`}
+            className={`text-[10px] ${theme.sectionLabel} tracking-[0.2em] uppercase font-medium`}
           >
             Reports
           </p>
           <h1
-            className={`text-lg md:text-xl font-black tracking-tight ${theme.sectionTitle} uppercase leading-tight`}
+            className={`text-lg md:text-xl font-semibold tracking-tight ${theme.sectionTitle} leading-tight`}
           >
             {title}
           </h1>
@@ -2201,45 +1449,53 @@ export default function Home({
           className={`ml-auto flex items-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} px-3 py-1 rounded-full`}
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full ${theme.sectionCountDot} animate-pulse`}
+            className={`w-1.5 h-1.5 rounded-full ${theme.sectionCountDot}`}
           />
           <span
-            className={`text-xs ${theme.sectionCountText} font-semibold tabular-nums`}
+            className={`text-xs ${theme.sectionCountText} font-medium tabular-nums`}
           >
             {count}
           </span>
         </span>
       )}
-      <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent ml-2 hidden md:block" />
+      <div className="flex-1 h-px bg-slate-200 ml-2 hidden md:block" />
     </div>
   );
 
   // ─── Empty state ───────────────────────────────────────────────────────────
   const EmptyState = ({ filtered }) => (
     <div className="flex flex-col items-center gap-3 my-16">
-      <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl opacity-40">
-        📋
+      <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+        <span className="material-symbols-outlined text-2xl">inbox</span>
       </div>
-      <p
-        className={`${theme.sectionCountText} text-sm tracking-widest uppercase font-semibold`}
-      >
+      <p className="text-slate-400 text-sm tracking-wide font-medium">
         {filtered
           ? "No reports match your search"
-          : "Nothing to display here...yet"}
+          : "Nothing to display here yet"}
       </p>
     </div>
   );
 
   return (
     <>
+      {/* One-time entrance keyframe for status badges — plays once on
+          mount, no looping motion. */}
+      <style>{`
+        @keyframes badge-pop {
+          0% { opacity: 0; transform: scale(0.7); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .animate-badge-in {
+          animation: badge-pop 220ms ease-out both;
+        }
+      `}</style>
+
       {showBirthdayBanner && (
         <BirthdayBanner
           name={getFirstName(user)}
           onDismiss={dismissBirthdayBanner}
         />
       )}
-
-      {showConfetti && <BirthdayConfetti />}
 
       <ReportDetailsContainer
         currentReport={currentReport}
@@ -2294,7 +1550,7 @@ export default function Home({
       {/* Mobile side toggle */}
       <div className="md:hidden">
         <button
-          className={`material-symbols-outlined select-none z-[60] fixed cursor-pointer top-1/2 -translate-y-1/2 right-0 ${theme.mobileToggleBg} border ${theme.mobileToggleBorder} border-r-0 ${theme.mobileToggleText} rounded-l-xl py-3 pl-2 pr-1 shadow-[-4px_0_12px_rgba(0,0,0,0.4)] ${theme.mobileToggleHover} transition-colors`}
+          className={`material-symbols-outlined select-none z-[60] fixed cursor-pointer top-1/2 -translate-y-1/2 right-0 ${theme.mobileToggleBg} border ${theme.mobileToggleBorder} border-r-0 ${theme.mobileToggleText} rounded-l-xl py-3 pl-2 pr-1 shadow-md ${theme.mobileToggleHover} transition-colors`}
           onClick={() => setSidePopup((prev) => !prev)}
         >
           {sidePopup ? "chevron_right" : "chevron_left"}
@@ -2304,14 +1560,14 @@ export default function Home({
       {/* Mobile bottom sheet toggle */}
       {!specificReportsPage && (
         <div
-          className={`fixed z-[40] bottom-0 cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-2xl px-8 py-2.5 md:hidden ${theme.mobileBottomBg} border border-b-0 ${theme.mobileBottomBorder} shadow-[0_-4px_24px_rgba(0,0,0,0.5)] flex items-center gap-2 hover:brightness-110 transition-all`}
+          className={`fixed z-[40] bottom-0 cursor-pointer left-1/2 -translate-x-1/2 select-none rounded-t-2xl px-8 py-2.5 md:hidden ${theme.mobileBottomBg} border border-b-0 ${theme.mobileBottomBorder} shadow-md flex items-center gap-2 hover:bg-slate-50 transition-colors`}
           onClick={() => SetShowReportsHiddenOnMobile((prev) => !prev)}
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full ${theme.mobileBottomDot} animate-pulse`}
+            className={`w-1.5 h-1.5 rounded-full ${theme.mobileBottomDot}`}
           />
           <span
-            className={`${theme.mobileBottomText} text-xs font-bold tracking-widest uppercase`}
+            className={`${theme.mobileBottomText} text-xs font-semibold tracking-wide`}
           >
             {showReportsHiddenOnMobile
               ? "Close"
@@ -2326,18 +1582,8 @@ export default function Home({
         <div
           className={`w-full fixed inset-y-0 z-10 max-w-[20%] h-screen ${theme.sidebarBg} ${theme.sidebarBorder} md:flex flex-col pt-28 px-5 gap-2 hidden overflow-hidden`}
         >
-          {/* Glass glow effects */}
-          <div className="absolute top-0 left-0 w-40 h-40 bg-emerald-400/20 blur-3xl rounded-full pointer-events-none" />
-
-          <div className="absolute bottom-0 right-0 w-40 h-40 bg-lime-300/20 blur-3xl rounded-full pointer-events-none" />
-
-          <div className="absolute inset-0 bg-white/[0.06] backdrop-blur-2xl pointer-events-none" />
-          <div
-            className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent ${theme.glowLine} to-transparent`}
-          />
-
           <p
-            className={`text-[9px] ${theme.sideNavLabel} tracking-[0.3em] uppercase font-semibold mb-3 px-3`}
+            className={`text-[9px] ${theme.sideNavLabel} tracking-[0.2em] uppercase font-medium mb-3 px-3`}
           >
             Navigation
           </p>
@@ -2346,17 +1592,17 @@ export default function Home({
             <NavLink
               to={assignedRedirect}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
                   Assigned
                   {newAssignedCount > 0 && (
-                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                    <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                       {newAssignedCount}
                     </span>
                   )}
@@ -2369,17 +1615,17 @@ export default function Home({
             <NavLink
               to={rejectedRedirect}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
                   Rejected
                   {newRejectedCount > 0 && (
-                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                    <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                       {newRejectedCount}
                     </span>
                   )}
@@ -2392,17 +1638,17 @@ export default function Home({
             <NavLink
               to={acceptedRedirect}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
                   In Progress
                   {newAcceptedCount > 0 && (
-                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                    <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                       {newAcceptedCount}
                     </span>
                   )}
@@ -2415,17 +1661,17 @@ export default function Home({
             <NavLink
               to={droppedRedirect}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
                   Dropped
                   {newDroppedCount > 0 && (
-                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                    <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                       {newDroppedCount}
                     </span>
                   )}
@@ -2438,17 +1684,17 @@ export default function Home({
             <NavLink
               to={reopenedRedirect}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
                   Reopened
                   {newReopenedCount > 0 && (
-                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                    <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                       {newReopenedCount}
                     </span>
                   )}
@@ -2464,23 +1710,23 @@ export default function Home({
                 to={completedRedirect}
                 end
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
                 }
               >
                 {({ isActive }) => (
                   <>
                     <span
-                      className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                     />
                     Completed
                     {newCompletedCount > 0 && (
-                      <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                      <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                         {newCompletedCount}
                       </span>
                     )}
                     {completedWithFeedback > 0 && (
                       <span
-                        className={`ml-auto ${theme.feedbackBadge} text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums`}
+                        className={`ml-auto ${theme.feedbackBadge} text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums`}
                       >
                         {completedWithFeedback}
                       </span>
@@ -2496,23 +1742,23 @@ export default function Home({
               to={closedRedirect}
               end
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
                   />
                   Closed
                   {newClosedCount > 0 && (
-                    <span className="ml-auto bg-sky-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums">
+                    <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                       {newClosedCount}
                     </span>
                   )}
                   {closedWithFeedback > 0 && (
                     <span
-                      className={`ml-auto ${theme.feedbackBadge} text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums`}
+                      className={`ml-auto ${theme.feedbackBadge} text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums`}
                     >
                       {closedWithFeedback}
                     </span>
@@ -2558,7 +1804,7 @@ export default function Home({
               <select
                 value={timeFilter}
                 onChange={(e) => setTimeFilter(e.target.value)}
-                className={`${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-semibold outline-none cursor-pointer`}
+                className={`${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-medium outline-none cursor-pointer`}
               >
                 {TIME_FILTERS.map((f) => (
                   <option key={f.value} value={f.value}>
@@ -2571,7 +1817,7 @@ export default function Home({
                 <button
                   type="button"
                   onClick={handleMarkAllAsRead}
-                  className={`flex items-center justify-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap`}
+                  className={`flex items-center justify-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors whitespace-nowrap`}
                 >
                   <span className="material-symbols-outlined text-base">
                     done_all
