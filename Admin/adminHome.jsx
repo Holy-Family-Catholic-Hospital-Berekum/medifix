@@ -8,7 +8,7 @@ export default function AdminHome() {
       secondReportsStatus="pending"
       primaryColor="text-green-300"
       title1="Incoming Reports"
-      title2={"Materials Request"}
+      title2={"Material Requests"}
       secColor={"bg-green-500"}
       titleBgColor={"bg-red-300"}
       reportCardHoverColor={"hover:bg-green-700"}
@@ -18,7 +18,7 @@ export default function AdminHome() {
       navBarColor="bg-green-300"
       slideInBgColor="bg-green-300"
       reportDetailsBgColor="bg-green-300"
-      reportsHiddenOnMobileTitle="Pending Confirmation"
+      reportsHiddenOnMobileTitle="Material Requests"
       completedRedirect={"/ac"}
       acceptedRedirect={"/aip"}
       logoBGColor="md:bg-green-500"
