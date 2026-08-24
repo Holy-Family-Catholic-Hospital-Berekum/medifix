@@ -30,15 +30,304 @@ import {
   canUserMarkProcured,
   getTotalCost,
   canUserAcceptOrRejectJob,
-  canUserDropJob, // add this
+  canUserDropJob,
 } from "../src/utils";
 
 const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
 
+// ─── Status / priority presentation ────────────────────────────────────────
+const STATUS_CONFIG = {
+  incoming: {
+    label: "Incoming",
+    color: "bg-slate-100 text-slate-700 border-slate-300",
+  },
+  approved: {
+    label: "Approved",
+    color: "bg-blue-100 text-blue-700 border-blue-300",
+  },
+  denied: { label: "Denied", color: "bg-red-100 text-red-700 border-red-300" },
+  pending: {
+    label: "Pending Confirmation",
+    color: "bg-amber-100 text-amber-700 border-amber-300",
+  },
+  confirmed: {
+    label: "Confirmed",
+    color: "bg-blue-100 text-blue-700 border-blue-300",
+  },
+  costDenied: {
+    label: "Cost Denied",
+    color: "bg-red-100 text-red-700 border-red-300",
+  },
+  procured: {
+    label: "Procured",
+    color: "bg-teal-100 text-teal-700 border-teal-300",
+  },
+  assigned: {
+    label: "Assigned",
+    color: "bg-purple-100 text-purple-700 border-purple-300",
+  },
+  accepted: {
+    label: "Accepted",
+    color: "bg-green-100 text-green-700 border-green-300",
+  },
+  rejected: {
+    label: "Rejected",
+    color: "bg-red-100 text-red-700 border-red-300",
+  },
+  dropped: {
+    label: "Dropped",
+    color: "bg-orange-100 text-orange-700 border-orange-300",
+  },
+  reopened: {
+    label: "Reopened",
+    color: "bg-amber-100 text-amber-700 border-amber-300",
+  },
+  completed: {
+    label: "Completed",
+    color: "bg-green-100 text-green-700 border-green-300",
+  },
+  closed: {
+    label: "Closed",
+    color: "bg-gray-200 text-gray-700 border-gray-300",
+  },
+};
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_CONFIG[status] || {
+    label: status,
+    color: "bg-gray-100 text-gray-700 border-gray-300",
+  };
+  return (
+    <span
+      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${cfg.color}`}
+    >
+      {cfg.label}
+    </span>
+  );
+}
+
+function PriorityBadge({ level }) {
+  if (!level) return null;
+  const lvl = String(level).toLowerCase();
+  const color =
+    lvl.includes("high") || lvl.includes("urgent")
+      ? "bg-red-100 text-red-700 border-red-300"
+      : lvl.includes("medium")
+        ? "bg-amber-100 text-amber-700 border-amber-300"
+        : lvl.includes("low")
+          ? "bg-green-100 text-green-700 border-green-300"
+          : "bg-gray-100 text-gray-700 border-gray-300";
+  return (
+    <span
+      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${color}`}
+    >
+      {level} priority
+    </span>
+  );
+}
+
+// Small label/value pair used in the compact info grid. Renders nothing if
+// there's no value, so the grid never shows empty cells.
+function InfoItem({ label, children }) {
+  if (children === null || children === undefined || children === "")
+    return null;
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+        {label}
+      </span>
+      <div className="text-sm md:text-base text-gray-800 font-medium break-words">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({ title, children, innerRef }) {
+  return (
+    <div
+      ref={innerRef}
+      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3"
+    >
+      {title && <h3 className="font-bold text-gray-800">{title}</h3>}
+      {children}
+    </div>
+  );
+}
+
+// Actions get a distinct visual treatment (accent bar) so it's obvious
+// what needs input from *this* viewer vs. what's just read-only history.
+function ActionSection({ innerRef, title, hint, children }) {
+  return (
+    <div
+      ref={innerRef}
+      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4"
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-1 w-1.5 h-5 rounded-full bg-red-400 shrink-0" />
+        <div>
+          <h3 className="font-bold text-gray-800 leading-tight">{title}</h3>
+          {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Denial reasons live in the report's `notes` array instead of the old
+// `alerts` field. A note entry looks like:
+// { type: "denial", content: "<reason>", date: <JS Date>, by: "<name>" }
+function getLatestNote(report, type) {
+  if (!report) return null;
+  const notes = (report.notes || []).filter((n) => n?.type === type);
+  return notes.length ? notes[notes.length - 1] : null;
+}
+
+function getDenialNote(report) {
+  if (!report || report.status !== "denied") return null;
+  return getLatestNote(report, "denial")?.content || null;
+}
+
+// ─── Timeline ───────────────────────────────────────────────────────────
+// Consolidates every "date + optional note" pair scattered across the old
+// layout into a single chronological activity log.
+function toMillis(d) {
+  if (!d) return 0;
+  if (typeof d.toMillis === "function") return d.toMillis();
+  if (typeof d.seconds === "number") return d.seconds * 1000;
+  if (d instanceof Date) return d.getTime();
+  const parsed = new Date(d).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function buildTimelineEntries(report) {
+  const entries = [];
+  const push = (date, label, opts = {}) => {
+    if (!date) return;
+    entries.push({ date, label, ...opts });
+  };
+
+  push(report.dateSent, "Report submitted");
+  push(report.dateApproved, "Approved");
+
+  if (report.status === "denied") {
+    const denial = getLatestNote(report, "denial");
+    push(denial?.date, "Denied", {
+      note: denial?.content,
+      by: denial?.by,
+      tone: "danger",
+    });
+  }
+
+  push(report.dateCostAdded, "Materials submitted");
+  push(report.dateCostDenied, "Materials denied");
+  push(report.dateConfirmed, "Materials confirmed");
+  push(report.dateProcured, "Materials procured", {
+    note:
+      report.cost != null
+        ? `Cost: ₵${Number(report.cost).toLocaleString()}`
+        : null,
+  });
+  push(report.dateAssigned, "Worker assigned");
+  push(report.dateReAssigned, "Worker reassigned");
+  push(report.dateRejected, "Job rejected", {
+    note: report.rejectReason,
+    by: report.rejectedBy,
+    tone: "danger",
+  });
+  push(report.dateAccepted, "Job accepted");
+  push(report.dateDropped, "Job dropped", {
+    note: report.dropReason,
+    by: report.droppedBy,
+    tone: "warning",
+  });
+  push(report.dateCompleted, "Work completed");
+  push(report.dateReopened, "Reopened", {
+    note: report.reopenReason,
+    tone: "warning",
+  });
+  push(report.dateMaintenanceCostAdded, "Maintenance cost submitted", {
+    note:
+      report.maintenanceCost != null
+        ? `₵${Number(report.maintenanceCost).toLocaleString()}`
+        : null,
+  });
+  push(report.feedbackDate, "Feedback submitted");
+
+  return entries.sort((a, b) => toMillis(a.date) - toMillis(b.date));
+}
+
+function Timeline({ entries }) {
+  if (!entries.length) return null;
+  return (
+    <div className="relative pl-6">
+      <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gray-200" />
+      <div className="space-y-5">
+        {entries.map((e, i) => (
+          <div key={i} className="relative">
+            <span
+              className={`absolute -left-6 top-1 w-3 h-3 rounded-full border-2 border-white ring-2 ${
+                e.tone === "danger"
+                  ? "bg-red-500 ring-red-200"
+                  : e.tone === "warning"
+                    ? "bg-orange-500 ring-orange-200"
+                    : "bg-blue-500 ring-blue-200"
+              }`}
+            />
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <p className="text-sm font-semibold text-gray-800">{e.label}</p>
+              <p className="text-xs text-gray-400 whitespace-nowrap">
+                {formatDate(e.date)}
+              </p>
+            </div>
+            {e.note && (
+              <p
+                className={`text-sm mt-1 rounded-lg px-3 py-2 ${
+                  e.tone === "danger"
+                    ? "bg-red-50 text-red-700"
+                    : e.tone === "warning"
+                      ? "bg-orange-50 text-orange-700"
+                      : "bg-gray-50 text-gray-600"
+                }`}
+              >
+                {e.note}
+                {e.by ? ` — ${e.by}` : ""}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Click-to-zoom viewer for report / completion photos.
+function ImageLightbox({ src, onClose }) {
+  if (!src) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <img
+        src={src}
+        alt="Full size preview"
+        className="max-w-full max-h-full rounded-lg shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button
+        onClick={onClose}
+        className="absolute top-5 right-5 text-white text-2xl font-bold w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 // How long we'll wait for a completion-photo upload before giving up and
 // showing an explicit error, instead of spinning forever.
-
-// ADD this (same pattern as ReportForm's compressImage):
 const compressImageToBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -75,23 +364,6 @@ const compressImageToBase64 = (file) => {
     };
   });
 };
-
-// Denial reasons now live in the report's `notes` array instead of the old
-// `alerts` field (alerts were being written but never really read anywhere
-// useful, so they were dropped from the flow). A note entry looks like:
-// { type: "denial", content: "<reason>", date: <JS Date>, by: "<name>" }
-//
-// NOTE: the date on this entry is a plain `new Date()`, not
-// serverTimestamp() — Firestore rejects serverTimestamp() sentinels inside
-// array elements passed to arrayUnion(), so a client-side Date is the only
-// option here.
-function getDenialNote(report) {
-  if (!report || report.status !== "denied") return null;
-  const denialNotes = (report.notes || []).filter((n) => n?.type === "denial");
-  return denialNotes.length
-    ? denialNotes[denialNotes.length - 1].content
-    : null;
-}
 
 // ─── Auto-scroll targeting ─────────────────────────────────────────────────
 // Maps (role, report status) → which action section to auto-scroll to when
@@ -133,10 +405,10 @@ function getScrollTarget(user, report, refs) {
       pending: refs.confirmCost,
     },
     estate: {
-      procured: refs.assignWorker, // reassignment/assignment section
-      rejected: refs.assignWorker, // reassignment section
-      dropped: refs.assignWorker, // reassignment section
-      reopened: refs.assignWorker, // reassignment section
+      procured: refs.assignWorker,
+      rejected: refs.assignWorker,
+      dropped: refs.assignWorker,
+      reopened: refs.assignWorker,
       costDenied: refs.addMaterials,
       completed: refs.submitCost,
       closed: refs.submitCost,
@@ -190,9 +462,7 @@ function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
 
 function MaterialsTable({ materials, onChange, readOnly = false }) {
   const addRow = () => onChange([...materials, { ...EMPTY_MATERIAL }]);
-
   const removeRow = (idx) => onChange(materials.filter((_, i) => i !== idx));
-
   const updateCell = (idx, field, value) => {
     const updated = materials.map((row, i) =>
       i === idx ? { ...row, [field]: value } : row,
@@ -203,21 +473,21 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
   if (readOnly) {
     if (!materials || materials.length === 0) return null;
     return (
-      <div className="overflow-x-auto rounded border border-gray-300">
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-100 text-gray-700">
-              <th className="border border-gray-300 px-3 py-2 text-left w-10">
+            <tr className="bg-gray-50 text-gray-600">
+              <th className="border-b border-gray-200 px-3 py-2 text-left w-10">
                 S/N
               </th>
-              <th className="border border-gray-300 px-3 py-2 text-left">
-                Description of Material/Item
+              <th className="border-b border-gray-200 px-3 py-2 text-left">
+                Description
               </th>
-              <th className="border border-gray-300 px-3 py-2 text-left w-24">
-                Qty Required
+              <th className="border-b border-gray-200 px-3 py-2 text-left w-24">
+                Qty
               </th>
-              <th className="border border-gray-300 px-3 py-2 text-left w-36">
-                Specification / Size
+              <th className="border-b border-gray-200 px-3 py-2 text-left w-36">
+                Spec / Size
               </th>
             </tr>
           </thead>
@@ -227,16 +497,16 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
                 key={idx}
                 className={idx % 2 === 1 ? "bg-gray-50" : "bg-white"}
               >
-                <td className="border border-gray-300 px-3 py-2 text-center text-gray-500">
+                <td className="border-b border-gray-100 px-3 py-2 text-center text-gray-400">
                   {idx + 1}
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-red-500 font-medium">
+                <td className="border-b border-gray-100 px-3 py-2 text-gray-800 font-medium">
                   {row.description}
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-red-500 text-center">
+                <td className="border-b border-gray-100 px-3 py-2 text-gray-800 text-center">
                   {row.quantity}
                 </td>
-                <td className="border border-gray-300 px-3 py-2 text-red-500">
+                <td className="border-b border-gray-100 px-3 py-2 text-gray-800">
                   {row.specification}
                 </td>
               </tr>
@@ -249,32 +519,32 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
 
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded border border-gray-300">
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-100 text-gray-700">
-              <th className="border border-gray-300 px-2 py-2 text-left w-10">
+            <tr className="bg-gray-50 text-gray-600">
+              <th className="border-b border-gray-200 px-2 py-2 text-left w-10">
                 S/N
               </th>
-              <th className="border border-gray-300 px-2 py-2 text-left">
-                Description of Material/Item
+              <th className="border-b border-gray-200 px-2 py-2 text-left">
+                Description
               </th>
-              <th className="border border-gray-300 px-2 py-2 text-left w-24">
-                Qty Required
+              <th className="border-b border-gray-200 px-2 py-2 text-left w-24">
+                Qty
               </th>
-              <th className="border border-gray-300 px-2 py-2 text-left w-36">
-                Specification / Size
+              <th className="border-b border-gray-200 px-2 py-2 text-left w-36">
+                Spec / Size
               </th>
-              <th className="border border-gray-300 px-2 py-2 w-10"></th>
+              <th className="border-b border-gray-200 px-2 py-2 w-10"></th>
             </tr>
           </thead>
           <tbody>
             {materials.map((row, idx) => (
               <tr key={idx}>
-                <td className="border border-gray-300 px-2 py-1 text-center text-gray-400 text-xs">
+                <td className="border-b border-gray-100 px-2 py-1 text-center text-gray-400 text-xs">
                   {idx + 1}
                 </td>
-                <td className="border border-gray-300 px-1 py-1">
+                <td className="border-b border-gray-100 px-1 py-1">
                   <input
                     type="text"
                     placeholder="e.g. Silicone"
@@ -282,10 +552,10 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
                     onChange={(e) =>
                       updateCell(idx, "description", e.target.value)
                     }
-                    className="w-full px-2 py-1 text-sm outline-none bg-transparent"
+                    className="w-full px-2 py-1.5 text-sm outline-none bg-transparent rounded focus:bg-blue-50"
                   />
                 </td>
-                <td className="border border-gray-300 px-1 py-1">
+                <td className="border-b border-gray-100 px-1 py-1">
                   <input
                     type="number"
                     placeholder="0"
@@ -293,10 +563,10 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
                     onChange={(e) =>
                       updateCell(idx, "quantity", e.target.value)
                     }
-                    className="w-full px-2 py-1 text-sm outline-none bg-transparent text-center"
+                    className="w-full px-2 py-1.5 text-sm outline-none bg-transparent text-center rounded focus:bg-blue-50"
                   />
                 </td>
-                <td className="border border-gray-300 px-1 py-1">
+                <td className="border-b border-gray-100 px-1 py-1">
                   <input
                     type="text"
                     placeholder='e.g. 4"'
@@ -304,10 +574,10 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
                     onChange={(e) =>
                       updateCell(idx, "specification", e.target.value)
                     }
-                    className="w-full px-2 py-1 text-sm outline-none bg-transparent"
+                    className="w-full px-2 py-1.5 text-sm outline-none bg-transparent rounded focus:bg-blue-50"
                   />
                 </td>
-                <td className="border border-gray-300 px-1 py-1 text-center">
+                <td className="border-b border-gray-100 px-1 py-1 text-center">
                   <button
                     type="button"
                     onClick={() => removeRow(idx)}
@@ -333,13 +603,12 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
   );
 }
 
-// New: lets a worker take a photo with the device camera or pick one from
+// Lets a worker take a photo with the device camera or pick one from
 // their gallery, and shows a live preview before submission.
 function CompletionImageUploader({ preview, onChange }) {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) onChange(file);
-    // allow re-selecting the same file
     e.target.value = "";
   };
 
@@ -353,12 +622,12 @@ function CompletionImageUploader({ preview, onChange }) {
         <img
           src={preview}
           alt="Completed work preview"
-          className="w-full max-h-64 object-contain rounded-lg border border-gray-300"
+          className="w-full max-h-64 object-contain rounded-lg border border-gray-200"
         />
       )}
 
       <div className="flex gap-2">
-        <label className="flex-1 cursor-pointer text-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded py-2 px-3 text-sm font-medium text-gray-700">
+        <label className="flex-1 cursor-pointer text-center bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 text-sm font-medium text-gray-700 transition-colors">
           {preview ? "Retake Photo" : "Take Photo"}
           <input
             type="file"
@@ -368,7 +637,7 @@ function CompletionImageUploader({ preview, onChange }) {
             className="hidden"
           />
         </label>
-        <label className="flex-1 cursor-pointer text-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded py-2 px-3 text-sm font-medium text-gray-700">
+        <label className="flex-1 cursor-pointer text-center bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 text-sm font-medium text-gray-700 transition-colors">
           Upload from Gallery
           <input
             type="file"
@@ -410,19 +679,13 @@ export default function ReportDetailsContainer({
   });
 
   const [actualCost, setActualCost] = useState("");
-
-  // New: completion-photo state for the worker's "mark as completed" flow
   const [completionImage, setCompletionImage] = useState(null);
   const [completionImagePreview, setCompletionImagePreview] = useState(null);
-
   const [uploadError, setUploadError] = useState("");
   const [maintenanceCost, setMaintenanceCost] = useState("");
-
-  // New: reason a worker gives when dropping a job they can't finish.
   const [dropReason, setDropReason] = useState("");
-
-  // New: reason a worker gives when rejecting a freshly assigned job.
   const [rejectReason, setRejectReason] = useState("");
+  const [lightboxSrc, setLightboxSrc] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
@@ -454,9 +717,6 @@ export default function ReportDetailsContainer({
     }
   }, [displayDetails]);
 
-  // Reset the completion-photo picker, drop reason, and reject reason
-  // whenever the panel closes so stale input doesn't carry over to the
-  // next report opened.
   useEffect(() => {
     if (!displayDetails) {
       setCompletionImage(null);
@@ -464,10 +724,10 @@ export default function ReportDetailsContainer({
       setUploadError("");
       setDropReason("");
       setRejectReason("");
+      setLightboxSrc(null);
     }
   }, [displayDetails]);
 
-  // Revoke the object URL used for the preview whenever it changes/unmounts
   useEffect(() => {
     return () => {
       if (completionImagePreview) URL.revokeObjectURL(completionImagePreview);
@@ -535,12 +795,6 @@ export default function ReportDetailsContainer({
   }, [displayDetails, currentReport]);
 
   // ── Auto-scroll to the section the viewer is expected to act on next ──
-  // See getScrollTarget above for the exact (role, status) rules. Waits
-  // for the panel's own slide-in transition to (mostly) finish before
-  // scrolling, so it doesn't visually fight the entrance animation. Falls
-  // back to scrolling the panel to the top when there's no target, so a
-  // previous report's scroll position never leaks into the next one
-  // opened.
   useEffect(() => {
     if (!displayDetails || !currentReport || currentReport.length === 0) return;
     const rep = currentReport[0];
@@ -573,13 +827,8 @@ export default function ReportDetailsContainer({
   if (!visible || !currentReport || currentReport.length === 0) return null;
 
   const report = currentReport[0];
-  const denialReason = getDenialNote(report);
-
   const assignedWorker = workers.find((w) => w.ID === report.assignedTo);
-
-  // New: is the current user the worker this job is assigned to?
-  const isAssignedWorker =
-    user?.role === "worker" && report?.assignedTo === user?.ID;
+  const timelineEntries = buildTimelineEntries(report);
 
   const handleApprove = async () => {
     if (!canUserApprove(user, report)) return;
@@ -589,7 +838,6 @@ export default function ReportDetailsContainer({
         status: "approved",
         dateApproved: serverTimestamp(),
       });
-
       alert("Report approved!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
@@ -604,16 +852,11 @@ export default function ReportDetailsContainer({
 
   const handleDeny = async () => {
     if (!canUserApprove(user, report)) return;
-
-    // A denial reason is now required — it's saved into the report's
-    // `notes` array (see getDenialNote above) and shown to the reporter,
-    // replacing the old `alerts`-based approach.
     const reason = formData.note.trim();
     if (!reason) {
       alert("Please provide a reason for denying this report.");
       return;
     }
-
     setLoading(true);
     try {
       await updateDoc(doc(db, "reports", report.id), {
@@ -628,7 +871,6 @@ export default function ReportDetailsContainer({
           by: user?.name || user?.role || "",
         }),
       });
-
       alert("Report denied!");
       setFormData({ ...formData, note: "" });
       setDisplayDetails(false);
@@ -744,11 +986,8 @@ export default function ReportDetailsContainer({
       // If the report already has (or previously had) an assigned worker
       // — e.g. that worker rejected/dropped the job, or staff reopened a
       // completed report — this is a reassignment rather than a first-time
-      // assignment. We track that via dateReAssigned so the history shows
-      // both the original assignment date and the reassignment date.
-      // `droppedBy` is checked too because dropping clears `assignedTo`
-      // back to null, so `report.assignedTo` alone can't tell us this was
-      // previously assigned to someone.
+      // assignment. `droppedBy` is checked too because dropping clears
+      // `assignedTo` back to null.
       const isReassignment =
         Boolean(report.assignedTo) || Boolean(report.droppedBy);
 
@@ -766,7 +1005,6 @@ export default function ReportDetailsContainer({
 
       await updateDoc(doc(db, "reports", report.id), updatePayload);
 
-      // If assigning directly from approved (no materials), also hide the add materials section
       const msg =
         report.status === "approved"
           ? "Work assigned directly (no materials required)!"
@@ -851,9 +1089,6 @@ export default function ReportDetailsContainer({
     }
   };
 
-  // A reject reason is now required — saved into `rejectReason`/`rejectedBy`
-  // fields on the report (same shape as the drop-job fields below) and
-  // shown to estate/admin in the report details.
   const handleRejectJob = async () => {
     if (!canUserAcceptOrRejectJob(user, report)) return;
     const reason = rejectReason.trim();
@@ -881,9 +1116,6 @@ export default function ReportDetailsContainer({
     }
   };
 
-  // New: worker drops a job they've already accepted (or a reopened job)
-  // but can't finish. Clears assignedTo so it goes back to the estate's
-  // reassignment pool, and requires a reason so estate has context.
   const handleDropWork = async () => {
     if (!canUserDropJob(user, report)) return;
     const reason = dropReason.trim();
@@ -935,7 +1167,7 @@ export default function ReportDetailsContainer({
       setLoading(false);
     }
   };
-  // New: capture the chosen file + generate a preview
+
   const handleCompletionImageChange = (file) => {
     if (completionImagePreview) URL.revokeObjectURL(completionImagePreview);
     setCompletionImage(file);
@@ -959,8 +1191,7 @@ export default function ReportDetailsContainer({
       // Write the photo FIRST, while the report is still 'accepted' or
       // 'reopened' — the reportImages security rule checks the report's
       // current status, so this must happen before the report itself
-      // flips to 'completed' below. setDoc+merge handles both "no
-      // before-photo doc exists yet" and "doc already has one" in one call.
+      // flips to 'completed' below.
       await setDoc(
         doc(db, "reportImages", report.id),
         { completionImage: base64Image },
@@ -997,7 +1228,6 @@ export default function ReportDetailsContainer({
     const confirmed = window.confirm(
       "Are you sure you want to cancel this report? This will permanently delete it from Firestore.",
     );
-
     if (!confirmed) return;
 
     setLoading(true);
@@ -1044,902 +1274,614 @@ export default function ReportDetailsContainer({
     }
   };
 
-  const reportDetails = (
-    <div className={`flex flex-col px-10 gap-10 pb-20`}>
-      <div className="flex items-center gap-2">
-        <h2 className={`text-lg md:text-xl ${theme.detailsLabelColor}`}>
-          Sent By:
-        </h2>
-        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-          {report.reporter}
-        </p>
-      </div>
+  const showCostSummary =
+    (report.cost != null || report.maintenanceCost != null) &&
+    ["admin", "estate"].includes(user?.role);
 
-      {report.reportsThisMonth != null && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Reports This Month:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {report.reportsThisMonth}
-          </p>
+  const showMaterials =
+    Array.isArray(report.materials) &&
+    report.materials.length > 0 &&
+    ["admin", "estate", "procurement"].includes(user.role);
+
+  return (
+    <div
+      ref={panelRef}
+      className={`fixed top-0 md:top-[10%] pb-24 md:pb-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden right-0 w-full md:max-w-[700px] h-screen md:max-h-[80%] md:right-5 md:rounded-xl ${reportDetailsBgColor} z-80 md:shadow-xl ${theme.detailsBg} overflow-y-auto ${
+        closing ? "slide-out-right" : "slide-in-right"
+      }`}
+    >
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+
+      {/* Sticky header: status + priority always visible while scrolling */}
+      <div className="sticky top-0 z-10 backdrop-blur bg-white/90 border-b border-gray-100 px-6 py-4 flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <StatusBadge status={report.status} />
+          <PriorityBadge level={report.priorityLevel} />
         </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <h2
-          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
+        <button
+          onClick={() => setDisplayDetails(false)}
+          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 text-lg font-bold"
+          aria-label="Close"
         >
-          Priority Level:
-        </h2>
-        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-          {report.priorityLevel}
-        </p>
+          ×
+        </button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <h2
-          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-        >
-          Category:
-        </h2>
-        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-          {report.category}
-        </p>
-      </div>
-
-      <div className="flex gap-2">
-        <h2
-          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-        >
-          Description:
-        </h2>
-        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-          {report.reportDescription}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <h2
-          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-        >
-          Date Sent:
-        </h2>
-        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-          {formatDate(report.dateSent)}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <h2
-          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-        >
-          Sender Contact:
-        </h2>
-        <PhoneCallButton
-          phoneNumber={report.reporterContact}
-          label={report.reporter}
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <h2
-          className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-        >
-          Location:
-        </h2>
-        <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-          {report.location}
-        </p>
-      </div>
-
-      {reportImagesData?.image && (
-        <div className="flex flex-col gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Attached Image:
-          </h2>
-          <img
-            src={reportImagesData.image}
-            alt="Report attachment"
-            className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
-          />
-        </div>
-      )}
-
-      {report.dateApproved && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Approved:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateApproved)}
-          </p>
-        </div>
-      )}
-
-      {report.dateCostAdded && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Materials Added:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateCostAdded)}
-          </p>
-        </div>
-      )}
-
-      {report.dateCostDenied && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Materials Denied:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateCostDenied)}
-          </p>
-        </div>
-      )}
-
-      {report.dateConfirmed && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Confirmed:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateConfirmed)}
-          </p>
-        </div>
-      )}
-
-      {report.dateProcured && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Procured:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateProcured)}
-          </p>
-        </div>
-      )}
-
-      {report.dateAssigned && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Assigned:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateAssigned)}
-          </p>
-        </div>
-      )}
-      {/* New: Date Accepted / Date Rejected */}
-      {report.dateRejected && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Rejected:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateRejected)}
-          </p>
-        </div>
-      )}
-
-      {/* New: Reject Reason / Rejected By — the worker's reason for
-          rejecting a freshly assigned job, kept visible to estate/admin
-          so it's available as context when reassigning to someone new. */}
-      {report.rejectReason && (
-        <div className="flex flex-col gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Reject Reason:
-          </h2>
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <p className="text-red-700 md:text-lg">{report.rejectReason}</p>
-            {report.rejectedBy && (
-              <p className="text-red-500 text-sm mt-1">
-                — Rejected by {report.rejectedBy}
-              </p>
+      <div className="flex flex-col px-6 py-6 gap-5">
+        {/* Overview */}
+        <SectionCard title="Report Overview">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            <InfoItem label="Sent By">{report.reporter}</InfoItem>
+            <InfoItem label="Date Sent">{formatDate(report.dateSent)}</InfoItem>
+            <InfoItem label="Category">{report.category}</InfoItem>
+            {report.reportsThisMonth != null && (
+              <InfoItem label="Reports This Month">
+                {report.reportsThisMonth}
+              </InfoItem>
+            )}
+            <InfoItem label="Location">{report.location}</InfoItem>
+            <InfoItem label="Sender Contact">
+              <PhoneCallButton
+                phoneNumber={report.reporterContact}
+                label={report.reporter}
+              />
+            </InfoItem>
+            {report.assignedTo && ["admin", "estate"].includes(user?.role) && (
+              <InfoItem label="Technician">
+                <PhoneCallButton
+                  phoneNumber={assignedWorker?.phoneNumber}
+                  label={assignedWorker?.name}
+                />
+              </InfoItem>
             )}
           </div>
-        </div>
-      )}
-
-      {report.dateReAssigned && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Re-Assigned:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateReAssigned)}
-          </p>
-        </div>
-      )}
-
-      {report.dateAccepted && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Accepted:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateAccepted)}
-          </p>
-        </div>
-      )}
-
-      {/* New: Date Dropped / Drop Reason / Dropped By — the previous
-          worker's reason for being unable to finish, kept visible to
-          estate/admin so it's available as context when reassigning to
-          someone new. */}
-      {report.dateDropped && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Dropped:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateDropped)}
-          </p>
-        </div>
-      )}
-      {report.dropReason && (
-        <div className="flex flex-col gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Drop Reason:
-          </h2>
-          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-            <p className="text-orange-700 md:text-lg">{report.dropReason}</p>
-            {report.droppedBy && (
-              <p className="text-orange-500 text-sm mt-1">
-                — Dropped by {report.droppedBy}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {report.assignedTo && ["admin", "estate"].includes(user?.role) && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Technician:
-          </h2>
-          <div className="flex flex-col gap-1">
-            <PhoneCallButton
-              phoneNumber={assignedWorker?.phoneNumber}
-              label={assignedWorker?.name}
-            />
-          </div>
-        </div>
-      )}
-
-      {report.dateCompleted && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Completed:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateCompleted)}
-          </p>
-        </div>
-      )}
-
-      {/* Reopen reason + date reopened — the report already carries these
-          as dedicated fields (set when staff reopens a completed job), this
-          panel just wasn't showing them before. */}
-      {report.dateReopened && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Date Reopened:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {formatDate(report.dateReopened)}
-          </p>
-        </div>
-      )}
-      {report.reopenReason && (
-        <div className="flex flex-col gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Reopen Reason:
-          </h2>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <p className="text-amber-700 md:text-lg">{report.reopenReason}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Materials table — shown to admin & estate when materials exist */}
-      {Array.isArray(report.materials) &&
-        report.materials.length > 0 &&
-        ["admin", "estate", "procurement"].includes(user.role) && (
-          <div className="flex flex-col gap-2">
-            <h2
-              className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-            >
-              Materials Required:
-            </h2>
-            <MaterialsTable
-              materials={report.materials}
-              onChange={() => {}}
-              readOnly
-            />
-          </div>
-        )}
-
-      {(report.cost != null || report.maintenanceCost != null) &&
-        ["admin", "estate"].includes(user?.role) && (
-          <div className="flex flex-col gap-1">
-            <h2
-              className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-            >
-              Cost Summary:
-            </h2>
-            <div className="pl-2 space-y-1">
-              {report.cost != null && (
-                <p className={`text-red-400 ${theme.detailsValueColor}`}>
-                  Materials Cost: ₵{Number(report.cost).toLocaleString()}
-                </p>
-              )}
-              {report.maintenanceCost != null && (
-                <p className={`text-red-400 ${theme.detailsValueColor}`}>
-                  Maintenance Cost: ₵
-                  {Number(report.maintenanceCost).toLocaleString()}
-                </p>
-              )}
-              <p
-                className={`font-semibold text-red-400 md:text-lg ${theme.detailsValueColor}`}
-              >
-                Total Cost: ₵{getTotalCost(report).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        )}
-
-      {report.instructions && user?.role !== "staff" && (
-        <div className="flex gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Instructions:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {report.instructions}
-          </p>
-        </div>
-      )}
-
-      {report.feedback && (
-        <div ref={feedbackRef} className="flex gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Feedback:
-          </h2>
-          <p className={`text-red-400 md:text-lg ${theme.detailsValueColor}`}>
-            {report.feedback}
-          </p>
-        </div>
-      )}
-
-      {/* Technician rating — now visible to every role viewing this panel,
-          not just the staff member who submitted it. */}
-      {report.technicianRating && (
-        <div className="flex items-center gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Technician Rating:
-          </h2>
-          <StarRating value={report.technicianRating} readOnly size="text-xl" />
-        </div>
-      )}
-
-      {/* New: read-only view of the completion photo once the job is done */}
-      {reportImagesData?.completionImage && (
-        <div className="flex flex-col gap-2">
-          <h2
-            className={`text-lg md:text-xl ${theme.detailsLabelColor} whitespace-nowrap`}
-          >
-            Completion Photo:
-          </h2>
-          <img
-            src={reportImagesData.completionImage}
-            alt="Completed work"
-            className="w-full max-h-96 object-contain rounded-xl shadow border border-gray-200 cursor-pointer"
-          />
-        </div>
-      )}
-
-      {/* ADMIN ACTIONS - Approve/Deny */}
-      {canUserApprove(user, report) && (
-        <div ref={approveDenyRef} className="bg-white rounded-lg p-5 space-y-3">
-          <h3 className="font-bold text-gray-800">
-            Admin Actions - Approve/Deny
-          </h3>
-          <textarea
-            placeholder="Add a note… (required if denying)"
-            value={formData.note}
-            onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-            className="w-full p-2 border border-gray-400 rounded"
-            rows="3"
-          />
-          <p className="text-xs text-gray-400 -mt-2">
-            A reason is required to deny a report — it's shown to the reporter.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={handleDeny}
-              disabled={loading}
-              className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-            >
-              {loading ? "Processing..." : "Deny"}
-            </button>
-            <button
-              onClick={handleApprove}
-              disabled={loading}
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-            >
-              {loading ? "Processing..." : "Approve"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ESTATE ACTIONS - Add Materials */}
-
-      {canUserAddCost(user, report) && (
-        <div
-          ref={addMaterialsRef}
-          className="bg-white rounded-lg p-5 space-y-4"
-        >
-          <h3 className="font-bold text-gray-800">
-            {report.status === "costDenied"
-              ? "Estate Actions - Resubmit Materials"
-              : "Estate Actions - Add Materials"}
-          </h3>
-          {report.status === "approved" && (
-            <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
-              If no materials are needed, skip this and use the{" "}
-              <span className="font-semibold">Assign Worker</span> section below
-              to assign work directly.
-            </p>
-          )}
-
-          {report.status === "costDenied" && (
-            <p className="text-sm text-red-500">
-              Your previous submission was denied. Please review and resubmit.
-            </p>
-          )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Materials / Items Required
-            </label>
-            <MaterialsTable materials={materials} onChange={setMaterials} />
+            <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              Description
+            </span>
+            <p className="text-sm md:text-base text-gray-800 mt-1 whitespace-pre-wrap">
+              {report.reportDescription}
+            </p>
           </div>
 
-          <button
-            onClick={handleAddMaterials}
-            disabled={loading}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full"
-          >
-            {loading ? "Processing..." : "Submit for Admin Confirmation"}
-          </button>
-        </div>
-      )}
-
-      {/* ADMIN ACTIONS - Confirm/Deny Materials */}
-      {canUserConfirmCost(user, report) && (
-        <div ref={confirmCostRef} className="bg-white rounded-lg p-5 space-y-4">
-          <h3 className="font-bold text-gray-800">
-            Admin Actions - Review & Confirm Materials
-          </h3>
-
-          {Array.isArray(report.materials) && report.materials.length > 0 && (
+          {report.instructions && user?.role !== "staff" && (
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-2">
-                Materials Requested:
+              <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                Instructions
+              </span>
+              <p className="text-sm md:text-base text-gray-800 mt-1 whitespace-pre-wrap">
+                {report.instructions}
               </p>
+            </div>
+          )}
+
+          {reportImagesData?.image && (
+            <div>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                Attached Image
+              </span>
+              <img
+                src={reportImagesData.image}
+                alt="Report attachment"
+                onClick={() => setLightboxSrc(reportImagesData.image)}
+                className="mt-1 w-full max-h-72 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+              />
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Unified activity timeline — replaces the old wall of individual
+            "Date X" rows and standalone reject/drop/reopen reason boxes. */}
+        {timelineEntries.length > 0 && (
+          <SectionCard title="Activity">
+            <Timeline entries={timelineEntries} />
+          </SectionCard>
+        )}
+
+        {/* Materials & cost */}
+        {(showMaterials || showCostSummary) && (
+          <SectionCard title="Materials & Cost">
+            {showMaterials && (
               <MaterialsTable
                 materials={report.materials}
                 onChange={() => {}}
                 readOnly
               />
-            </div>
-          )}
+            )}
+            {showCostSummary && (
+              <div className="pt-1 space-y-1 border-t border-gray-100 mt-1">
+                {report.cost != null && (
+                  <p className="text-sm text-gray-600">
+                    Materials cost: ₵{Number(report.cost).toLocaleString()}
+                  </p>
+                )}
+                {report.maintenanceCost != null && (
+                  <p className="text-sm text-gray-600">
+                    Maintenance cost: ₵
+                    {Number(report.maintenanceCost).toLocaleString()}
+                  </p>
+                )}
+                <p className="font-semibold text-gray-900">
+                  Total: ₵{getTotalCost(report).toLocaleString()}
+                </p>
+              </div>
+            )}
+          </SectionCard>
+        )}
 
-          <textarea
-            placeholder="Add optional note for estate..."
-            value={formData.note}
-            onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-            className="w-full p-2 border border-gray-400 rounded"
-            rows="3"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleDenyCost}
-              disabled={loading}
-              className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-1"
-            >
-              {loading ? "Processing..." : "Deny"}
-            </button>
-            <button
-              onClick={handleConfirmCost}
-              disabled={loading}
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
-            >
-              {loading ? "Processing..." : "Confirm"}
-            </button>
-          </div>
-        </div>
-      )}
+        {/* Feedback — kept as its own prominent card since it's the
+            scroll target for "you have unread feedback". */}
+        {report.feedback && (
+          <SectionCard title="Feedback" innerRef={feedbackRef}>
+            <p className="text-sm md:text-base text-gray-800 whitespace-pre-wrap">
+              {report.feedback}
+            </p>
+            {report.technicianRating && (
+              <div className="pt-2">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                  Technician Rating
+                </span>
+                <StarRating
+                  value={report.technicianRating}
+                  readOnly
+                  size="text-xl"
+                />
+              </div>
+            )}
+          </SectionCard>
+        )}
 
-      {/* PROCUREMENT ACTIONS - Enter Cost & Mark Procured */}
-      {canUserMarkProcured(user, report) && (
-        <div
-          ref={markProcuredRef}
-          className="bg-white rounded-lg p-5 space-y-4"
-        >
-          <h3 className="font-bold text-gray-800">
-            Procurement Actions - Purchase Materials
-          </h3>
-
-          {Array.isArray(report.materials) && report.materials.length > 0 && (
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-2">
-                Materials to Procure:
-              </p>
-              <MaterialsTable
-                materials={report.materials}
-                onChange={() => {}}
-                readOnly
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Cost of Materials (₵)
-            </label>
-            <input
-              type="number"
-              placeholder="e.g. 450.00"
-              value={procurementCost}
-              onChange={(e) => setProcurementCost(e.target.value)}
-              className="w-full p-2 border border-gray-400 rounded"
-              min="0"
-              step="0.01"
+        {reportImagesData?.completionImage && (
+          <SectionCard title="Completion Photo">
+            <img
+              src={reportImagesData.completionImage}
+              alt="Completed work"
+              onClick={() => setLightboxSrc(reportImagesData.completionImage)}
+              className="w-full max-h-72 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
             />
-          </div>
+          </SectionCard>
+        )}
 
-          <button
-            onClick={handleMarkProcured}
-            disabled={loading}
-            className="bg-teal-500 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded w-full"
-          >
-            {loading ? "Processing..." : "Mark as Procured"}
-          </button>
-        </div>
-      )}
+        {/* ── Actions ─────────────────────────────────────────────────── */}
+        {(canUserApprove(user, report) ||
+          canUserAddCost(user, report) ||
+          canUserConfirmCost(user, report) ||
+          canUserMarkProcured(user, report) ||
+          canUserAssignWorker(user, report) ||
+          canUserSubmitCost(user, report) ||
+          canUserAcceptOrRejectJob(user, report) ||
+          canUserDropJob(user, report) ||
+          canUserComplete(user, report) ||
+          canUserSendFeedback(user, report) ||
+          (user?.role === "staff" &&
+            report?.reporterId === user?.ID &&
+            report?.status === "incoming")) && (
+          <div className="pt-1">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+              Action Needed
+            </h2>
+            <div className="space-y-4">
+              {/* ADMIN — Approve/Deny */}
+              {canUserApprove(user, report) && (
+                <ActionSection
+                  innerRef={approveDenyRef}
+                  title="Approve or Deny"
+                  hint="A reason is required to deny — it will be shown to the reporter."
+                >
+                  <textarea
+                    placeholder="Add a note… (required if denying)"
+                    value={formData.note}
+                    onChange={(e) =>
+                      setFormData({ ...formData, note: e.target.value })
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    rows="3"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDeny}
+                      disabled={loading}
+                      className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg flex-1"
+                    >
+                      {loading ? "Processing..." : "Deny"}
+                    </button>
+                    <button
+                      onClick={handleApprove}
+                      disabled={loading}
+                      className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg flex-1"
+                    >
+                      {loading ? "Processing..." : "Approve"}
+                    </button>
+                  </div>
+                </ActionSection>
+              )}
 
-      {/* ESTATE ACTIONS - Assign Worker (also the reassignment section for
-          rejected/dropped/reopened reports — see getScrollTarget above) */}
-      {canUserAssignWorker(user, report) && (
-        <div
-          ref={assignWorkerRef}
-          className="bg-white rounded-lg p-5 space-y-3"
-        >
-          <h3 className="font-bold text-gray-800">
-            Estate Actions - Assign Worker
-          </h3>
-          {report.status === "dropped" && (
-            <p className="text-sm text-orange-600 bg-orange-50 rounded px-3 py-2">
-              This job was dropped by the previously assigned worker. Review the
-              drop reason above before reassigning.
-            </p>
-          )}
-          <label className="block text-sm font-medium text-gray-700">
-            Select a registered worker
-          </label>
-          <select
-            value={formData.selectedWorker}
-            onChange={(e) =>
-              setFormData({ ...formData, selectedWorker: e.target.value })
-            }
-            className="w-full p-2 border border-gray-400 rounded"
-          >
-            <option value="">Choose worker</option>
-            {workers.map((worker) => (
-              <option key={worker.id} value={worker.ID || worker.id}>
-                {worker.name}{" "}
-                {worker.profession ? `(${worker.profession})` : ""}
-              </option>
-            ))}
-          </select>
-          {workers.length === 0 && (
-            <p className="text-sm text-gray-500">
-              No registered workers found. Please add workers first.
-            </p>
-          )}
+              {/* ESTATE — Add / Resubmit Materials */}
+              {canUserAddCost(user, report) && (
+                <ActionSection
+                  innerRef={addMaterialsRef}
+                  title={
+                    report.status === "costDenied"
+                      ? "Resubmit Materials"
+                      : "Add Materials"
+                  }
+                  hint={
+                    report.status === "approved"
+                      ? "If no materials are needed, skip this and use Assign Worker below."
+                      : report.status === "costDenied"
+                        ? "Your previous submission was denied — review and resubmit."
+                        : undefined
+                  }
+                >
+                  <MaterialsTable
+                    materials={materials}
+                    onChange={setMaterials}
+                  />
+                  <button
+                    onClick={handleAddMaterials}
+                    disabled={loading}
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg w-full"
+                  >
+                    {loading
+                      ? "Processing..."
+                      : "Submit for Admin Confirmation"}
+                  </button>
+                </ActionSection>
+              )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Instructions{" "}
-              <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <textarea
-              placeholder="Add work instructions for the worker..."
-              value={formData.instructions}
-              onChange={(e) =>
-                setFormData({ ...formData, instructions: e.target.value })
-              }
-              className="w-full p-2 border border-gray-400 rounded"
-              rows="4"
-            />
-          </div>
+              {/* ADMIN — Confirm/Deny Materials */}
+              {canUserConfirmCost(user, report) && (
+                <ActionSection
+                  innerRef={confirmCostRef}
+                  title="Review & Confirm Materials"
+                >
+                  {Array.isArray(report.materials) &&
+                    report.materials.length > 0 && (
+                      <MaterialsTable
+                        materials={report.materials}
+                        onChange={() => {}}
+                        readOnly
+                      />
+                    )}
+                  <textarea
+                    placeholder="Add optional note for estate..."
+                    value={formData.note}
+                    onChange={(e) =>
+                      setFormData({ ...formData, note: e.target.value })
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    rows="3"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDenyCost}
+                      disabled={loading}
+                      className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg flex-1"
+                    >
+                      {loading ? "Processing..." : "Deny"}
+                    </button>
+                    <button
+                      onClick={handleConfirmCost}
+                      disabled={loading}
+                      className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg flex-1"
+                    >
+                      {loading ? "Processing..." : "Confirm"}
+                    </button>
+                  </div>
+                </ActionSection>
+              )}
 
-          <button
-            onClick={handleAssignWorker}
-            disabled={loading || !formData.selectedWorker}
-            className={`font-bold py-2 px-4 rounded w-full text-white transition ${
-              loading || !formData.selectedWorker
-                ? "bg-purple-300 cursor-not-allowed"
-                : "bg-purple-500 hover:bg-purple-700 cursor-pointer"
-            }`}
-          >
-            {loading ? "Processing..." : "Assign Worker"}
-          </button>
+              {/* PROCUREMENT — Purchase Materials */}
+              {canUserMarkProcured(user, report) && (
+                <ActionSection
+                  innerRef={markProcuredRef}
+                  title="Purchase Materials"
+                >
+                  {Array.isArray(report.materials) &&
+                    report.materials.length > 0 && (
+                      <MaterialsTable
+                        materials={report.materials}
+                        onChange={() => {}}
+                        readOnly
+                      />
+                    )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cost of Materials (₵)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 450.00"
+                      value={procurementCost}
+                      onChange={(e) => setProcurementCost(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <button
+                    onClick={handleMarkProcured}
+                    disabled={loading}
+                    className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg w-full"
+                  >
+                    {loading ? "Processing..." : "Mark as Procured"}
+                  </button>
+                </ActionSection>
+              )}
 
-          {report.assignedTo && (
-            <div className="mt-4 pt-4 border-t space-y-2">
-              <h4 className="font-bold text-gray-800">Update Instructions</h4>
-              <textarea
-                placeholder="Replace or add new instructions for the worker..."
-                value={formData.instructions}
-                onChange={(e) =>
-                  setFormData({ ...formData, instructions: e.target.value })
-                }
-                className="w-full p-2 border border-gray-400 rounded"
-                rows="4"
-              />
-              <button
-                onClick={handleAddInstructions}
-                disabled={loading}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full"
-              >
-                {loading ? "Processing..." : "Save Instructions"}
-              </button>
+              {/* ESTATE — Assign / Reassign Worker */}
+              {canUserAssignWorker(user, report) && (
+                <ActionSection
+                  innerRef={assignWorkerRef}
+                  title="Assign Worker"
+                  hint={
+                    report.status === "dropped"
+                      ? "This job was dropped by the previous worker — see the Activity log above for the reason."
+                      : undefined
+                  }
+                >
+                  <label className="block text-sm font-medium text-gray-700">
+                    Select a registered worker
+                  </label>
+                  <select
+                    value={formData.selectedWorker}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        selectedWorker: e.target.value,
+                      })
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value="">Choose worker</option>
+                    {workers.map((worker) => (
+                      <option key={worker.id} value={worker.ID || worker.id}>
+                        {worker.name}{" "}
+                        {worker.profession ? `(${worker.profession})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {workers.length === 0 && (
+                    <p className="text-sm text-gray-500">
+                      No registered workers found. Please add workers first.
+                    </p>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Instructions{" "}
+                      <span className="text-gray-400 font-normal">
+                        (optional)
+                      </span>
+                    </label>
+                    <textarea
+                      placeholder="Add work instructions for the worker..."
+                      value={formData.instructions}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          instructions: e.target.value,
+                        })
+                      }
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      rows="4"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleAssignWorker}
+                    disabled={loading || !formData.selectedWorker}
+                    className={`font-semibold py-2 px-4 rounded-lg w-full text-white transition ${
+                      loading || !formData.selectedWorker
+                        ? "bg-purple-300 cursor-not-allowed"
+                        : "bg-purple-500 hover:bg-purple-600 cursor-pointer"
+                    }`}
+                  >
+                    {loading ? "Processing..." : "Assign Worker"}
+                  </button>
+
+                  {report.assignedTo && (
+                    <div className="pt-3 border-t border-gray-100 space-y-2">
+                      <h4 className="font-semibold text-gray-800 text-sm">
+                        Update Instructions
+                      </h4>
+                      <textarea
+                        placeholder="Replace or add new instructions for the worker..."
+                        value={formData.instructions}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            instructions: e.target.value,
+                          })
+                        }
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                        rows="4"
+                      />
+                      <button
+                        onClick={handleAddInstructions}
+                        disabled={loading}
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg w-full"
+                      >
+                        {loading ? "Processing..." : "Save Instructions"}
+                      </button>
+                    </div>
+                  )}
+                </ActionSection>
+              )}
+
+              {/* ESTATE — Submit Maintenance Cost */}
+              {canUserSubmitCost(user, report) && (
+                <ActionSection
+                  innerRef={submitCostRef}
+                  title="Submit Maintenance Cost"
+                  hint="This is added to the materials cost for the total."
+                >
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Maintenance Cost (₵)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 150.00"
+                      value={actualCost}
+                      onChange={(e) => setActualCost(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSubmitCost}
+                    disabled={loading}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg w-full"
+                  >
+                    {loading ? "Submitting..." : "Submit Maintenance Cost"}
+                  </button>
+                </ActionSection>
+              )}
+
+              {/* WORKER — Accept / Reject */}
+              {canUserAcceptOrRejectJob(user, report) && (
+                <ActionSection
+                  innerRef={acceptRejectRef}
+                  title="Respond to Assignment"
+                >
+                  {report.instructions && (
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+                      <span className="font-semibold">Instructions: </span>
+                      {report.instructions}
+                    </div>
+                  )}
+                  <textarea
+                    placeholder="Reason for rejecting this job (required)..."
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    rows="3"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRejectJob}
+                      disabled={loading || !rejectReason.trim()}
+                      className={`font-semibold py-2 px-4 rounded-lg flex-1 text-white transition ${
+                        loading || !rejectReason.trim()
+                          ? "bg-red-300 cursor-not-allowed"
+                          : "bg-red-500 hover:bg-red-600 cursor-pointer"
+                      }`}
+                    >
+                      {loading ? "Processing..." : "Reject Job"}
+                    </button>
+                    <button
+                      onClick={handleAcceptJob}
+                      disabled={loading}
+                      className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg flex-1"
+                    >
+                      {loading ? "Processing..." : "Accept Job"}
+                    </button>
+                  </div>
+                </ActionSection>
+              )}
+
+              {/* WORKER — Drop Job */}
+              {canUserDropJob(user, report) && (
+                <ActionSection
+                  innerRef={dropJobRef}
+                  title="Drop Job"
+                  hint="If you can't complete this job, dropping it returns it to Estate for reassignment."
+                >
+                  <textarea
+                    placeholder="Reason for dropping this job (required)..."
+                    value={dropReason}
+                    onChange={(e) => setDropReason(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    rows="3"
+                  />
+                  <button
+                    onClick={handleDropWork}
+                    disabled={loading || !dropReason.trim()}
+                    className={`font-semibold py-2 px-4 rounded-lg w-full text-white transition ${
+                      loading || !dropReason.trim()
+                        ? "bg-orange-300 cursor-not-allowed"
+                        : "bg-orange-600 hover:bg-orange-700 cursor-pointer"
+                    }`}
+                  >
+                    {loading ? "Processing..." : "Drop Job"}
+                  </button>
+                </ActionSection>
+              )}
+
+              {/* WORKER — Complete Work */}
+              {canUserComplete(user, report) && (
+                <ActionSection innerRef={completeWorkRef} title="Complete Work">
+                  <CompletionImageUploader
+                    preview={completionImagePreview}
+                    onChange={handleCompletionImageChange}
+                  />
+                  {uploadError && (
+                    <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                      ⚠ {uploadError}
+                    </p>
+                  )}
+                  <button
+                    onClick={handleCompleteWork}
+                    disabled={loading || !completionImage}
+                    className={`font-semibold py-2 px-4 rounded-lg w-full text-white transition ${
+                      loading || !completionImage
+                        ? "bg-green-300 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700 cursor-pointer"
+                    }`}
+                  >
+                    {loading ? "Processing..." : "Mark Work as Completed"}
+                  </button>
+                </ActionSection>
+              )}
+
+              {/* STAFF — Cancel Incoming Report */}
+              {user?.role === "staff" &&
+                report?.reporterId === user?.ID &&
+                report?.status === "incoming" && (
+                  <ActionSection
+                    title="Cancel Report"
+                    hint="Only available while the report is still incoming. This permanently deletes it."
+                  >
+                    <button
+                      onClick={handleCancelReport}
+                      disabled={loading}
+                      className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg w-full"
+                    >
+                      {loading ? "Processing..." : "Cancel Report"}
+                    </button>
+                  </ActionSection>
+                )}
+
+              {/* STAFF — Send Feedback */}
+              {canUserSendFeedback(user, report) && (
+                <ActionSection innerRef={sendFeedbackRef} title="Send Feedback">
+                  <textarea
+                    placeholder="Enter your feedback about the completed work..."
+                    value={formData.feedback}
+                    onChange={(e) =>
+                      setFormData({ ...formData, feedback: e.target.value })
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    rows="4"
+                  />
+                  <button
+                    onClick={handleSendFeedback}
+                    disabled={loading}
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg w-full"
+                  >
+                    {loading ? "Processing..." : "Submit Feedback"}
+                  </button>
+                </ActionSection>
+              )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* ESTATE ACTIONS - Submit Maintenance Cost */}
-      {canUserSubmitCost(user, report) && (
-        <div ref={submitCostRef} className="bg-white rounded-lg p-5 space-y-3">
-          <h3 className="font-bold text-gray-800">
-            Estate Actions - Submit Maintenance Cost
-          </h3>
-          <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
-            Enter any additional labor/maintenance cost for the completed work.
-            This will be added to the materials cost to give the total cost.
-          </p>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Maintenance Cost (₵)
-            </label>
-            <input
-              type="number"
-              placeholder="e.g. 150.00"
-              value={actualCost}
-              onChange={(e) => setActualCost(e.target.value)}
-              className="w-full p-2 border border-gray-400 rounded"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <button
-            onClick={handleSubmitCost}
-            disabled={loading}
-            className="bg-emerald-500 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded w-full"
-          >
-            {loading ? "Submitting..." : "Submit Maintenance Cost"}
-          </button>
-        </div>
-      )}
-
-      {/* WORKER ACTIONS - Accept / Reject */}
-      {canUserAcceptOrRejectJob(user, report) && (
-        <div
-          ref={acceptRejectRef}
-          className="bg-white rounded-lg p-5 space-y-3"
-        >
-          <h3 className="font-bold text-gray-800">
-            Worker Actions — Respond to Assignment
-          </h3>
-          {report.instructions && (
-            <div className="bg-gray-50 rounded p-3 text-sm text-gray-700">
-              <span className="font-semibold">Instructions: </span>
-              {report.instructions}
-            </div>
-          )}
-          <textarea
-            placeholder="Reason for rejecting this job (required)..."
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            className="w-full p-2 border border-gray-400 rounded"
-            rows="3"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleRejectJob}
-              disabled={loading || !rejectReason.trim()}
-              className={`font-bold py-2 px-4 rounded flex-1 text-white transition ${
-                loading || !rejectReason.trim()
-                  ? "bg-red-300 cursor-not-allowed"
-                  : "bg-red-500 hover:bg-red-700 cursor-pointer"
-              }`}
-            >
-              {loading ? "Processing..." : "Reject Job"}
-            </button>
-            <button
-              onClick={handleAcceptJob}
-              disabled={loading}
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex-1"
-            >
-              {loading ? "Processing..." : "Accept Job"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* WORKER ACTIONS - Drop Job */}
-      {canUserDropJob(user, report) && (
-        <div ref={dropJobRef} className="bg-white rounded-lg p-5 space-y-3">
-          <h3 className="font-bold text-gray-800">Worker Actions — Drop Job</h3>
-          <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
-            If you're unable to complete this job, you can drop it. It will be
-            unassigned from you and returned to Estate for reassignment to
-            another worker.
-          </p>
-          <textarea
-            placeholder="Reason for dropping this job (required)..."
-            value={dropReason}
-            onChange={(e) => setDropReason(e.target.value)}
-            className="w-full p-2 border border-gray-400 rounded"
-            rows="3"
-          />
-          <button
-            onClick={handleDropWork}
-            disabled={loading || !dropReason.trim()}
-            className={`font-bold py-2 px-4 rounded w-full text-white transition ${
-              loading || !dropReason.trim()
-                ? "bg-orange-300 cursor-not-allowed"
-                : "bg-orange-600 hover:bg-orange-800 cursor-pointer"
-            }`}
-          >
-            {loading ? "Processing..." : "Drop Job"}
-          </button>
-        </div>
-      )}
-
-      {/* WORKER ACTIONS - Complete Work */}
-      {canUserComplete(user, report) && (
-        <div
-          ref={completeWorkRef}
-          className="bg-white rounded-lg p-5 space-y-4"
-        >
-          <h3 className="font-bold text-gray-800">
-            Worker Actions — Complete Work
-          </h3>
-
-          <CompletionImageUploader
-            preview={completionImagePreview}
-            onChange={handleCompletionImageChange}
-          />
-
-          {uploadError && (
-            <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
-              ⚠ {uploadError}
-            </p>
-          )}
-
-          <button
-            onClick={handleCompleteWork}
-            disabled={loading || !completionImage}
-            className={`font-bold py-2 px-4 rounded w-full text-white transition ${
-              loading || !completionImage
-                ? "bg-green-300 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-800 cursor-pointer"
-            }`}
-          >
-            {loading ? "Processing..." : "Mark Work as Completed"}
-          </button>
-        </div>
-      )}
-
-      {/* STAFF ACTIONS - Cancel Incoming Report */}
-      {user?.role === "staff" &&
-        report?.reporterId === user?.ID &&
-        report?.status === "incoming" && (
-          <div className="bg-white rounded-lg p-5 space-y-3">
-            <h3 className="font-bold text-gray-800">Staff Actions</h3>
-            <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
-              Cancel this report only while it is still incoming. This
-              permanently deletes the report from Firestore.
-            </p>
-            <button
-              onClick={handleCancelReport}
-              disabled={loading}
-              className="bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded w-full"
-            >
-              {loading ? "Processing..." : "Cancel Report"}
-            </button>
           </div>
         )}
 
-      {/* STAFF ACTIONS - Send Feedback */}
-      {canUserSendFeedback(user, report) && (
-        <div
-          ref={sendFeedbackRef}
-          className="bg-white rounded-lg p-5 space-y-3"
-        >
-          <h3 className="font-bold text-gray-800">
-            Staff Actions - Send Feedback
-          </h3>
-          <textarea
-            placeholder="Enter your feedback about the completed work..."
-            value={formData.feedback}
-            onChange={(e) =>
-              setFormData({ ...formData, feedback: e.target.value })
-            }
-            className="w-full p-2 border border-gray-400 rounded"
-            rows="4"
-          />
-          <button
-            onClick={handleSendFeedback}
-            disabled={loading}
-            className="bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded w-full"
-          >
-            {loading ? "Processing..." : "Submit Feedback"}
-          </button>
-        </div>
-      )}
-
-      {/* ESTATE ACTIONS - Download PDF */}
-      {canUserDownloadPDF(user, report) && (
-        <div className="bg-white rounded-lg p-5">
+        {/* Download PDF — kept separate, always at the bottom */}
+        {canUserDownloadPDF(user, report) && (
           <button
             onClick={() => {
               const workerName =
@@ -1955,30 +1897,12 @@ export default function ReportDetailsContainer({
                 estateManagerPhone,
               );
             }}
-            className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded w-full"
+            className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg w-full"
           >
             Download Report (PDF)
           </button>
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <div
-      ref={panelRef}
-      className={`fixed top-0 md:top-[10%] py-24 md:py-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden right-0 w-full md:max-w-[700px] h-screen md:max-h-[80%] md:right-5 md:rounded-xl ${reportDetailsBgColor} z-80 md:shadow-xl ${theme.detailsBg} overflow-y-auto ${
-        closing ? "slide-out-right" : "slide-in-right"
-      }`}
-    >
-      <span
-        className={`fixed top-20 md:top-5 right-5 ${theme.detailsCloseText} cursor-pointer text-xl font-bold`}
-        onClick={() => setDisplayDetails(false)}
-      >
-        X
-      </span>
-
-      {reportDetails}
+        )}
+      </div>
     </div>
   );
 }
