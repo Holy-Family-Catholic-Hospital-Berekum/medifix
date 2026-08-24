@@ -8,7 +8,7 @@ export default function AdminHome() {
       secondReportsStatus="pending"
       primaryColor="text-green-300"
       title1="Incoming Reports"
-      title2={"Pending Confirmation"}
+      title2={"Materials Request"}
       secColor={"bg-green-500"}
       titleBgColor={"bg-red-300"}
       reportCardHoverColor={"hover:bg-green-700"}
