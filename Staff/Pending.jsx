@@ -418,8 +418,8 @@ function ReportCard({
                   </span>
                 </div>
                 {assignedWorker.phoneNumber && (
-                  
-                   <a href={`tel:${assignedWorker.phoneNumber}`}
+                  <a
+                    href={`tel:${assignedWorker.phoneNumber}`}
                     className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full text-white transition hover:opacity-90 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{ backgroundColor: ORANGE }}
                   >
@@ -464,8 +464,8 @@ function ReportCard({
                       </span>
                     </div>
                     {em.phoneNumber && (
-                      
-                       <a href={`tel:${em.phoneNumber}`}
+                      <a
+                        href={`tel:${em.phoneNumber}`}
                         className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full transition flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                         style={{ backgroundColor: `${TEAL}1A`, color: TEAL }}
                       >
@@ -819,28 +819,6 @@ export default function Pending() {
           Every maintenance report you've filed, tracked stage by stage.
         </p>
       </div>
-
-      {/* ── Status tally strip ──────────────────────────────────────── */}
-      {!loading && reports.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {Object.entries(countByStatus).map(([status, count]) => {
-            const sc = STATUS_CONFIG[status];
-            if (!sc) return null;
-            return (
-              <div
-                key={status}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap border border-black/5 flex-shrink-0 ${sc.bg} ${sc.text}`}
-              >
-                <span>{sc.icon}</span>
-                <span>{sc.label}</span>
-                <span className="ff-mono text-[11px] font-semibold opacity-70">
-                  {count}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* ── Filter tabs ──────────────────────────────────────────── */}
       {!loading && reports.length > 0 && (
