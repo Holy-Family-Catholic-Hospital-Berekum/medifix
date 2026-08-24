@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router";
-
+import { signOut } from "firebase/auth";
+import { auth } from "../src/firebase";
 const icons = {
   assigned: (
     <svg
@@ -140,7 +141,22 @@ export default function SlideInRight({
     linkHoverText = "hover:text-white",
     linkHoverBg = "hover:bg-white/[0.04]",
     feedbackBadge = "bg-amber-400 text-amber-950",
+    logoutBorder = "border-white/25",
+    logoutText = "text-[#7C2D12]",
+    logoutHoverBorder = "hover:border-red-400/50",
+    logoutHoverText = "hover:text-red-500",
+    logoutHoverBg = "hover:bg-red-500/5",
   } = theme;
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.removeItem("user");
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   useEffect(() => {
     if (sidePopup) {
@@ -410,6 +426,13 @@ export default function SlideInRight({
                   <path d="M9 18l6-6-6-6" />
                 </svg>
               </NavLink>
+
+              <button
+                onClick={handleLogout}
+                className={`text-xs tracking-widest uppercase md:hidden font-semibold px-3 py-1.5 my-10 rounded border transition-all duration-200 cursor-pointer ${logoutBorder} ${logoutText} ${logoutHoverBorder} ${logoutHoverText} ${logoutHoverBg}`}
+              >
+                Logout
+              </button>
             </div>
           )}
         </div>
