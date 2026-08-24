@@ -15,7 +15,21 @@ import {
 import { db } from "../src/firebase";
 import { formatDate } from "../src/utils";
 
+// ─── design tokens ───────────────────────────────────────────────────────────
 const ORANGE = "#FF8825";
+const INK = "#131B26";
+const TEAL = "#0E7C86";
+
+const FONTS = `
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+  .ff-display { font-family: 'Sora', sans-serif; }
+  .ff-mono { font-family: 'JetBrains Mono', monospace; }
+  @keyframes cardRise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card-rise { animation: cardRise .45s cubic-bezier(.22,1,.36,1) both; }
+`;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function timeAgo(date) {
@@ -120,70 +134,78 @@ function getStatusMessage(report) {
   return STATUS_MESSAGES[report.status] || "";
 }
 
-// ─── Status config ────────────────────────────────────────────────────────────
+// Short, chart-style reference code derived from the report's own id —
+// gives each card a clinical "record number" instead of a bare category
+// name floating with nothing to anchor it.
+function getRefCode(id) {
+  if (!id) return "———";
+  return `#${id.slice(-5).toUpperCase()}`;
+}
+
+// ─── status & priority config ─────────────────────────────────────────────
 const STATUS_CONFIG = {
   incoming: {
     label: "Incoming",
-    bg: "bg-orange-100",
+    bg: "bg-orange-50",
     text: "text-orange-700",
     dot: "bg-orange-500",
-    bar: "bg-orange-400",
+    spine: "#F59E0B",
     icon: "📥",
   },
   approved: {
     label: "Approved",
-    bg: "bg-blue-100",
+    bg: "bg-blue-50",
     text: "text-blue-700",
     dot: "bg-blue-500",
-    bar: "bg-blue-400",
+    spine: "#3B82F6",
     icon: "✅",
   },
   pending: {
     label: "Pending",
-    bg: "bg-yellow-100",
+    bg: "bg-yellow-50",
     text: "text-yellow-700",
     dot: "bg-yellow-500",
-    bar: "bg-yellow-400",
+    spine: "#EAB308",
     icon: "⏳",
   },
   confirmed: {
     label: "Confirmed",
-    bg: "bg-teal-100",
+    bg: "bg-teal-50",
     text: "text-teal-700",
     dot: "bg-teal-500",
-    bar: "bg-teal-400",
+    spine: TEAL,
     icon: "🔒",
   },
   assigned: {
     label: "Assigned",
-    bg: "bg-purple-100",
+    bg: "bg-purple-50",
     text: "text-purple-700",
     dot: "bg-purple-500",
-    bar: "bg-purple-400",
+    spine: "#8B5CF6",
     icon: "👷",
   },
   denied: {
     label: "Denied",
-    bg: "bg-red-100",
+    bg: "bg-red-50",
     text: "text-red-700",
     dot: "bg-red-500",
-    bar: "bg-red-400",
+    spine: "#DC2626",
     icon: "❌",
   },
   completed: {
     label: "Completed",
-    bg: "bg-green-100",
+    bg: "bg-green-50",
     text: "text-green-700",
     dot: "bg-green-500",
-    bar: "bg-green-400",
+    spine: "#16A34A",
     icon: "🏁",
   },
   reopened: {
     label: "Reopened",
-    bg: "bg-amber-100",
+    bg: "bg-amber-50",
     text: "text-amber-700",
     dot: "bg-amber-500",
-    bar: "bg-amber-400",
+    spine: "#F59E0B",
     icon: "🔁",
   },
   closed: {
@@ -191,45 +213,71 @@ const STATUS_CONFIG = {
     bg: "bg-gray-100",
     text: "text-gray-700",
     dot: "bg-gray-500",
-    bar: "bg-gray-400",
+    spine: "#64748B",
     icon: "📁",
   },
 };
 
 const PRIORITY_CONFIG = {
-  emergency: { label: "Emergency", bg: "bg-red-500", text: "text-white" },
-  urgent: { label: "Urgent", bg: "bg-orange-500", text: "text-white" },
-  routine: { label: "Routine", bg: "bg-green-500", text: "text-white" },
+  emergency: { label: "Emergency", solid: "#DC2626" },
+  urgent: { label: "Urgent", solid: "#F97316" },
+  routine: { label: "Routine", solid: "#16A34A" },
 };
 
-// ─── Progress helpers ─────────────────────────────────────────────────────
-const STATUS_ORDER = [
+// ─── pipeline stepper — the page's signature element ──────────────────────
+// The workflow genuinely IS a fixed sequence, so a discrete step tracker
+// encodes real information about where a report sits — unlike a smooth
+// percentage bar, which implies granularity that doesn't exist. Only
+// rendered for reports still moving forward through the sequence; denied
+// and reopened reports get their own note blocks below instead.
+const PIPELINE_STAGES = [
   "incoming",
   "approved",
   "pending",
   "confirmed",
   "procured",
   "assigned",
-  "completed",
 ];
 
-function getProgressPercent(status) {
-  if (status === "denied" || status === "reopened" || status === "closed")
-    return 100;
-  const idx = STATUS_ORDER.indexOf(status);
-  if (idx === -1) return 0;
-  return (idx / (STATUS_ORDER.length - 1)) * 100;
-}
-
-// Interpolates from red-500 (#EF4444) to green-500 (#22C55E)
-function getProgressColor(percent) {
-  const red = { r: 239, g: 68, b: 68 };
-  const green = { r: 34, g: 197, b: 94 };
-  const t = Math.max(0, Math.min(100, percent)) / 100;
-  const r = Math.round(red.r + (green.r - red.r) * t);
-  const g = Math.round(red.g + (green.g - red.g) * t);
-  const b = Math.round(red.b + (green.b - red.b) * t);
-  return `rgb(${r}, ${g}, ${b})`;
+function PipelineStepper({ status }) {
+  const idx = PIPELINE_STAGES.indexOf(status);
+  if (idx === -1) return null;
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">
+          Pipeline
+        </span>
+        <span
+          className="text-[9px] font-bold uppercase tracking-wide ff-mono"
+          style={{ color: INK }}
+        >
+          {STATUS_CONFIG[status]?.label}
+        </span>
+      </div>
+      <div className="flex items-center">
+        {PIPELINE_STAGES.map((key, i) => {
+          const done = i <= idx;
+          const isLast = i === PIPELINE_STAGES.length - 1;
+          return (
+            <div key={key} className="flex items-center flex-1 last:flex-none">
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-300"
+                style={{ backgroundColor: done ? ORANGE : "#E4E8EE" }}
+                title={STATUS_CONFIG[key]?.label}
+              />
+              {!isLast && (
+                <span
+                  className="h-[2px] flex-1 mx-1 transition-colors duration-300"
+                  style={{ backgroundColor: i < idx ? ORANGE : "#E4E8EE" }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ─── Report Card ──────────────────────────────────────────────────────────────
@@ -242,6 +290,7 @@ function ReportCard({
   onCancelReport,
   onCloseReport,
   onDismissReport,
+  index,
 }) {
   const overdueLabel = useLiveTimeAgo(report.dateDue);
   const denialNote = getDenialNote(report);
@@ -267,75 +316,52 @@ function ReportCard({
     report?.status === "denied";
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
-      {/* coloured top bar */}
-      <div className={`h-1.5 w-full ${sc.bar}`} />
+    <div
+      className="card-rise relative flex bg-white rounded-2xl border border-[#E4E8EE] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+      style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+    >
+      {/* triage spine — the "chart tab" left edge, colored by status */}
+      <div
+        className="w-1.5 flex-shrink-0"
+        style={{ backgroundColor: sc.spine }}
+      />
 
-      <div className="p-5">
-        {/* header row */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xl">{sc.icon}</span>
-            <h3 className="font-black text-gray-900 text-lg leading-tight">
+      <div className="flex-1 p-5 min-w-0">
+        {/* header row — ref code + category + priority stamp */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
+            <span className="ff-mono text-[10px] font-semibold text-gray-400 tracking-wide">
+              {getRefCode(report.id)}
+            </span>
+            <h3
+              className="ff-display font-bold text-lg leading-tight truncate"
+              style={{ color: INK }}
+            >
               {report.category}
             </h3>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* priority badge */}
-            <span
-              className={`text-xs font-black px-2.5 py-1 rounded-full ${pc.bg} ${pc.text} uppercase tracking-wide`}
-            >
-              {report.priorityLevel}
-            </span>
-            {/* status badge */}
-            <span
-              className={`text-xs font-bold px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} flex items-center gap-1`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${sc.dot} inline-block`}
-              />
-              {sc.label}
-            </span>
-          </div>
+          <span
+            className="flex-shrink-0 -rotate-2 inline-flex items-center text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border border-dashed ff-mono"
+            style={{ color: pc.solid, borderColor: pc.solid }}
+          >
+            {pc.label}
+          </span>
         </div>
 
-        {/* progress bar */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs font-black text-gray-400 uppercase tracking-wide">
-              Progress
-            </span>
-            <span className="text-xs font-bold text-gray-500">
-              {report.status === "denied"
-                ? "Denied"
-                : report.status === "reopened"
-                  ? "Reopened"
-                  : report.status === "closed"
-                    ? "Closed"
-                    : `${Math.round(getProgressPercent(report.status))}%`}
-            </span>
-          </div>
-          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${getProgressPercent(report.status)}%`,
-                backgroundColor:
-                  report.status === "denied"
-                    ? "#EF4444"
-                    : report.status === "reopened"
-                      ? "#F59E0B"
-                      : report.status === "closed"
-                        ? "#6B7280"
-                        : getProgressColor(getProgressPercent(report.status)),
-              }}
-            />
-          </div>
-        </div>
+        {/* status badge */}
+        <span
+          className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full mb-4 ${sc.bg} ${sc.text}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+          {sc.label}
+        </span>
+
+        {/* signature pipeline stepper */}
+        <PipelineStepper status={report.status} />
 
         {/* status detail message */}
         {getStatusMessage(report) && (
-          <p className="text-xs text-gray-500 leading-relaxed mb-4 -mt-2">
+          <p className="text-xs text-gray-500 leading-relaxed mb-3">
             {getStatusMessage(report)}
           </p>
         )}
@@ -347,10 +373,10 @@ function ReportCard({
 
         {/* meta chips */}
         <div className="flex flex-wrap gap-2 mb-4">
-          <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+          <span className="inline-flex items-center gap-1 text-xs bg-gray-50 text-gray-600 border border-gray-100 px-2.5 py-1 rounded-full font-medium">
             📍 {report.location}
           </span>
-          <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+          <span className="inline-flex items-center gap-1 text-xs bg-gray-50 text-gray-600 border border-gray-100 px-2.5 py-1 rounded-full font-medium ff-mono">
             🗓 {formatDate(report.dateSent)}
           </span>
         </div>
@@ -360,11 +386,13 @@ function ReportCard({
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-4">
             <span className="text-base">⚠️</span>
             <div>
-              <p className="text-xs font-black text-red-700 uppercase tracking-wide">
+              <p className="text-[10px] font-black text-red-700 uppercase tracking-wide">
                 Overdue
               </p>
               {report.dateDue && (
-                <p className="text-xs text-red-500">Due {overdueLabel}</p>
+                <p className="text-xs text-red-500 ff-mono">
+                  Due {overdueLabel}
+                </p>
               )}
             </div>
           </div>
@@ -373,26 +401,26 @@ function ReportCard({
         {/* assigned worker */}
         {report.status === "assigned" && (
           <div className="border-t border-gray-100 pt-4 mt-2">
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">
               Assigned Technician
             </p>
             {assignedWorker ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm text-white"
+                    className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm text-white flex-shrink-0"
                     style={{ backgroundColor: ORANGE }}
                   >
                     {assignedWorker.name?.charAt(0)?.toUpperCase()}
                   </div>
-                  <span className="text-sm font-bold text-gray-800">
+                  <span className="text-sm font-bold text-gray-800 truncate">
                     {assignedWorker.name}
                   </span>
                 </div>
                 {assignedWorker.phoneNumber && (
-                  <a
-                    href={`tel:${assignedWorker.phoneNumber}`}
-                    className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full text-white transition hover:opacity-90"
+                  
+                   <a href={`tel:${assignedWorker.phoneNumber}`}
+                    className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full text-white transition hover:opacity-90 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{ backgroundColor: ORANGE }}
                   >
                     <span className="material-symbols-outlined text-sm">
@@ -410,31 +438,36 @@ function ReportCard({
           </div>
         )}
 
-        {/* estate managers — emergency or overdue */}
+        {/* estate managers — emergency or overdue, teal accent to
+            distinguish "contact" actions from the orange primary CTA */}
         {(report.priorityLevel === "emergency" || report.overdue) &&
           estateManagers.length > 0 && (
             <div className="border-t border-gray-100 pt-4 mt-4">
-              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 Call Estate Manager
               </p>
               <div className="flex flex-col gap-2">
                 {estateManagers.map((em, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2"
+                    className="flex items-center justify-between gap-2 bg-gray-50 rounded-xl px-3 py-2"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-black text-blue-700">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0"
+                        style={{ backgroundColor: `${TEAL}1A`, color: TEAL }}
+                      >
                         {em.name?.charAt(0)?.toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium text-gray-800">
+                      <span className="text-sm font-medium text-gray-800 truncate">
                         {em.name}
                       </span>
                     </div>
                     {em.phoneNumber && (
-                      <a
-                        href={`tel:${em.phoneNumber}`}
-                        className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                      
+                       <a href={`tel:${em.phoneNumber}`}
+                        className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full transition flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                        style={{ backgroundColor: `${TEAL}1A`, color: TEAL }}
                       >
                         <span className="material-symbols-outlined text-sm">
                           call
@@ -451,7 +484,7 @@ function ReportCard({
         {/* denial note */}
         {denialNote && (
           <div className="border-t border-gray-100 pt-4 mt-4">
-            <p className="text-xs font-black text-red-400 uppercase tracking-widest mb-1">
+            <p className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-1">
               Denial Reason
             </p>
             <div className="bg-red-50 rounded-xl px-3 py-2">
@@ -463,7 +496,7 @@ function ReportCard({
         {/* reopen reason */}
         {reopenNote && (
           <div className="border-t border-gray-100 pt-4 mt-4">
-            <p className="text-xs font-black text-amber-500 uppercase tracking-widest mb-1">
+            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">
               Why You Reopened This
             </p>
             <div className="bg-amber-50 rounded-xl px-3 py-2">
@@ -477,9 +510,12 @@ function ReportCard({
             <button
               type="button"
               onClick={() => onCancelReport?.(report)}
-              className="w-full rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90"
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={{ backgroundColor: "#dc2626" }}
             >
+              <span className="material-symbols-outlined text-base">
+                cancel
+              </span>
               Cancel Report
             </button>
           </div>
@@ -493,9 +529,12 @@ function ReportCard({
             <button
               type="button"
               onClick={() => onCloseReport?.(report)}
-              className="w-full rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90"
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={{ backgroundColor: "#16a34a" }}
             >
+              <span className="material-symbols-outlined text-base">
+                task_alt
+              </span>
               Close Report
             </button>
           </div>
@@ -511,9 +550,12 @@ function ReportCard({
             <button
               type="button"
               onClick={() => onDismissReport?.(report)}
-              className="w-full rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90"
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-white transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={{ backgroundColor: "#6B7280" }}
             >
+              <span className="material-symbols-outlined text-base">
+                archive
+              </span>
               Dismiss Report
             </button>
           </div>
@@ -526,13 +568,14 @@ function ReportCard({
 // ─── Skeleton card ────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
-      <div className="h-1.5 w-full bg-gray-200" />
-      <div className="p-5 space-y-3">
+    <div className="flex bg-white rounded-2xl border border-[#E4E8EE] shadow-sm overflow-hidden animate-pulse">
+      <div className="w-1.5 flex-shrink-0 bg-gray-200" />
+      <div className="flex-1 p-5 space-y-3">
         <div className="flex justify-between">
           <div className="h-5 bg-gray-200 rounded w-1/3" />
           <div className="h-5 bg-gray-200 rounded w-1/4" />
         </div>
+        <div className="h-2 bg-gray-100 rounded w-full" />
         <div className="h-3 bg-gray-100 rounded w-full" />
         <div className="h-3 bg-gray-100 rounded w-4/5" />
         <div className="flex gap-2">
@@ -747,43 +790,52 @@ export default function Pending() {
   }, {});
 
   const pendingReports = (
-    <div className="min-h-screen bg-white py-24 px-4 md:px-8 lg:px-16">
-      {/* ── Page header ──────────────────────────────────────────── */}
+    <div className="min-h-screen bg-[#F5F7FA] py-24 px-4 md:px-8 lg:px-16">
+      <style>{FONTS}</style>
 
-      {/* ── Welcome message ──────────────────────────────────────── */}
-      <p className="text-gray-500 font-semibold mb-4">
-        {getGreeting()}, {getFormalName(user)} 👋
+      {/* ── Hero header ──────────────────────────────────────────── */}
+      <p className="text-gray-400 font-medium text-sm mb-2">
+        {getGreeting()},{" "}
+        <span className="text-gray-700 font-semibold">
+          {getFormalName(user)}
+        </span>
       </p>
 
       <div className="mb-8">
         <span
-          className="inline-block text-xs font-black tracking-[.2em] uppercase px-3 py-1.5 rounded-full text-white mb-3"
+          className="inline-flex items-center gap-1.5 text-[10px] font-black tracking-[0.25em] uppercase px-3 py-1.5 rounded-full text-white mb-3"
           style={{ backgroundColor: ORANGE }}
         >
+          <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
           My Reports
         </span>
-        <h1 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight">
+        <h1
+          className="ff-display font-extrabold text-4xl md:text-5xl leading-[1.05] tracking-tight"
+          style={{ color: INK }}
+        >
           Pending Reports
         </h1>
-        <p className="text-gray-400 mt-2">
-          Track every report you've submitted in real-time.
+        <p className="text-gray-400 mt-2 max-w-md">
+          Every maintenance report you've filed, tracked stage by stage.
         </p>
       </div>
 
-      {/* ── Summary pills ────────────────────────────────────────── */}
+      {/* ── Status tally strip ──────────────────────────────────────── */}
       {!loading && reports.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-8">
+        <div className="flex gap-2 overflow-x-auto pb-1 mb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {Object.entries(countByStatus).map(([status, count]) => {
             const sc = STATUS_CONFIG[status];
             if (!sc) return null;
             return (
               <div
                 key={status}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${sc.bg} ${sc.text}`}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap border border-black/5 flex-shrink-0 ${sc.bg} ${sc.text}`}
               >
                 <span>{sc.icon}</span>
                 <span>{sc.label}</span>
-                <span className="font-black">{count}</span>
+                <span className="ff-mono text-[11px] font-semibold opacity-70">
+                  {count}
+                </span>
               </div>
             );
           })}
@@ -802,7 +854,7 @@ export default function Pending() {
               <button
                 key={tab.key}
                 onClick={() => setActiveFilter(tab.key)}
-                className={`text-xs font-bold px-4 py-2 rounded-full border-2 transition-all duration-200 ${
+                className={`text-xs font-bold px-4 py-2 rounded-full border-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 ${
                   isActive
                     ? "text-white border-transparent"
                     : "bg-white text-gray-500 border-gray-200 hover:border-orange-300"
@@ -836,7 +888,7 @@ export default function Pending() {
         </div>
       ) : filtered.length > 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((report) => (
+          {filtered.map((report, i) => (
             <ReportCard
               key={report.id}
               report={report}
@@ -847,13 +899,17 @@ export default function Pending() {
               onCancelReport={handleCancelReport}
               onCloseReport={handleCloseReport}
               onDismissReport={handleDismissReport}
+              index={i}
             />
           ))}
         </div>
       ) : (
         <div className="text-center py-24">
           <div className="text-6xl mb-4">📭</div>
-          <h2 className="text-xl font-black text-gray-700 mb-2">
+          <h2
+            className="ff-display font-extrabold text-xl mb-2"
+            style={{ color: INK }}
+          >
             Nothing here yet
           </h2>
           <p className="text-gray-400 text-sm">
