@@ -259,29 +259,6 @@ export default function SlideInRight({
                 Maintenance Portal
               </p>
             </div>
-
-            <button
-              onClick={onClose}
-              aria-label="Close navigation"
-              className="
-                w-10 h-10 rounded-xl
-                flex items-center justify-center
-                text-white/50 hover:text-white
-                bg-white/[0.04] hover:bg-white/[0.08]
-                border border-white/[0.07]
-                transition
-              "
-            >
-              <svg
-                className="w-5 h-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
           </div>
 
           {/* User info */}
@@ -294,10 +271,6 @@ export default function SlideInRight({
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-500 truncate">
                   {user?.name || "User"}
-                </p>
-
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mt-0.5">
-                  {user?.role || "Worker"}
                 </p>
               </div>
             </div>

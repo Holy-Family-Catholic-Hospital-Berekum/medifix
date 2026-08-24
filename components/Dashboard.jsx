@@ -1,3 +1,4 @@
+// components/Dashboard.jsx
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   collection,
@@ -15,8 +16,53 @@ import {
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db } from "../src/firebase";
 import NavBar from "./navBar";
-import { THEMES } from "./Home";
+import { THEMES, getTheme } from "./Home";
 import { generateDashboardStatsPDF } from "../src/utils";
+import { useThemeMode } from "../src/ThemeModeContext";
+
+// ─── surface palette (light/dark) for this file's inline-style primitives ──
+// Dashboard.jsx predates the makeTheme() token system in Home.jsx and styles
+// everything via inline hex values instead of Tailwind classes, so instead
+// of migrating the whole file to that system, this gives every surface
+// (cards, tables, borders, body/label/muted text) a light/dark pair and a
+// hook to read it. Status/priority/role badge colors (STATUS_META etc.
+// below) are deliberately NOT part of this — those are colored chips
+// carrying meaning and stay constant across modes, same as most dashboards.
+const SURFACE = {
+  light: {
+    page: "#f8fafc",
+    card: "#ffffff",
+    cardBorder: "#f1f5f9",
+    shadow: "0 1px 6px rgba(0,0,0,.06)",
+    border: "#e2e8f0",
+    rowAlt: "#fafafa",
+    hover: "#f8fafc",
+    textPrimary: "#0f172a",
+    textSecondary: "#374151",
+    textMuted: "#64748b",
+    textFaint: "#94a3b8",
+    inputBg: "#ffffff",
+  },
+  dark: {
+    page: "#0b1220",
+    card: "#1e293b",
+    cardBorder: "#293548",
+    shadow: "0 1px 6px rgba(0,0,0,.4)",
+    border: "#334155",
+    rowAlt: "#1a2436",
+    hover: "#243044",
+    textPrimary: "#f1f5f9",
+    textSecondary: "#cbd5e1",
+    textMuted: "#94a3b8",
+    textFaint: "#64748b",
+    inputBg: "#0f172a",
+  },
+};
+
+function useSurface() {
+  const { mode } = useThemeMode();
+  return SURFACE[mode] || SURFACE.light;
+}
 
 // ─── status classification ────────────────────────────────────────────────
 // "Terminal" = the job is fully done and out of anyone's queue.
@@ -156,12 +202,11 @@ const STATUS_META = {
     bg: "#ffe4e6",
     text: "#881337",
   },
-  // New: worker accepted a job, then dropped it before finishing — cleared
-  // back to unassigned and returned to Estate for reassignment. Given its
-  // own distinct orange tone (matching the orange bg-orange-50/text-orange-700
-  // treatment ReportDetailsContainer.jsx already uses for the drop reason
-  // banner) so it doesn't get visually confused with "Job Rejected" (rose),
-  // even though both land the report back with Estate for reassignment.
+  // Worker accepted a job, then dropped it before finishing — cleared back
+  // to unassigned and returned to Estate for reassignment. Given its own
+  // distinct orange tone so it doesn't get visually confused with
+  // "Job Rejected" (rose), even though both land the report back with
+  // Estate for reassignment.
   dropped: {
     label: "Dropped",
     color: "#ea580c",
@@ -583,13 +628,14 @@ function Badge({ bg, text, children }) {
 }
 
 function Card({ children, style = {} }) {
+  const s = useSurface();
   return (
     <div
       style={{
-        background: "#fff",
+        background: s.card,
         borderRadius: 16,
-        border: "1px solid #f1f5f9",
-        boxShadow: "0 1px 6px rgba(0,0,0,.06)",
+        border: `1px solid ${s.cardBorder}`,
+        boxShadow: s.shadow,
         ...style,
       }}
     >
@@ -599,12 +645,13 @@ function Card({ children, style = {} }) {
 }
 
 function SectionTitle({ children }) {
+  const s = useSurface();
   return (
     <h2
       style={{
         fontSize: 11,
         fontWeight: 800,
-        color: "#9ca3af",
+        color: s.textFaint,
         margin: "28px 0 12px",
         letterSpacing: ".08em",
         textTransform: "uppercase",
@@ -616,6 +663,7 @@ function SectionTitle({ children }) {
 }
 
 function PeriodSelect({ value, onChange }) {
+  const s = useSurface();
   return (
     <select
       value={value}
@@ -623,9 +671,9 @@ function PeriodSelect({ value, onChange }) {
       style={{
         padding: "8px 12px",
         borderRadius: 8,
-        border: "1px solid #e2e8f0",
-        background: "#fff",
-        color: "#374151",
+        border: `1px solid ${s.border}`,
+        background: s.card,
+        color: s.textSecondary,
         fontSize: 12,
         fontWeight: 700,
         cursor: "pointer",
@@ -651,6 +699,7 @@ function PaginationControls({
   totalItems,
   pageSize,
 }) {
+  const s = useSurface();
   if (totalPages <= 1) return null;
 
   const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -667,7 +716,7 @@ function PaginationControls({
         padding: "14px 4px 4px",
       }}
     >
-      <span style={{ fontSize: 12, color: "#94a3b8" }}>
+      <span style={{ fontSize: 12, color: s.textFaint }}>
         Showing {start}–{end} of {totalItems}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -678,9 +727,9 @@ function PaginationControls({
           style={{
             padding: "6px 12px",
             borderRadius: 8,
-            border: "1px solid #e2e8f0",
-            background: "#fff",
-            color: "#374151",
+            border: `1px solid ${s.border}`,
+            background: s.card,
+            color: s.textSecondary,
             fontSize: 12,
             fontWeight: 700,
             cursor: page <= 1 ? "not-allowed" : "pointer",
@@ -689,7 +738,7 @@ function PaginationControls({
         >
           ← Prev
         </button>
-        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+        <span style={{ fontSize: 12, color: s.textMuted, fontWeight: 600 }}>
           Page {page} / {totalPages}
         </span>
         <button
@@ -699,9 +748,9 @@ function PaginationControls({
           style={{
             padding: "6px 12px",
             borderRadius: 8,
-            border: "1px solid #e2e8f0",
-            background: "#fff",
-            color: "#374151",
+            border: `1px solid ${s.border}`,
+            background: s.card,
+            color: s.textSecondary,
             fontSize: 12,
             fontWeight: 700,
             cursor: page >= totalPages ? "not-allowed" : "pointer",
@@ -716,6 +765,7 @@ function PaginationControls({
 }
 
 function StatCard({ label, value, icon, accent, sub }) {
+  const s = useSurface();
   return (
     <Card
       style={{
@@ -735,7 +785,7 @@ function StatCard({ label, value, icon, accent, sub }) {
         <span
           style={{
             fontSize: 11,
-            color: "#64748b",
+            color: s.textMuted,
             fontWeight: 700,
             letterSpacing: ".05em",
             textTransform: "uppercase",
@@ -763,13 +813,13 @@ function StatCard({ label, value, icon, accent, sub }) {
         style={{
           fontSize: 28,
           fontWeight: 800,
-          color: "#0f172a",
+          color: s.textPrimary,
           lineHeight: 1,
         }}
       >
         {value}
       </span>
-      {sub && <span style={{ fontSize: 11, color: "#94a3b8" }}>{sub}</span>}
+      {sub && <span style={{ fontSize: 11, color: s.textFaint }}>{sub}</span>}
     </Card>
   );
 }
@@ -778,13 +828,14 @@ function StatCard({ label, value, icon, accent, sub }) {
 // metrics grid (see WorkerCard below). Pulled out as its own primitive so
 // the grid can lay out any number of these responsively without repeating
 // the same inline-style block four times per card.
-function WorkerMetric({ label, value, sub, color = "#0f172a", empty }) {
+function WorkerMetric({ label, value, sub, color, empty }) {
+  const s = useSurface();
   return (
     <div style={{ textAlign: "center", minWidth: 0 }}>
       <div
         style={{
           fontSize: 9,
-          color: "#94a3b8",
+          color: s.textFaint,
           fontWeight: 700,
           textTransform: "uppercase",
           letterSpacing: ".05em",
@@ -793,7 +844,7 @@ function WorkerMetric({ label, value, sub, color = "#0f172a", empty }) {
         {label}
       </div>
       {empty ? (
-        <span style={{ fontSize: 12, color: "#cbd5e1", fontStyle: "italic" }}>
+        <span style={{ fontSize: 12, color: s.textFaint, fontStyle: "italic" }}>
           {empty}
         </span>
       ) : (
@@ -802,7 +853,7 @@ function WorkerMetric({ label, value, sub, color = "#0f172a", empty }) {
             style={{
               fontSize: 17,
               fontWeight: 800,
-              color,
+              color: color || s.textPrimary,
               lineHeight: 1.3,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -815,7 +866,7 @@ function WorkerMetric({ label, value, sub, color = "#0f172a", empty }) {
             <span
               style={{
                 fontSize: 9,
-                color: "#2d2f31",
+                color: s.textMuted,
                 display: "block",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -837,9 +888,10 @@ function WorkerMetric({ label, value, sub, color = "#0f172a", empty }) {
 // the ".worker-metrics" CSS rule, is what keeps this readable on narrow
 // mobile widths instead of overflowing a single wide row.
 function WorkerCard({ w, rank }) {
+  const s = useSurface();
   const perfColor =
     w.performancePct == null
-      ? "#cbd5e1"
+      ? s.textFaint
       : w.performancePct >= 80
         ? "#22c55e"
         : w.performancePct >= 50
@@ -853,7 +905,7 @@ function WorkerCard({ w, rank }) {
           style={{
             fontSize: 11,
             fontWeight: 800,
-            color: rank === 0 ? "#f59e0b" : "#94a3b8",
+            color: rank === 0 ? "#f59e0b" : s.textFaint,
             width: 22,
             flexShrink: 0,
             textAlign: "center",
@@ -889,7 +941,7 @@ function WorkerCard({ w, rank }) {
             style={{
               fontWeight: 700,
               fontSize: 14,
-              color: "#0f172a",
+              color: s.textPrimary,
               marginBottom: 6,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -922,7 +974,7 @@ function WorkerCard({ w, rank }) {
             style={{
               height: 5,
               borderRadius: 999,
-              background: "#f1f5f9",
+              background: s.hover,
               overflow: "hidden",
             }}
           >
@@ -948,7 +1000,7 @@ function WorkerCard({ w, rank }) {
         style={{
           marginTop: 12,
           paddingTop: 12,
-          borderTop: "1px solid #f1f5f9",
+          borderTop: `1px solid ${s.cardBorder}`,
         }}
       >
         {w.weightedRating != null ? (
@@ -961,7 +1013,7 @@ function WorkerCard({ w, rank }) {
         ) : (
           <WorkerMetric label="Rating" empty="No ratings" />
         )}
-        <WorkerMetric label="Assigned" value={w.assigned} color="#64748b" />
+        <WorkerMetric label="Assigned" value={w.assigned} color={s.textMuted} />
         <WorkerMetric label="Done" value={w.done} color="#22c55e" />
         <WorkerMetric
           label="Performance"
@@ -974,12 +1026,13 @@ function WorkerCard({ w, rank }) {
 }
 
 function Donut({ slices, size = 88 }) {
+  const s = useSurface();
   const r = 30,
     cx = 40,
     cy = 40,
     circ = 2 * Math.PI * r;
   let offset = 0;
-  const total = slices.reduce((s, sl) => s + sl.value, 0) || 1;
+  const total = slices.reduce((sl2, sl) => sl2 + sl.value, 0) || 1;
   return (
     <svg
       width={size}
@@ -992,7 +1045,7 @@ function Donut({ slices, size = 88 }) {
         cy={cy}
         r={r}
         fill="none"
-        stroke="#f1f5f9"
+        stroke={s.hover}
         strokeWidth="13"
       />
       {slices.map((sl, i) => {
@@ -1020,6 +1073,7 @@ function Donut({ slices, size = 88 }) {
 }
 
 function BarChart({ data, color = "#3b82f6", height = 100 }) {
+  const s = useSurface();
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
     <div
@@ -1057,7 +1111,7 @@ function BarChart({ data, color = "#3b82f6", height = 100 }) {
           <span
             style={{
               fontSize: 10,
-              color: "#9ca3af",
+              color: s.textFaint,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -1073,6 +1127,7 @@ function BarChart({ data, color = "#3b82f6", height = 100 }) {
 }
 
 function ConfirmModal({ message, onConfirm, onCancel, danger }) {
+  const s = useSurface();
   return (
     <div
       style={{
@@ -1090,7 +1145,7 @@ function ConfirmModal({ message, onConfirm, onCancel, danger }) {
         <p
           style={{
             fontSize: 15,
-            color: "#0f172a",
+            color: s.textPrimary,
             margin: "0 0 24px",
             lineHeight: 1.7,
           }}
@@ -1103,9 +1158,9 @@ function ConfirmModal({ message, onConfirm, onCancel, danger }) {
             style={{
               padding: "9px 20px",
               borderRadius: 8,
-              border: "1px solid #e2e8f0",
-              background: "#fff",
-              color: "#374151",
+              border: `1px solid ${s.border}`,
+              background: s.card,
+              color: s.textSecondary,
               cursor: "pointer",
               fontSize: 13,
               fontWeight: 500,
@@ -1154,9 +1209,12 @@ function TableWrap({ children }) {
 }
 
 function THead({ cols }) {
+  const s = useSurface();
   return (
     <thead>
-      <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+      <tr
+        style={{ background: s.hover, borderBottom: `2px solid ${s.border}` }}
+      >
         {cols.map((c) => (
           <th
             key={c}
@@ -1164,7 +1222,7 @@ function THead({ cols }) {
               padding: "11px 14px",
               textAlign: "left",
               fontWeight: 700,
-              color: "#374151",
+              color: s.textSecondary,
               whiteSpace: "nowrap",
               fontSize: 12,
             }}
@@ -1180,7 +1238,8 @@ function THead({ cols }) {
 // Small inline banner used for "data may be incomplete" / "failed to load"
 // states — deliberately quiet so it doesn't compete with the KPI cards, but
 // visible enough that a real backend problem never looks identical to
-// "there's genuinely nothing here yet."
+// "there's genuinely nothing here yet." Tone colors (warning/error) are
+// semantic and kept constant across light/dark.
 function InlineNotice({ tone = "info", children }) {
   const palette =
     tone === "error"
@@ -1210,7 +1269,7 @@ function InlineNotice({ tone = "info", children }) {
 // overdue — is meant to demand attention rather than blend in with routine
 // "data may be stale" notices. Shown regardless of which Overview period is
 // selected, since "is anything on fire right now" shouldn't depend on the
-// dropdown.
+// dropdown. Kept as a fixed semantic red across modes.
 function EmergencyOverdueBanner({ count }) {
   if (!count) return null;
   return (
@@ -1238,6 +1297,9 @@ function EmergencyOverdueBanner({ count }) {
 
 // ─── Generate Registration ID modal ──────────────────────────────────────────
 function GenIDModal({ role, onClose }) {
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
+
   const allowedTypes =
     role === "admin"
       ? ["manager", "estate", "staff", "worker", "procurement"]
@@ -1275,14 +1337,18 @@ function GenIDModal({ role, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 flex flex-col gap-4">
-        <h2 className="text-lg font-bold text-gray-800">
-          Generate Registration PIN
-        </h2>
+      <div
+        className={`rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 flex flex-col gap-4 ${
+          dark ? "bg-slate-800 text-slate-100" : "bg-white text-gray-800"
+        }`}
+      >
+        <h2 className="text-lg font-bold">Generate Registration PIN</h2>
         {!generatedID ? (
           <>
             <div className="flex flex-col gap-2">
-              <label className="text-sm text-gray-600 font-medium">
+              <label
+                className={`text-sm font-medium ${dark ? "text-slate-300" : "text-gray-600"}`}
+              >
                 Select account type
               </label>
               <div className="flex gap-2 flex-wrap">
@@ -1291,7 +1357,13 @@ function GenIDModal({ role, onClose }) {
                     key={type}
                     type="button"
                     onClick={() => setGenType(type)}
-                    className={`px-4 py-2 rounded-full capitalize text-sm font-medium border transition cursor-pointer ${genType === type ? "bg-[#F8934C] text-white border-[#F8934C]" : "bg-white text-gray-700 border-gray-300 hover:border-[#F8934C]"}`}
+                    className={`px-4 py-2 rounded-full capitalize text-sm font-medium border transition cursor-pointer ${
+                      genType === type
+                        ? "bg-[#F8934C] text-white border-[#F8934C]"
+                        : dark
+                          ? "bg-slate-800 text-slate-200 border-slate-600 hover:border-[#F8934C]"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-[#F8934C]"
+                    }`}
                   >
                     {type}
                   </button>
@@ -1302,7 +1374,11 @@ function GenIDModal({ role, onClose }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                className={`flex-1 py-2 rounded-lg border transition cursor-pointer ${
+                  dark
+                    ? "border-slate-600 text-slate-300 hover:bg-slate-700"
+                    : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                }`}
               >
                 Cancel
               </button>
@@ -1318,23 +1394,31 @@ function GenIDModal({ role, onClose }) {
           </>
         ) : (
           <>
-            <p className="text-sm text-gray-600">
+            <p
+              className={`text-sm ${dark ? "text-slate-300" : "text-gray-600"}`}
+            >
               Share this PIN with the new{" "}
               <span className="font-semibold capitalize">{genType}</span>:
             </p>
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-3">
-              <span className="flex-1 text-center text-2xl font-mono font-bold tracking-[0.3em] text-gray-800">
+            <div
+              className={`flex items-center gap-2 rounded-lg px-3 py-3 ${dark ? "bg-slate-900" : "bg-gray-100"}`}
+            >
+              <span
+                className={`flex-1 text-center text-2xl font-mono font-bold tracking-[0.3em] ${dark ? "text-slate-100" : "text-gray-800"}`}
+              >
                 {generatedID}
               </span>
               <button
                 type="button"
                 onClick={() => navigator.clipboard.writeText(generatedID)}
-                className="material-symbols-outlined text-gray-500 hover:text-gray-800 transition cursor-pointer text-lg"
+                className={`material-symbols-outlined transition cursor-pointer text-lg ${dark ? "text-slate-400 hover:text-slate-100" : "text-gray-500 hover:text-gray-800"}`}
               >
                 content_copy
               </button>
             </div>
-            <p className="text-xs text-gray-400 text-center -mt-2">
+            <p
+              className={`text-xs text-center -mt-2 ${dark ? "text-slate-500" : "text-gray-400"}`}
+            >
               Expires in 48 hours if not used to register.
             </p>
             <div className="flex gap-3 mt-2">
@@ -1344,7 +1428,11 @@ function GenIDModal({ role, onClose }) {
                   setGeneratedID("");
                   setGenType(allowedTypes[0]);
                 }}
-                className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                className={`flex-1 py-2 rounded-lg border transition cursor-pointer ${
+                  dark
+                    ? "border-slate-600 text-slate-300 hover:bg-slate-700"
+                    : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                }`}
               >
                 Generate Another
               </button>
@@ -1365,6 +1453,9 @@ function GenIDModal({ role, onClose }) {
 
 // ─── Reset Password modal ─────────────────────────────────────────────────────
 function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
+  const s = useSurface();
+  const { mode } = useThemeMode();
+  const dark = mode === "dark";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -1413,15 +1504,18 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
               style={{
                 fontSize: 16,
                 fontWeight: 800,
-                color: "#0f172a",
+                color: s.textPrimary,
                 margin: "0 0 4px",
               }}
             >
               Reset Password
             </h2>
-            <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+            <p style={{ fontSize: 13, color: s.textMuted, margin: 0 }}>
               Send a secure password reset link to{" "}
-              <strong style={{ color: "#0f172a" }}>{targetUser.name}</strong>.
+              <strong style={{ color: s.textPrimary }}>
+                {targetUser.name}
+              </strong>
+              .
             </p>
           </div>
           <button
@@ -1431,7 +1525,7 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
               border: "none",
               cursor: "pointer",
               fontSize: 20,
-              color: "#94a3b8",
+              color: s.textFaint,
               lineHeight: 1,
               padding: "0 0 0 12px",
               flexShrink: 0,
@@ -1443,13 +1537,13 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
 
         <div
           style={{
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
+            background: dark ? "rgba(59,130,246,0.12)" : "#eff6ff",
+            border: `1px solid ${dark ? "rgba(59,130,246,0.35)" : "#bfdbfe"}`,
             borderRadius: 10,
             padding: "10px 14px",
             marginBottom: 18,
             fontSize: 12,
-            color: "#1e40af",
+            color: dark ? "#93c5fd" : "#1e40af",
             lineHeight: 1.6,
           }}
         >
@@ -1460,13 +1554,13 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
 
         <div
           style={{
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
+            background: s.hover,
+            border: `1px solid ${s.border}`,
             borderRadius: 10,
             padding: "12px 14px",
             marginBottom: 16,
             fontSize: 13,
-            color: "#0f172a",
+            color: s.textPrimary,
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 4 }}>
@@ -1478,13 +1572,13 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
         {error && (
           <div
             style={{
-              background: "#fee2e2",
-              border: "1px solid #fca5a5",
+              background: dark ? "rgba(239,68,68,0.12)" : "#fee2e2",
+              border: `1px solid ${dark ? "rgba(239,68,68,0.4)" : "#fca5a5"}`,
               borderRadius: 8,
               padding: "8px 12px",
               marginBottom: 16,
               fontSize: 12,
-              color: "#991b1b",
+              color: dark ? "#fca5a5" : "#991b1b",
             }}
           >
             {error}
@@ -1499,9 +1593,9 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
               flex: 1,
               padding: "10px 0",
               borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#fff",
-              color: "#374151",
+              border: `1px solid ${s.border}`,
+              background: s.card,
+              color: s.textSecondary,
               cursor: "pointer",
               fontSize: 13,
               fontWeight: 600,
@@ -1532,7 +1626,7 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
         <p
           style={{
             fontSize: 11,
-            color: "#94a3b8",
+            color: s.textFaint,
             marginTop: 14,
             textAlign: "center",
             lineHeight: 1.5,
@@ -1548,6 +1642,7 @@ function ResetPasswordModal({ targetUser, onClose, onSuccess }) {
 
 // ─── Access Denied screen ─────────────────────────────────────────────────────
 function AccessDenied({ role }) {
+  const s = useSurface();
   return (
     <div
       style={{
@@ -1555,7 +1650,7 @@ function AccessDenied({ role }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f8fafc",
+        background: s.page,
         padding: 24,
       }}
     >
@@ -1563,7 +1658,7 @@ function AccessDenied({ role }) {
         <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
         <h2
           style={{
-            color: "#0f172a",
+            color: s.textPrimary,
             margin: "0 0 8px",
             fontSize: 20,
             fontWeight: 700,
@@ -1571,15 +1666,15 @@ function AccessDenied({ role }) {
         >
           Access Denied
         </h2>
-        <p style={{ color: "#64748b", fontSize: 14, marginBottom: 8 }}>
+        <p style={{ color: s.textMuted, fontSize: 14, marginBottom: 8 }}>
           You don't have permission to view this page.
         </p>
         {role && (
-          <p style={{ color: "#94a3b8", fontSize: 12 }}>
+          <p style={{ color: s.textFaint, fontSize: 12 }}>
             Your role:{" "}
             <code
               style={{
-                background: "#f1f5f9",
+                background: s.hover,
                 padding: "1px 6px",
                 borderRadius: 4,
               }}
@@ -1599,6 +1694,9 @@ export default function Dashboard({
   homeRedirect,
   dashboardRedirect,
 }) {
+  const { mode } = useThemeMode();
+  const s = SURFACE[mode] || SURFACE.light;
+
   // ── all hooks first — no early returns before this block ─────────────────
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
@@ -1656,7 +1754,7 @@ export default function Dashboard({
     "estate",
     "procurement",
   ].includes(role);
-  const roleTheme = THEMES[role] || {};
+  const roleTheme = getTheme(role || "admin", mode) || THEMES[role] || {};
   const resolvedHomeRedirect =
     homeRedirect ||
     (role === "admin"
@@ -1772,7 +1870,7 @@ export default function Dashboard({
     const active = reports.filter((r) => isActive(r.status)).length;
 
     const byStatus = Object.fromEntries(
-      Object.keys(STATUS_META).map((s) => [s, 0]),
+      Object.keys(STATUS_META).map((s2) => [s2, 0]),
     );
     reports.forEach((r) => {
       if (r.status in byStatus) byStatus[r.status]++;
@@ -1864,7 +1962,7 @@ export default function Dashboard({
       .filter((r) => r.assignedTo && isCleanCompletion(r))
       .map((r) => diffDays(r.dateAccepted, r.dateCompleted));
     const fleetAvgCompletionDays = fleetCleanDurations.length
-      ? fleetCleanDurations.reduce((s, d) => s + d, 0) /
+      ? fleetCleanDurations.reduce((sm, d) => sm + d, 0) /
         fleetCleanDurations.length
       : null;
 
@@ -1901,7 +1999,7 @@ export default function Dashboard({
       );
       const ratingCount = ratedReports.length;
       const ratingSum = ratedReports.reduce(
-        (s, r) => s + r.technicianRating,
+        (sm, r) => sm + r.technicianRating,
         0,
       );
       const avgRating = ratingCount ? ratingSum / ratingCount : null;
@@ -1912,7 +2010,7 @@ export default function Dashboard({
         .map((r) => diffDays(r.dateAccepted, r.dateCompleted));
       const completionCount = cleanDurations.length;
       const avgCompletionDays = completionCount
-        ? cleanDurations.reduce((s, d) => s + d, 0) / completionCount
+        ? cleanDurations.reduce((sm, d) => sm + d, 0) / completionCount
         : null;
 
       return {
@@ -1942,11 +2040,11 @@ export default function Dashboard({
     // Quality (unchanged from before)
     const ratedWorkers = workerStatsRaw.filter((w) => w.ratingCount > 0);
     const ratingC = ratedWorkers.length
-      ? ratedWorkers.reduce((s, w) => s + w.ratingSum, 0) /
-        ratedWorkers.reduce((s, w) => s + w.ratingCount, 0)
+      ? ratedWorkers.reduce((sm, w) => sm + w.ratingSum, 0) /
+        ratedWorkers.reduce((sm, w) => sm + w.ratingCount, 0)
       : 0;
     const ratingM = ratedWorkers.length
-      ? ratedWorkers.reduce((s, w) => s + w.ratingCount, 0) /
+      ? ratedWorkers.reduce((sm, w) => sm + w.ratingCount, 0) /
         ratedWorkers.length
       : 0;
 
@@ -1956,11 +2054,11 @@ export default function Dashboard({
       (w) => w.completedAtLeastOnce > 0,
     );
     const fleetReworkRate = completedWorkers.length
-      ? completedWorkers.reduce((s, w) => s + w.reworked, 0) /
-        completedWorkers.reduce((s, w) => s + w.completedAtLeastOnce, 0)
+      ? completedWorkers.reduce((sm, w) => sm + w.reworked, 0) /
+        completedWorkers.reduce((sm, w) => sm + w.completedAtLeastOnce, 0)
       : 0;
     const reliabilityM = completedWorkers.length
-      ? completedWorkers.reduce((s, w) => s + w.completedAtLeastOnce, 0) /
+      ? completedWorkers.reduce((sm, w) => sm + w.completedAtLeastOnce, 0) /
         completedWorkers.length
       : 0;
 
@@ -1969,7 +2067,7 @@ export default function Dashboard({
     // fleetAvgCompletionDays.
     const timedWorkers = workerStatsRaw.filter((w) => w.completionCount > 0);
     const speedM = timedWorkers.length
-      ? timedWorkers.reduce((s, w) => s + w.completionCount, 0) /
+      ? timedWorkers.reduce((sm, w) => sm + w.completionCount, 0) /
         timedWorkers.length
       : 0;
 
@@ -2041,10 +2139,10 @@ export default function Dashboard({
           },
         ].filter(Boolean);
 
-        const totalWeight = components.reduce((s, c) => s + c.weight, 0);
+        const totalWeight = components.reduce((sm, c) => sm + c.weight, 0);
         const performancePct = totalWeight
           ? Math.round(
-              components.reduce((s, c) => s + c.value * c.weight, 0) /
+              components.reduce((sm, c) => sm + c.value * c.weight, 0) /
                 totalWeight,
             )
           : null;
@@ -2069,13 +2167,6 @@ export default function Dashboard({
       .slice(0, 10);
 
     // ── recent denial reasons (global, not period-scoped) ────────────────
-    // Mirrors the "Recent activity" feed's shape: most-recent-first,
-    // capped at 15. Scoped ONLY to "denied" (incoming → denied) reports —
-    // "costDenied" is a separate flow and intentionally excluded here.
-    // Reads the reason out of the report's `notes` array (written by
-    // ReportDetailsContainer.jsx's handleDeny as a { type: "denial", ... }
-    // entry) via getDenialReasonText/getDenialSortDate above — there is no
-    // top-level `denialReason` field on the report document.
     const recentDenials = [...reports]
       .filter((r) => r.status === "denied")
       .map((r) => ({ ...r, resolvedDenialReason: getDenialReasonText(r) }))
@@ -2138,15 +2229,15 @@ export default function Dashboard({
         (r.maintenanceCost != null && !isNaN(r.maintenanceCost)),
     );
     const totalCost = reportsWithCost.reduce(
-      (s, r) => s + getReportTotalCost(r),
+      (sm, r) => sm + getReportTotalCost(r),
       0,
     );
     const totalMaterialsCost = reportsWithCost.reduce(
-      (s, r) => s + (Number(r.cost) || 0),
+      (sm, r) => sm + (Number(r.cost) || 0),
       0,
     );
     const totalMaintenanceCost = reportsWithCost.reduce(
-      (s, r) => s + (Number(r.maintenanceCost) || 0),
+      (sm, r) => sm + (Number(r.maintenanceCost) || 0),
       0,
     );
     const avgCost = reportsWithCost.length
@@ -2173,7 +2264,7 @@ export default function Dashboard({
       return {
         label: d.toLocaleString("default", { month: "short" }),
         value: monthReportsForTrend.reduce(
-          (s, r) => s + getReportTotalCost(r),
+          (sm, r) => sm + getReportTotalCost(r),
           0,
         ),
       };
@@ -2465,7 +2556,7 @@ export default function Dashboard({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f8fafc",
+          background: s.page,
         }}
       >
         <div style={{ textAlign: "center" }}>
@@ -2480,7 +2571,7 @@ export default function Dashboard({
               animation: "spin 1s linear infinite",
             }}
           />
-          <span style={{ color: "#64748b", fontSize: 14 }}>
+          <span style={{ color: s.textMuted, fontSize: 14 }}>
             Loading dashboard…
           </span>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -2490,7 +2581,7 @@ export default function Dashboard({
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh" }}>
+    <div style={{ minHeight: "100vh", background: s.page }}>
       {showGenID && (
         <GenIDModal role={role} onClose={() => setShowGenID(false)} />
       )}
@@ -2591,7 +2682,7 @@ export default function Dashboard({
               style={{
                 fontSize: 22,
                 fontWeight: 800,
-                color: "#0f172a",
+                color: s.textPrimary,
                 margin: "0 0 12px",
                 lineHeight: 1.25,
               }}
@@ -2623,8 +2714,8 @@ export default function Dashboard({
                         position: "absolute",
                         top: "calc(100% + 8px)",
                         left: 0,
-                        background: "#fff",
-                        border: "1px solid #e2e8f0",
+                        background: s.card,
+                        border: `1px solid ${s.border}`,
                         borderRadius: 12,
                         padding: 12,
                         boxShadow: "0 10px 30px rgba(15,23,42,.12)",
@@ -2637,7 +2728,7 @@ export default function Dashboard({
                           display: "block",
                           fontSize: 11,
                           fontWeight: 700,
-                          color: "#64748b",
+                          color: s.textMuted,
                           marginBottom: 8,
                           textTransform: "uppercase",
                           letterSpacing: ".06em",
@@ -2652,11 +2743,12 @@ export default function Dashboard({
                           width: "100%",
                           padding: "10px 12px",
                           borderRadius: 10,
-                          border: "1px solid #cbd5e1",
+                          border: `1px solid ${s.border}`,
                           outline: "none",
                           fontSize: 13,
                           marginBottom: 10,
-                          background: "#f8fafc",
+                          background: s.hover,
+                          color: s.textPrimary,
                         }}
                       >
                         <option value="month">Current month</option>
@@ -2687,7 +2779,7 @@ export default function Dashboard({
               gap: 6,
             }}
           >
-            <span style={{ fontSize: 12, color: "#94a3b8" }}>
+            <span style={{ fontSize: 12, color: s.textFaint }}>
               {new Date().toLocaleDateString("en-GB", {
                 weekday: "long",
                 day: "numeric",
@@ -2704,9 +2796,9 @@ export default function Dashboard({
                 gap: 6,
                 fontSize: 11,
                 fontWeight: 700,
-                color: isRefreshing ? "#cbd5e1" : "#64748b",
+                color: isRefreshing ? s.textFaint : s.textMuted,
                 background: "none",
-                border: "1px solid #e2e8f0",
+                border: `1px solid ${s.border}`,
                 borderRadius: 999,
                 padding: "5px 12px",
                 cursor: isRefreshing ? "not-allowed" : "pointer",
@@ -2787,7 +2879,7 @@ export default function Dashboard({
           </InlineNotice>
         )}
 
-        {/* 4. Overdue breakdown by priority — a global "is anything on fire"
+        {/* Overdue breakdown by priority — a global "is anything on fire"
             banner, independent of the Overview period selector. */}
         <EmergencyOverdueBanner
           count={stats.periodStats.overall.overdueByPriority.emergency}
@@ -2797,7 +2889,7 @@ export default function Dashboard({
         <div
           style={{
             overflowX: "auto",
-            borderBottom: "2px solid #e2e8f0",
+            borderBottom: `2px solid ${s.border}`,
             marginBottom: 24,
             WebkitOverflowScrolling: "touch",
           }}
@@ -2816,7 +2908,7 @@ export default function Dashboard({
                     activeTab === tab
                       ? "2.5px solid #ef4444"
                       : "2.5px solid transparent",
-                  color: activeTab === tab ? "#ef4444" : "#6b7280",
+                  color: activeTab === tab ? "#ef4444" : s.textMuted,
                   marginBottom: -2,
                   textTransform: "capitalize",
                 }}
@@ -2933,9 +3025,9 @@ export default function Dashboard({
                 accent="#f43f5e"
                 sub="Awaiting reassignment"
               />
-              {/* New: current count of reports sitting in "dropped" — a
-                  worker accepted the job, then couldn't finish it. Distinct
-                  from "Declined" (rejected before ever being accepted). */}
+              {/* Current count of reports sitting in "dropped" — a worker
+                  accepted the job, then couldn't finish it. Distinct from
+                  "Declined" (rejected before ever being accepted). */}
               <StatCard
                 label="Jobs Dropped by Worker"
                 value={displayStats.droppedJobs ?? 0}
@@ -2945,10 +3037,6 @@ export default function Dashboard({
               />
             </div>
 
-            {/* 1. Denial rate & 3. reassignment rate & 6. first-time-fix
-                rate — three quality/risk signals grouped together since
-                they're all "how well is the pipeline working", distinct
-                from the raw lifecycle counts above. */}
             <SectionTitle>Quality &amp; risk</SectionTitle>
             <div className="kpi-3" style={{ marginBottom: 20 }}>
               <StatCard
@@ -2978,10 +3066,6 @@ export default function Dashboard({
               />
             </div>
 
-            {/* 1. Recent denial reasons — global feed, not period-scoped,
-                so it always shows the most recent activity regardless of
-                which Overview period is selected. Scoped to "denied"
-                (incoming → denied) only. */}
             <SectionTitle>Recent denial reasons</SectionTitle>
             <Card style={{ padding: "4px 20px 8px", marginBottom: 20 }}>
               {stats.recentDenials.length === 0 ? (
@@ -2989,7 +3073,7 @@ export default function Dashboard({
                   style={{
                     textAlign: "center",
                     padding: "32px 0",
-                    color: "#94a3b8",
+                    color: s.textFaint,
                     fontSize: 13,
                   }}
                 >
@@ -3003,7 +3087,7 @@ export default function Dashboard({
                       padding: "12px 0",
                       borderBottom:
                         i < stats.recentDenials.length - 1
-                          ? "1px solid #f1f5f9"
+                          ? `1px solid ${s.cardBorder}`
                           : "none",
                     }}
                   >
@@ -3020,7 +3104,7 @@ export default function Dashboard({
                         style={{
                           fontSize: 12,
                           fontWeight: 700,
-                          color: "#0f172a",
+                          color: s.textPrimary,
                         }}
                       >
                         {r.reporter || "Unknown reporter"} · {r.category}
@@ -3036,7 +3120,7 @@ export default function Dashboard({
                       style={{
                         margin: 0,
                         fontSize: 12,
-                        color: "#64748b",
+                        color: s.textMuted,
                         lineHeight: 1.5,
                       }}
                     >
@@ -3047,9 +3131,6 @@ export default function Dashboard({
               )}
             </Card>
 
-            {/* 4. Overdue breakdown by priority — split out of the single
-                "Overdue" number above so an overdue emergency doesn't get
-                flattened together with an overdue routine job. */}
             <SectionTitle>Overdue by priority</SectionTitle>
             <div className="kpi-3" style={{ marginBottom: 20 }}>
               {Object.entries(displayStats.overdueByPriority).map(([k, v]) => {
@@ -3112,7 +3193,7 @@ export default function Dashboard({
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
-                          background: m?.bg ?? "#f1f5f9",
+                          background: m?.bg ?? s.hover,
                           borderRadius: 10,
                           padding: "10px 14px",
                           flex: "1 1 120px",
@@ -3124,7 +3205,7 @@ export default function Dashboard({
                             width: 8,
                             height: 8,
                             borderRadius: "50%",
-                            background: m?.color ?? "#94a3b8",
+                            background: m?.color ?? s.textFaint,
                             flexShrink: 0,
                           }}
                         />
@@ -3132,7 +3213,7 @@ export default function Dashboard({
                           <div
                             style={{
                               fontSize: 10,
-                              color: m?.text ?? "#374151",
+                              color: m?.text ?? s.textSecondary,
                               fontWeight: 700,
                               textTransform: "uppercase",
                               letterSpacing: ".04em",
@@ -3147,7 +3228,7 @@ export default function Dashboard({
                             style={{
                               fontSize: 20,
                               fontWeight: 800,
-                              color: m?.text ?? "#0f172a",
+                              color: m?.text ?? s.textPrimary,
                               lineHeight: 1.2,
                             }}
                           >
@@ -3168,7 +3249,7 @@ export default function Dashboard({
                   style={{
                     fontSize: 11,
                     fontWeight: 800,
-                    color: "#9ca3af",
+                    color: s.textFaint,
                     textTransform: "uppercase",
                     letterSpacing: ".07em",
                     margin: "0 0 16px",
@@ -3214,7 +3295,11 @@ export default function Dashboard({
                           }}
                         />
                         <span
-                          style={{ fontSize: 13, color: "#4b5563", flex: 1 }}
+                          style={{
+                            fontSize: 13,
+                            color: s.textSecondary,
+                            flex: 1,
+                          }}
                         >
                           {PRIORITY_META[k].label}
                         </span>
@@ -3222,7 +3307,7 @@ export default function Dashboard({
                           style={{
                             fontSize: 14,
                             fontWeight: 800,
-                            color: "#0f172a",
+                            color: s.textPrimary,
                           }}
                         >
                           {v}
@@ -3237,7 +3322,7 @@ export default function Dashboard({
                   style={{
                     fontSize: 11,
                     fontWeight: 800,
-                    color: "#9ca3af",
+                    color: s.textFaint,
                     textTransform: "uppercase",
                     letterSpacing: ".07em",
                     margin: "0 0 16px",
@@ -3254,23 +3339,19 @@ export default function Dashboard({
                     height={100}
                   />
                 ) : (
-                  <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                  <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
                     No data yet.
                   </p>
                 )}
               </Card>
             </div>
 
-            {/* 2. Pipeline stage duration — where jobs actually spend
-                their time, broken into the four main handoffs, so a
-                bottleneck ("materials confirmation is slow") shows up
-                directly instead of hiding inside one end-to-end average. */}
             <SectionTitle>Pipeline stage duration</SectionTitle>
             <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
-              {displayStats.stageDurations.some((s) => s.days != null) ? (
+              {displayStats.stageDurations.some((st) => st.days != null) ? (
                 (() => {
                   const maxDays = Math.max(
-                    ...displayStats.stageDurations.map((s) => s.days ?? 0),
+                    ...displayStats.stageDurations.map((st) => st.days ?? 0),
                     0.0001,
                   );
                   return (
@@ -3281,15 +3362,15 @@ export default function Dashboard({
                         gap: 12,
                       }}
                     >
-                      {displayStats.stageDurations.map((s) => {
+                      {displayStats.stageDurations.map((st) => {
                         const isBottleneck =
-                          s.days != null && s.days === maxDays;
+                          st.days != null && st.days === maxDays;
                         const pct =
-                          s.days != null
-                            ? Math.round((s.days / maxDays) * 100)
+                          st.days != null
+                            ? Math.round((st.days / maxDays) * 100)
                             : 0;
                         return (
-                          <div key={s.label}>
+                          <div key={st.label}>
                             <div
                               style={{
                                 display: "flex",
@@ -3303,10 +3384,10 @@ export default function Dashboard({
                                 style={{
                                   fontSize: 12,
                                   fontWeight: 600,
-                                  color: "#374151",
+                                  color: s.textSecondary,
                                 }}
                               >
-                                {s.label}
+                                {st.label}
                                 {isBottleneck && (
                                   <span
                                     style={{
@@ -3326,19 +3407,21 @@ export default function Dashboard({
                               <span
                                 style={{
                                   fontSize: 12,
-                                  color: "#64748b",
+                                  color: s.textMuted,
                                   fontFamily: "monospace",
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                {s.days != null ? `${s.days.toFixed(1)}d` : "—"}
+                                {st.days != null
+                                  ? `${st.days.toFixed(1)}d`
+                                  : "—"}
                               </span>
                             </div>
                             <div
                               style={{
                                 height: 5,
                                 borderRadius: 999,
-                                background: "#f1f5f9",
+                                background: s.hover,
                               }}
                             >
                               <div
@@ -3360,14 +3443,12 @@ export default function Dashboard({
                   );
                 })()
               ) : (
-                <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
                   No stage timing data yet.
                 </p>
               )}
             </Card>
 
-            {/* 5. Location hotspots — recurring problem areas, not just
-                one-off repairs. */}
             <SectionTitle>Location hotspots</SectionTitle>
             <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
               {displayStats.topLocations.length > 0 ? (
@@ -3392,7 +3473,7 @@ export default function Dashboard({
                             style={{
                               fontSize: 12,
                               fontWeight: 600,
-                              color: "#374151",
+                              color: s.textSecondary,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -3400,7 +3481,7 @@ export default function Dashboard({
                           >
                             {loc.location}
                           </span>
-                          <span style={{ fontSize: 12, color: "#64748b" }}>
+                          <span style={{ fontSize: 12, color: s.textMuted }}>
                             {loc.count}
                           </span>
                         </div>
@@ -3408,7 +3489,7 @@ export default function Dashboard({
                           style={{
                             height: 5,
                             borderRadius: 999,
-                            background: "#f1f5f9",
+                            background: s.hover,
                           }}
                         >
                           <div
@@ -3426,7 +3507,7 @@ export default function Dashboard({
                   })}
                 </div>
               ) : (
-                <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
                   No location data yet.
                 </p>
               )}
@@ -3494,7 +3575,7 @@ export default function Dashboard({
                   style={{
                     fontSize: 11,
                     fontWeight: 800,
-                    color: "#9ca3af",
+                    color: s.textFaint,
                     textTransform: "uppercase",
                     letterSpacing: ".07em",
                     margin: "0 0 16px",
@@ -3512,7 +3593,7 @@ export default function Dashboard({
                     height={120}
                   />
                 ) : (
-                  <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                  <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
                     No cost data yet.
                   </p>
                 )}
@@ -3522,7 +3603,7 @@ export default function Dashboard({
                   style={{
                     fontSize: 11,
                     fontWeight: 800,
-                    color: "#9ca3af",
+                    color: s.textFaint,
                     textTransform: "uppercase",
                     letterSpacing: ".07em",
                     margin: "0 0 16px",
@@ -3557,7 +3638,7 @@ export default function Dashboard({
                               <span
                                 style={{
                                   fontSize: 12,
-                                  color: "#374151",
+                                  color: s.textSecondary,
                                   fontWeight: 600,
                                 }}
                               >
@@ -3566,7 +3647,7 @@ export default function Dashboard({
                               <span
                                 style={{
                                   fontSize: 12,
-                                  color: "#64748b",
+                                  color: s.textMuted,
                                   fontFamily: "monospace",
                                 }}
                               >
@@ -3575,7 +3656,7 @@ export default function Dashboard({
                                   maximumFractionDigits: 0,
                                 })}
                                 <span
-                                  style={{ color: "#9ca3af", marginLeft: 6 }}
+                                  style={{ color: s.textFaint, marginLeft: 6 }}
                                 >
                                   {pct}%
                                 </span>
@@ -3585,7 +3666,7 @@ export default function Dashboard({
                               style={{
                                 height: 5,
                                 borderRadius: 999,
-                                background: "#f1f5f9",
+                                background: s.hover,
                               }}
                             >
                               <div
@@ -3603,7 +3684,7 @@ export default function Dashboard({
                       })}
                   </div>
                 ) : (
-                  <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                  <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
                     No cost data yet.
                   </p>
                 )}
@@ -3615,7 +3696,7 @@ export default function Dashboard({
                 style={{
                   fontSize: 11,
                   fontWeight: 800,
-                  color: "#9ca3af",
+                  color: s.textFaint,
                   textTransform: "uppercase",
                   letterSpacing: ".07em",
                   margin: "0 0 16px",
@@ -3691,20 +3772,20 @@ export default function Dashboard({
                     <tr
                       key={r.id}
                       style={{
-                        borderBottom: "1px solid #f1f5f9",
-                        background: i % 2 ? "#fafafa" : "#fff",
+                        borderBottom: `1px solid ${s.cardBorder}`,
+                        background: i % 2 ? s.rowAlt : s.card,
                       }}
                     >
                       <td
                         style={{
                           padding: "11px 14px",
                           fontWeight: 600,
-                          color: "#0f172a",
+                          color: s.textPrimary,
                         }}
                       >
                         {r.reporter}
                       </td>
-                      <td style={{ padding: "11px 14px", color: "#64748b" }}>
+                      <td style={{ padding: "11px 14px", color: s.textMuted }}>
                         {r.category}
                       </td>
                       <td style={{ padding: "11px 14px" }}>
@@ -3745,7 +3826,7 @@ export default function Dashboard({
                       <td
                         style={{
                           padding: "11px 14px",
-                          color: "#94a3b8",
+                          color: s.textFaint,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -3768,7 +3849,7 @@ export default function Dashboard({
                 style={{
                   textAlign: "center",
                   padding: "48px 0",
-                  color: "#94a3b8",
+                  color: s.textFaint,
                 }}
               >
                 No reports yet.
@@ -3785,7 +3866,7 @@ export default function Dashboard({
             {stats.workerStats.length === 0 ? (
               <p
                 style={{
-                  color: "#94a3b8",
+                  color: s.textFaint,
                   textAlign: "center",
                   padding: "60px 0",
                 }}
@@ -3802,11 +3883,6 @@ export default function Dashboard({
               </div>
             )}
 
-            {/* Average resolution time — pulled out of the leaderboard rows
-                into its own section. Keeping it here (rather than crammed
-                into each card's metrics row) is what lets the leaderboard
-                stay a compact, mobile-friendly grid instead of overflowing
-                a wide row on narrow screens. */}
             <SectionTitle>Average resolution time</SectionTitle>
             <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
               {timedWorkerStats.length > 0 ? (
@@ -3834,7 +3910,7 @@ export default function Dashboard({
                             style={{
                               fontSize: 12,
                               fontWeight: 600,
-                              color: "#374151",
+                              color: s.textSecondary,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -3845,13 +3921,13 @@ export default function Dashboard({
                           <span
                             style={{
                               fontSize: 12,
-                              color: "#64748b",
+                              color: s.textMuted,
                               fontFamily: "monospace",
                               whiteSpace: "nowrap",
                             }}
                           >
                             {w.avgCompletionDays.toFixed(1)}d
-                            <span style={{ color: "#9ca3af", marginLeft: 6 }}>
+                            <span style={{ color: s.textFaint, marginLeft: 6 }}>
                               · {w.completionCount} timed
                             </span>
                           </span>
@@ -3860,7 +3936,7 @@ export default function Dashboard({
                           style={{
                             height: 5,
                             borderRadius: 999,
-                            background: "#f1f5f9",
+                            background: s.hover,
                           }}
                         >
                           <div
@@ -3878,7 +3954,7 @@ export default function Dashboard({
                   })}
                 </div>
               ) : (
-                <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
                   No timing data yet.
                 </p>
               )}
@@ -3887,7 +3963,7 @@ export default function Dashboard({
             <SectionTitle>Category demand</SectionTitle>
             <Card style={{ padding: "18px 20px" }}>
               {Object.keys(stats.catCount).length === 0 ? (
-                <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
+                <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
                   No data yet.
                 </p>
               ) : (
@@ -3930,7 +4006,7 @@ export default function Dashboard({
                   style={{
                     textAlign: "center",
                     padding: "48px 0",
-                    color: "#94a3b8",
+                    color: s.textFaint,
                   }}
                 >
                   No activity yet.
@@ -3949,7 +4025,7 @@ export default function Dashboard({
                         padding: "14px 0",
                         borderBottom:
                           i < stats.recent.length - 1
-                            ? "1px solid #f1f5f9"
+                            ? `1px solid ${s.cardBorder}`
                             : "none",
                       }}
                     >
@@ -3967,14 +4043,14 @@ export default function Dashboard({
                             width: 9,
                             height: 9,
                             borderRadius: "50%",
-                            background: sm?.color ?? "#94a3b8",
+                            background: sm?.color ?? s.textFaint,
                           }}
                         />
                         {i < stats.recent.length - 1 && (
                           <div
                             style={{
                               width: 1,
-                              background: "#e2e8f0",
+                              background: s.border,
                               flex: 1,
                               minHeight: 20,
                               marginTop: 4,
@@ -3992,8 +4068,10 @@ export default function Dashboard({
                             flexWrap: "wrap",
                           }}
                         >
-                          <div style={{ fontSize: 13, color: "#374151" }}>
-                            <span style={{ fontWeight: 700, color: "#0f172a" }}>
+                          <div style={{ fontSize: 13, color: s.textSecondary }}>
+                            <span
+                              style={{ fontWeight: 700, color: s.textPrimary }}
+                            >
                               {r.reporter}
                             </span>
                             {" submitted a "}
@@ -4005,7 +4083,7 @@ export default function Dashboard({
                           <span
                             style={{
                               fontSize: 11,
-                              color: "#94a3b8",
+                              color: s.textFaint,
                               whiteSpace: "nowrap",
                             }}
                           >
@@ -4041,7 +4119,7 @@ export default function Dashboard({
                             style={{
                               margin: "6px 0 0",
                               fontSize: 12,
-                              color: "#94a3b8",
+                              color: s.textFaint,
                               lineHeight: 1.5,
                             }}
                           >
@@ -4155,8 +4233,8 @@ export default function Dashboard({
                               height: 38,
                               borderRadius: "50%",
                               flexShrink: 0,
-                              background: (rm?.color ?? "#94a3b8") + "20",
-                              color: rm?.color ?? "#94a3b8",
+                              background: (rm?.color ?? s.textFaint) + "20",
+                              color: rm?.color ?? s.textFaint,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
@@ -4171,7 +4249,7 @@ export default function Dashboard({
                               style={{
                                 fontWeight: 700,
                                 fontSize: 13,
-                                color: "#0f172a",
+                                color: s.textPrimary,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
@@ -4182,7 +4260,7 @@ export default function Dashboard({
                             <div
                               style={{
                                 fontSize: 11,
-                                color: "#94a3b8",
+                                color: s.textFaint,
                                 marginTop: 2,
                               }}
                             >
@@ -4220,9 +4298,9 @@ export default function Dashboard({
                   padding: "9px 14px",
                   borderRadius: 10,
                   fontSize: 13,
-                  border: "1px solid #e2e8f0",
-                  background: "#fff",
-                  color: "#0f172a",
+                  border: `1px solid ${s.border}`,
+                  background: s.card,
+                  color: s.textPrimary,
                   outline: "none",
                   minWidth: 0,
                 }}
@@ -4240,9 +4318,9 @@ export default function Dashboard({
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: "pointer",
-                        border: `1px solid ${active ? "#ef4444" : "#e2e8f0"}`,
-                        background: active ? "#fef2f2" : "#fff",
-                        color: active ? "#ef4444" : "#6b7280",
+                        border: `1px solid ${active ? "#ef4444" : s.border}`,
+                        background: active ? "#fef2f2" : s.card,
+                        color: active ? "#ef4444" : s.textMuted,
                       }}
                     >
                       {r === "all" ? "All" : (ROLE_META[r]?.label ?? r)}
@@ -4270,14 +4348,14 @@ export default function Dashboard({
                   const self = isSelf(u);
                   const canAct = canActOnUser(u);
                   const rowBg = u.deactivated
-                    ? "#fafafa"
+                    ? s.rowAlt
                     : i % 2
-                      ? "#fafafa"
-                      : "#fff";
+                      ? s.rowAlt
+                      : s.card;
                   return (
                     <tr
                       key={u.id}
-                      style={{ borderBottom: "1px solid #f1f5f9" }}
+                      style={{ borderBottom: `1px solid ${s.cardBorder}` }}
                     >
                       {/* Name */}
                       <td style={{ padding: "11px 14px", background: rowBg }}>
@@ -4295,11 +4373,11 @@ export default function Dashboard({
                               borderRadius: "50%",
                               flexShrink: 0,
                               background: u.deactivated
-                                ? "#f1f5f9"
-                                : (rm?.color ?? "#94a3b8") + "20",
+                                ? s.hover
+                                : (rm?.color ?? s.textFaint) + "20",
                               color: u.deactivated
-                                ? "#94a3b8"
-                                : (rm?.color ?? "#94a3b8"),
+                                ? s.textFaint
+                                : (rm?.color ?? s.textFaint),
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
@@ -4312,7 +4390,9 @@ export default function Dashboard({
                           <span
                             style={{
                               fontWeight: 600,
-                              color: u.deactivated ? "#94a3b8" : "#0f172a",
+                              color: u.deactivated
+                                ? s.textFaint
+                                : s.textPrimary,
                               fontSize: 13,
                             }}
                           >
@@ -4322,7 +4402,7 @@ export default function Dashboard({
                                 style={{
                                   marginLeft: 5,
                                   fontSize: 10,
-                                  color: "#94a3b8",
+                                  color: s.textFaint,
                                 }}
                               >
                                 (you)
@@ -4345,7 +4425,7 @@ export default function Dashboard({
                       <td
                         style={{
                           padding: "11px 14px",
-                          color: "#64748b",
+                          color: s.textMuted,
                           background: rowBg,
                           maxWidth: 160,
                           overflow: "hidden",
@@ -4359,7 +4439,7 @@ export default function Dashboard({
                       <td
                         style={{
                           padding: "11px 14px",
-                          color: "#64748b",
+                          color: s.textMuted,
                           background: rowBg,
                           whiteSpace: "nowrap",
                         }}
@@ -4370,7 +4450,7 @@ export default function Dashboard({
                       <td
                         style={{
                           padding: "11px 14px",
-                          color: "#94a3b8",
+                          color: s.textFaint,
                           background: rowBg,
                           whiteSpace: "nowrap",
                         }}
@@ -4463,14 +4543,14 @@ export default function Dashboard({
                           <span
                             style={{
                               fontSize: 11,
-                              color: "#cbd5e1",
+                              color: s.textFaint,
                               fontStyle: "italic",
                             }}
                           >
                             You
                           </span>
                         ) : (
-                          <span style={{ fontSize: 11, color: "#cbd5e1" }}>
+                          <span style={{ fontSize: 11, color: s.textFaint }}>
                             —
                           </span>
                         )}
@@ -4493,7 +4573,7 @@ export default function Dashboard({
                 style={{
                   textAlign: "center",
                   padding: "48px 0",
-                  color: "#94a3b8",
+                  color: s.textFaint,
                 }}
               >
                 {userSearch || userFilter !== "all"

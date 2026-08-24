@@ -36,6 +36,10 @@ import {
 const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
 
 // ─── Status / priority presentation ────────────────────────────────────────
+// Kept as fixed light-pastel chip colors across both themes — these are
+// semantic status/priority indicators, not surface chrome, and stay
+// legible and recognizable on a dark card the same way a colored label
+// chip does in most dashboards.
 const STATUS_CONFIG = {
   incoming: {
     label: "Incoming",
@@ -128,28 +132,34 @@ function PriorityBadge({ level }) {
 
 // Small label/value pair used in the compact info grid. Renders nothing if
 // there's no value, so the grid never shows empty cells.
-function InfoItem({ label, children }) {
+function InfoItem({ label, children, theme }) {
   if (children === null || children === undefined || children === "")
     return null;
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+      <span
+        className={`text-[11px] font-medium uppercase tracking-wide ${theme.surfaceHint}`}
+      >
         {label}
       </span>
-      <div className="text-sm md:text-base text-gray-800 font-medium break-words">
+      <div
+        className={`text-sm md:text-base font-medium break-words ${theme.detailsValueColor}`}
+      >
         {children}
       </div>
     </div>
   );
 }
 
-function SectionCard({ title, children, innerRef }) {
+function SectionCard({ title, children, innerRef, theme }) {
   return (
     <div
       ref={innerRef}
-      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3"
+      className={`rounded-xl shadow-sm p-5 space-y-3 ${theme.surfaceBg}`}
     >
-      {title && <h3 className="font-bold text-gray-800">{title}</h3>}
+      {title && (
+        <h3 className={`font-bold ${theme.surfaceHeading}`}>{title}</h3>
+      )}
       {children}
     </div>
   );
@@ -157,17 +167,21 @@ function SectionCard({ title, children, innerRef }) {
 
 // Actions get a distinct visual treatment (accent bar) so it's obvious
 // what needs input from *this* viewer vs. what's just read-only history.
-function ActionSection({ innerRef, title, hint, children }) {
+function ActionSection({ innerRef, title, hint, children, theme }) {
   return (
     <div
       ref={innerRef}
-      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4"
+      className={`rounded-xl shadow-sm p-5 space-y-4 ${theme.surfaceBg}`}
     >
       <div className="flex items-start gap-3">
         <span className="mt-1 w-1.5 h-5 rounded-full bg-red-400 shrink-0" />
         <div>
-          <h3 className="font-bold text-gray-800 leading-tight">{title}</h3>
-          {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
+          <h3 className={`font-bold leading-tight ${theme.surfaceHeading}`}>
+            {title}
+          </h3>
+          {hint && (
+            <p className={`text-xs mt-1 ${theme.surfaceHint}`}>{hint}</p>
+          )}
         </div>
       </div>
       {children}
@@ -258,11 +272,14 @@ function buildTimelineEntries(report) {
   return entries.sort((a, b) => toMillis(a.date) - toMillis(b.date));
 }
 
-function Timeline({ entries }) {
+function Timeline({ entries, theme }) {
   if (!entries.length) return null;
+  const dark = theme.mode === "dark";
   return (
     <div className="relative pl-6">
-      <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gray-200" />
+      <div
+        className={`absolute left-[7px] top-1 bottom-1 w-px ${theme.timelineLine}`}
+      />
       <div className="space-y-5">
         {entries.map((e, i) => (
           <div key={i} className="relative">
@@ -276,8 +293,10 @@ function Timeline({ entries }) {
               }`}
             />
             <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-              <p className="text-sm font-semibold text-gray-800">{e.label}</p>
-              <p className="text-xs text-gray-400 whitespace-nowrap">
+              <p className={`text-sm font-semibold ${theme.detailsValueColor}`}>
+                {e.label}
+              </p>
+              <p className={`text-xs whitespace-nowrap ${theme.surfaceHint}`}>
                 {formatDate(e.date)}
               </p>
             </div>
@@ -285,10 +304,14 @@ function Timeline({ entries }) {
               <p
                 className={`text-sm mt-1 rounded-lg px-3 py-2 ${
                   e.tone === "danger"
-                    ? "bg-red-50 text-red-700"
+                    ? dark
+                      ? "bg-red-500/10 text-red-300"
+                      : "bg-red-50 text-red-700"
                     : e.tone === "warning"
-                      ? "bg-orange-50 text-orange-700"
-                      : "bg-gray-50 text-gray-600"
+                      ? dark
+                        ? "bg-orange-500/10 text-orange-300"
+                        : "bg-orange-50 text-orange-700"
+                      : `${theme.tableAltRowBg} ${theme.tableMutedText}`
                 }`}
               >
                 {e.note}
@@ -428,8 +451,15 @@ function getScrollTarget(user, report, refs) {
 
 // Read-only star display for the technician rating, so any role viewing
 // this panel (not just the staff member who submitted it) can see it.
-function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
+function StarRating({
+  value,
+  onChange,
+  readOnly = false,
+  size = "text-2xl",
+  theme,
+}) {
   const [hovered, setHovered] = useState(0);
+  const dark = theme?.mode === "dark";
   return (
     <div
       className="flex gap-1"
@@ -450,7 +480,7 @@ function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
             onMouseLeave={() => setHovered(0)}
             className={`${size} leading-none p-0 bg-transparent border-0 select-none transition-transform ${
               readOnly ? "cursor-default" : "cursor-pointer hover:scale-110"
-            } ${filled ? "text-yellow-400" : "text-gray-300"}`}
+            } ${filled ? "text-yellow-400" : dark ? "text-slate-600" : "text-gray-300"}`}
           >
             ★
           </button>
@@ -460,7 +490,7 @@ function StarRating({ value, onChange, readOnly = false, size = "text-2xl" }) {
   );
 }
 
-function MaterialsTable({ materials, onChange, readOnly = false }) {
+function MaterialsTable({ materials, onChange, readOnly = false, theme }) {
   const addRow = () => onChange([...materials, { ...EMPTY_MATERIAL }]);
   const removeRow = (idx) => onChange(materials.filter((_, i) => i !== idx));
   const updateCell = (idx, field, value) => {
@@ -473,20 +503,28 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
   if (readOnly) {
     if (!materials || materials.length === 0) return null;
     return (
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className={`overflow-x-auto rounded-lg border ${theme.tableBorder}`}>
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-50 text-gray-600">
-              <th className="border-b border-gray-200 px-3 py-2 text-left w-10">
+            <tr className={theme.tableHeaderBg}>
+              <th
+                className={`border-b ${theme.tableBorder} px-3 py-2 text-left w-10`}
+              >
                 S/N
               </th>
-              <th className="border-b border-gray-200 px-3 py-2 text-left">
+              <th
+                className={`border-b ${theme.tableBorder} px-3 py-2 text-left`}
+              >
                 Description
               </th>
-              <th className="border-b border-gray-200 px-3 py-2 text-left w-24">
+              <th
+                className={`border-b ${theme.tableBorder} px-3 py-2 text-left w-24`}
+              >
                 Qty
               </th>
-              <th className="border-b border-gray-200 px-3 py-2 text-left w-36">
+              <th
+                className={`border-b ${theme.tableBorder} px-3 py-2 text-left w-36`}
+              >
                 Spec / Size
               </th>
             </tr>
@@ -495,18 +533,28 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
             {materials.map((row, idx) => (
               <tr
                 key={idx}
-                className={idx % 2 === 1 ? "bg-gray-50" : "bg-white"}
+                className={
+                  idx % 2 === 1 ? theme.tableAltRowBg : theme.tableRowBg
+                }
               >
-                <td className="border-b border-gray-100 px-3 py-2 text-center text-gray-400">
+                <td
+                  className={`border-b ${theme.tableCellBorder} px-3 py-2 text-center ${theme.tableMutedText}`}
+                >
                   {idx + 1}
                 </td>
-                <td className="border-b border-gray-100 px-3 py-2 text-gray-800 font-medium">
+                <td
+                  className={`border-b ${theme.tableCellBorder} px-3 py-2 ${theme.tableCellText} font-medium`}
+                >
                   {row.description}
                 </td>
-                <td className="border-b border-gray-100 px-3 py-2 text-gray-800 text-center">
+                <td
+                  className={`border-b ${theme.tableCellBorder} px-3 py-2 ${theme.tableCellText} text-center`}
+                >
                   {row.quantity}
                 </td>
-                <td className="border-b border-gray-100 px-3 py-2 text-gray-800">
+                <td
+                  className={`border-b ${theme.tableCellBorder} px-3 py-2 ${theme.tableCellText}`}
+                >
                   {row.specification}
                 </td>
               </tr>
@@ -519,32 +567,44 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
 
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className={`overflow-x-auto rounded-lg border ${theme.tableBorder}`}>
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-50 text-gray-600">
-              <th className="border-b border-gray-200 px-2 py-2 text-left w-10">
+            <tr className={theme.tableHeaderBg}>
+              <th
+                className={`border-b ${theme.tableBorder} px-2 py-2 text-left w-10`}
+              >
                 S/N
               </th>
-              <th className="border-b border-gray-200 px-2 py-2 text-left">
+              <th
+                className={`border-b ${theme.tableBorder} px-2 py-2 text-left`}
+              >
                 Description
               </th>
-              <th className="border-b border-gray-200 px-2 py-2 text-left w-24">
+              <th
+                className={`border-b ${theme.tableBorder} px-2 py-2 text-left w-24`}
+              >
                 Qty
               </th>
-              <th className="border-b border-gray-200 px-2 py-2 text-left w-36">
+              <th
+                className={`border-b ${theme.tableBorder} px-2 py-2 text-left w-36`}
+              >
                 Spec / Size
               </th>
-              <th className="border-b border-gray-200 px-2 py-2 w-10"></th>
+              <th
+                className={`border-b ${theme.tableBorder} px-2 py-2 w-10`}
+              ></th>
             </tr>
           </thead>
           <tbody>
             {materials.map((row, idx) => (
               <tr key={idx}>
-                <td className="border-b border-gray-100 px-2 py-1 text-center text-gray-400 text-xs">
+                <td
+                  className={`border-b ${theme.tableCellBorder} px-2 py-1 text-center ${theme.tableMutedText} text-xs`}
+                >
                   {idx + 1}
                 </td>
-                <td className="border-b border-gray-100 px-1 py-1">
+                <td className={`border-b ${theme.tableCellBorder} px-1 py-1`}>
                   <input
                     type="text"
                     placeholder="e.g. Silicone"
@@ -552,10 +612,10 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
                     onChange={(e) =>
                       updateCell(idx, "description", e.target.value)
                     }
-                    className="w-full px-2 py-1.5 text-sm outline-none bg-transparent rounded focus:bg-blue-50"
+                    className={`w-full px-2 py-1.5 text-sm outline-none bg-transparent rounded ${theme.tableCellText}`}
                   />
                 </td>
-                <td className="border-b border-gray-100 px-1 py-1">
+                <td className={`border-b ${theme.tableCellBorder} px-1 py-1`}>
                   <input
                     type="number"
                     placeholder="0"
@@ -563,10 +623,10 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
                     onChange={(e) =>
                       updateCell(idx, "quantity", e.target.value)
                     }
-                    className="w-full px-2 py-1.5 text-sm outline-none bg-transparent text-center rounded focus:bg-blue-50"
+                    className={`w-full px-2 py-1.5 text-sm outline-none bg-transparent text-center rounded ${theme.tableCellText}`}
                   />
                 </td>
-                <td className="border-b border-gray-100 px-1 py-1">
+                <td className={`border-b ${theme.tableCellBorder} px-1 py-1`}>
                   <input
                     type="text"
                     placeholder='e.g. 4"'
@@ -574,10 +634,12 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
                     onChange={(e) =>
                       updateCell(idx, "specification", e.target.value)
                     }
-                    className="w-full px-2 py-1.5 text-sm outline-none bg-transparent rounded focus:bg-blue-50"
+                    className={`w-full px-2 py-1.5 text-sm outline-none bg-transparent rounded ${theme.tableCellText}`}
                   />
                 </td>
-                <td className="border-b border-gray-100 px-1 py-1 text-center">
+                <td
+                  className={`border-b ${theme.tableCellBorder} px-1 py-1 text-center`}
+                >
                   <button
                     type="button"
                     onClick={() => removeRow(idx)}
@@ -595,7 +657,7 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
       <button
         type="button"
         onClick={addRow}
-        className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+        className="text-sm text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
       >
         <span className="text-lg leading-none">+</span> Add item
       </button>
@@ -605,7 +667,7 @@ function MaterialsTable({ materials, onChange, readOnly = false }) {
 
 // Lets a worker take a photo with the device camera or pick one from
 // their gallery, and shows a live preview before submission.
-function CompletionImageUploader({ preview, onChange }) {
+function CompletionImageUploader({ preview, onChange, theme }) {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) onChange(file);
@@ -614,7 +676,7 @@ function CompletionImageUploader({ preview, onChange }) {
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
+      <label className={`block text-sm font-medium ${theme.surfaceHeading}`}>
         Photo of Completed Work
       </label>
 
@@ -622,12 +684,14 @@ function CompletionImageUploader({ preview, onChange }) {
         <img
           src={preview}
           alt="Completed work preview"
-          className="w-full max-h-64 object-contain rounded-lg border border-gray-200"
+          className={`w-full max-h-64 object-contain rounded-lg border ${theme.tableBorder}`}
         />
       )}
 
       <div className="flex gap-2">
-        <label className="flex-1 cursor-pointer text-center bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 text-sm font-medium text-gray-700 transition-colors">
+        <label
+          className={`flex-1 cursor-pointer text-center rounded-lg py-2 px-3 text-sm font-medium transition-colors border ${theme.uploaderBg}`}
+        >
           {preview ? "Retake Photo" : "Take Photo"}
           <input
             type="file"
@@ -637,7 +701,9 @@ function CompletionImageUploader({ preview, onChange }) {
             className="hidden"
           />
         </label>
-        <label className="flex-1 cursor-pointer text-center bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 text-sm font-medium text-gray-700 transition-colors">
+        <label
+          className={`flex-1 cursor-pointer text-center rounded-lg py-2 px-3 text-sm font-medium transition-colors border ${theme.uploaderBg}`}
+        >
           Upload from Gallery
           <input
             type="file"
@@ -649,7 +715,7 @@ function CompletionImageUploader({ preview, onChange }) {
       </div>
 
       {!preview && (
-        <p className="text-xs text-gray-400">
+        <p className={`text-xs ${theme.surfaceHint}`}>
           A photo of the completed work is required before you can mark this job
           as completed.
         </p>
@@ -1283,6 +1349,8 @@ export default function ReportDetailsContainer({
     report.materials.length > 0 &&
     ["admin", "estate", "procurement"].includes(user.role);
 
+  const inputClasses = `w-full p-2 rounded-lg text-sm border ${theme.inputBg} ${theme.inputBorder} ${theme.inputText}`;
+
   return (
     <div
       ref={panelRef}
@@ -1293,14 +1361,16 @@ export default function ReportDetailsContainer({
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
 
       {/* Sticky header: status + priority always visible while scrolling */}
-      <div className="sticky top-0 z-10 backdrop-blur bg-white/90 border-b border-gray-100 px-6 py-4 flex items-center justify-between gap-3">
+      <div
+        className={`sticky top-0 z-10 backdrop-blur border-b px-6 py-4 flex items-center justify-between gap-3 ${theme.detailsHeaderBg} ${theme.detailsHeaderBorder}`}
+      >
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <StatusBadge status={report.status} />
           <PriorityBadge level={report.priorityLevel} />
         </div>
         <button
           onClick={() => setDisplayDetails(false)}
-          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 text-lg font-bold"
+          className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-lg font-bold transition-colors ${theme.detailsCloseText} ${theme.detailsCloseHover}`}
           aria-label="Close"
         >
           ×
@@ -1309,25 +1379,33 @@ export default function ReportDetailsContainer({
 
       <div className="flex flex-col px-6 py-6 gap-5">
         {/* Overview */}
-        <SectionCard title="Report Overview">
+        <SectionCard title="Report Overview" theme={theme}>
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-            <InfoItem label="Sent By">{report.reporter}</InfoItem>
-            <InfoItem label="Date Sent">{formatDate(report.dateSent)}</InfoItem>
-            <InfoItem label="Category">{report.category}</InfoItem>
+            <InfoItem label="Sent By" theme={theme}>
+              {report.reporter}
+            </InfoItem>
+            <InfoItem label="Date Sent" theme={theme}>
+              {formatDate(report.dateSent)}
+            </InfoItem>
+            <InfoItem label="Category" theme={theme}>
+              {report.category}
+            </InfoItem>
             {report.reportsThisMonth != null && (
-              <InfoItem label="Reports This Month">
+              <InfoItem label="Reports This Month" theme={theme}>
                 {report.reportsThisMonth}
               </InfoItem>
             )}
-            <InfoItem label="Location">{report.location}</InfoItem>
-            <InfoItem label="Sender Contact">
+            <InfoItem label="Location" theme={theme}>
+              {report.location}
+            </InfoItem>
+            <InfoItem label="Sender Contact" theme={theme}>
               <PhoneCallButton
                 phoneNumber={report.reporterContact}
                 label={report.reporter}
               />
             </InfoItem>
             {report.assignedTo && ["admin", "estate"].includes(user?.role) && (
-              <InfoItem label="Technician">
+              <InfoItem label="Technician" theme={theme}>
                 <PhoneCallButton
                   phoneNumber={assignedWorker?.phoneNumber}
                   label={assignedWorker?.name}
@@ -1337,20 +1415,28 @@ export default function ReportDetailsContainer({
           </div>
 
           <div>
-            <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+            <span
+              className={`text-[11px] font-medium uppercase tracking-wide ${theme.surfaceHint}`}
+            >
               Description
             </span>
-            <p className="text-sm md:text-base text-gray-800 mt-1 whitespace-pre-wrap">
+            <p
+              className={`text-sm md:text-base mt-1 whitespace-pre-wrap ${theme.detailsValueColor}`}
+            >
               {report.reportDescription}
             </p>
           </div>
 
           {report.instructions && user?.role !== "staff" && (
             <div>
-              <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              <span
+                className={`text-[11px] font-medium uppercase tracking-wide ${theme.surfaceHint}`}
+              >
                 Instructions
               </span>
-              <p className="text-sm md:text-base text-gray-800 mt-1 whitespace-pre-wrap">
+              <p
+                className={`text-sm md:text-base mt-1 whitespace-pre-wrap ${theme.detailsValueColor}`}
+              >
                 {report.instructions}
               </p>
             </div>
@@ -1358,14 +1444,16 @@ export default function ReportDetailsContainer({
 
           {reportImagesData?.image && (
             <div>
-              <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              <span
+                className={`text-[11px] font-medium uppercase tracking-wide ${theme.surfaceHint}`}
+              >
                 Attached Image
               </span>
               <img
                 src={reportImagesData.image}
                 alt="Report attachment"
                 onClick={() => setLightboxSrc(reportImagesData.image)}
-                className="mt-1 w-full max-h-72 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+                className={`mt-1 w-full max-h-72 object-contain rounded-xl border cursor-zoom-in ${theme.tableBorder}`}
               />
             </div>
           )}
@@ -1374,35 +1462,38 @@ export default function ReportDetailsContainer({
         {/* Unified activity timeline — replaces the old wall of individual
             "Date X" rows and standalone reject/drop/reopen reason boxes. */}
         {timelineEntries.length > 0 && (
-          <SectionCard title="Activity">
-            <Timeline entries={timelineEntries} />
+          <SectionCard title="Activity" theme={theme}>
+            <Timeline entries={timelineEntries} theme={theme} />
           </SectionCard>
         )}
 
         {/* Materials & cost */}
         {(showMaterials || showCostSummary) && (
-          <SectionCard title="Materials & Cost">
+          <SectionCard title="Materials & Cost" theme={theme}>
             {showMaterials && (
               <MaterialsTable
                 materials={report.materials}
                 onChange={() => {}}
                 readOnly
+                theme={theme}
               />
             )}
             {showCostSummary && (
-              <div className="pt-1 space-y-1 border-t border-gray-100 mt-1">
+              <div
+                className={`pt-1 space-y-1 border-t mt-1 ${theme.tableCellBorder}`}
+              >
                 {report.cost != null && (
-                  <p className="text-sm text-gray-600">
+                  <p className={`text-sm ${theme.surfaceHint}`}>
                     Materials cost: ₵{Number(report.cost).toLocaleString()}
                   </p>
                 )}
                 {report.maintenanceCost != null && (
-                  <p className="text-sm text-gray-600">
+                  <p className={`text-sm ${theme.surfaceHint}`}>
                     Maintenance cost: ₵
                     {Number(report.maintenanceCost).toLocaleString()}
                   </p>
                 )}
-                <p className="font-semibold text-gray-900">
+                <p className={`font-semibold ${theme.surfaceHeading}`}>
                   Total: ₵{getTotalCost(report).toLocaleString()}
                 </p>
               </div>
@@ -1413,19 +1504,24 @@ export default function ReportDetailsContainer({
         {/* Feedback — kept as its own prominent card since it's the
             scroll target for "you have unread feedback". */}
         {report.feedback && (
-          <SectionCard title="Feedback" innerRef={feedbackRef}>
-            <p className="text-sm md:text-base text-gray-800 whitespace-pre-wrap">
+          <SectionCard title="Feedback" innerRef={feedbackRef} theme={theme}>
+            <p
+              className={`text-sm md:text-base whitespace-pre-wrap ${theme.detailsValueColor}`}
+            >
               {report.feedback}
             </p>
             {report.technicianRating && (
               <div className="pt-2">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                <span
+                  className={`text-[11px] font-medium uppercase tracking-wide block mb-1 ${theme.surfaceHint}`}
+                >
                   Technician Rating
                 </span>
                 <StarRating
                   value={report.technicianRating}
                   readOnly
                   size="text-xl"
+                  theme={theme}
                 />
               </div>
             )}
@@ -1433,12 +1529,12 @@ export default function ReportDetailsContainer({
         )}
 
         {reportImagesData?.completionImage && (
-          <SectionCard title="Completion Photo">
+          <SectionCard title="Completion Photo" theme={theme}>
             <img
               src={reportImagesData.completionImage}
               alt="Completed work"
               onClick={() => setLightboxSrc(reportImagesData.completionImage)}
-              className="w-full max-h-72 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+              className={`w-full max-h-72 object-contain rounded-xl border cursor-zoom-in ${theme.tableBorder}`}
             />
           </SectionCard>
         )}
@@ -1458,7 +1554,9 @@ export default function ReportDetailsContainer({
             report?.reporterId === user?.ID &&
             report?.status === "incoming")) && (
           <div className="pt-1">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+            <h2
+              className={`text-xs font-semibold uppercase tracking-wide mb-3 ${theme.surfaceHint}`}
+            >
               Action Needed
             </h2>
             <div className="space-y-4">
@@ -1468,6 +1566,7 @@ export default function ReportDetailsContainer({
                   innerRef={approveDenyRef}
                   title="Approve or Deny"
                   hint="A reason is required to deny — it will be shown to the reporter."
+                  theme={theme}
                 >
                   <textarea
                     placeholder="Add a note… (required if denying)"
@@ -1475,7 +1574,7 @@ export default function ReportDetailsContainer({
                     onChange={(e) =>
                       setFormData({ ...formData, note: e.target.value })
                     }
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    className={inputClasses}
                     rows="3"
                   />
                   <div className="flex gap-2">
@@ -1513,10 +1612,12 @@ export default function ReportDetailsContainer({
                         ? "Your previous submission was denied — review and resubmit."
                         : undefined
                   }
+                  theme={theme}
                 >
                   <MaterialsTable
                     materials={materials}
                     onChange={setMaterials}
+                    theme={theme}
                   />
                   <button
                     onClick={handleAddMaterials}
@@ -1535,6 +1636,7 @@ export default function ReportDetailsContainer({
                 <ActionSection
                   innerRef={confirmCostRef}
                   title="Review & Confirm Materials"
+                  theme={theme}
                 >
                   {Array.isArray(report.materials) &&
                     report.materials.length > 0 && (
@@ -1542,6 +1644,7 @@ export default function ReportDetailsContainer({
                         materials={report.materials}
                         onChange={() => {}}
                         readOnly
+                        theme={theme}
                       />
                     )}
                   <textarea
@@ -1550,7 +1653,7 @@ export default function ReportDetailsContainer({
                     onChange={(e) =>
                       setFormData({ ...formData, note: e.target.value })
                     }
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    className={inputClasses}
                     rows="3"
                   />
                   <div className="flex gap-2">
@@ -1577,6 +1680,7 @@ export default function ReportDetailsContainer({
                 <ActionSection
                   innerRef={markProcuredRef}
                   title="Purchase Materials"
+                  theme={theme}
                 >
                   {Array.isArray(report.materials) &&
                     report.materials.length > 0 && (
@@ -1584,10 +1688,13 @@ export default function ReportDetailsContainer({
                         materials={report.materials}
                         onChange={() => {}}
                         readOnly
+                        theme={theme}
                       />
                     )}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
+                    >
                       Cost of Materials (₵)
                     </label>
                     <input
@@ -1595,7 +1702,7 @@ export default function ReportDetailsContainer({
                       placeholder="e.g. 450.00"
                       value={procurementCost}
                       onChange={(e) => setProcurementCost(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      className={inputClasses}
                       min="0"
                       step="0.01"
                     />
@@ -1620,8 +1727,11 @@ export default function ReportDetailsContainer({
                       ? "This job was dropped by the previous worker — see the Activity log above for the reason."
                       : undefined
                   }
+                  theme={theme}
                 >
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label
+                    className={`block text-sm font-medium ${theme.surfaceHeading}`}
+                  >
                     Select a registered worker
                   </label>
                   <select
@@ -1632,7 +1742,7 @@ export default function ReportDetailsContainer({
                         selectedWorker: e.target.value,
                       })
                     }
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    className={inputClasses}
                   >
                     <option value="">Choose worker</option>
                     {workers.map((worker) => (
@@ -1643,15 +1753,17 @@ export default function ReportDetailsContainer({
                     ))}
                   </select>
                   {workers.length === 0 && (
-                    <p className="text-sm text-gray-500">
+                    <p className={`text-sm ${theme.surfaceHint}`}>
                       No registered workers found. Please add workers first.
                     </p>
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
+                    >
                       Instructions{" "}
-                      <span className="text-gray-400 font-normal">
+                      <span className={`font-normal ${theme.surfaceHint}`}>
                         (optional)
                       </span>
                     </label>
@@ -1664,7 +1776,7 @@ export default function ReportDetailsContainer({
                           instructions: e.target.value,
                         })
                       }
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      className={inputClasses}
                       rows="4"
                     />
                   </div>
@@ -1682,8 +1794,12 @@ export default function ReportDetailsContainer({
                   </button>
 
                   {report.assignedTo && (
-                    <div className="pt-3 border-t border-gray-100 space-y-2">
-                      <h4 className="font-semibold text-gray-800 text-sm">
+                    <div
+                      className={`pt-3 border-t space-y-2 ${theme.tableCellBorder}`}
+                    >
+                      <h4
+                        className={`font-semibold text-sm ${theme.surfaceHeading}`}
+                      >
                         Update Instructions
                       </h4>
                       <textarea
@@ -1695,7 +1811,7 @@ export default function ReportDetailsContainer({
                             instructions: e.target.value,
                           })
                         }
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                        className={inputClasses}
                         rows="4"
                       />
                       <button
@@ -1716,9 +1832,12 @@ export default function ReportDetailsContainer({
                   innerRef={submitCostRef}
                   title="Submit Maintenance Cost"
                   hint="This is added to the materials cost for the total."
+                  theme={theme}
                 >
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
+                    >
                       Maintenance Cost (₵)
                     </label>
                     <input
@@ -1726,7 +1845,7 @@ export default function ReportDetailsContainer({
                       placeholder="e.g. 150.00"
                       value={actualCost}
                       onChange={(e) => setActualCost(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      className={inputClasses}
                       min="0"
                       step="0.01"
                     />
@@ -1746,9 +1865,12 @@ export default function ReportDetailsContainer({
                 <ActionSection
                   innerRef={acceptRejectRef}
                   title="Respond to Assignment"
+                  theme={theme}
                 >
                   {report.instructions && (
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+                    <div
+                      className={`rounded-lg p-3 text-sm ${theme.tableAltRowBg} ${theme.tableMutedText}`}
+                    >
                       <span className="font-semibold">Instructions: </span>
                       {report.instructions}
                     </div>
@@ -1757,7 +1879,7 @@ export default function ReportDetailsContainer({
                     placeholder="Reason for rejecting this job (required)..."
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    className={inputClasses}
                     rows="3"
                   />
                   <div className="flex gap-2">
@@ -1789,12 +1911,13 @@ export default function ReportDetailsContainer({
                   innerRef={dropJobRef}
                   title="Drop Job"
                   hint="If you can't complete this job, dropping it returns it to Estate for reassignment."
+                  theme={theme}
                 >
                   <textarea
                     placeholder="Reason for dropping this job (required)..."
                     value={dropReason}
                     onChange={(e) => setDropReason(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    className={inputClasses}
                     rows="3"
                   />
                   <button
@@ -1813,10 +1936,15 @@ export default function ReportDetailsContainer({
 
               {/* WORKER — Complete Work */}
               {canUserComplete(user, report) && (
-                <ActionSection innerRef={completeWorkRef} title="Complete Work">
+                <ActionSection
+                  innerRef={completeWorkRef}
+                  title="Complete Work"
+                  theme={theme}
+                >
                   <CompletionImageUploader
                     preview={completionImagePreview}
                     onChange={handleCompletionImageChange}
+                    theme={theme}
                   />
                   {uploadError && (
                     <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
@@ -1844,6 +1972,7 @@ export default function ReportDetailsContainer({
                   <ActionSection
                     title="Cancel Report"
                     hint="Only available while the report is still incoming. This permanently deletes it."
+                    theme={theme}
                   >
                     <button
                       onClick={handleCancelReport}
@@ -1857,14 +1986,18 @@ export default function ReportDetailsContainer({
 
               {/* STAFF — Send Feedback */}
               {canUserSendFeedback(user, report) && (
-                <ActionSection innerRef={sendFeedbackRef} title="Send Feedback">
+                <ActionSection
+                  innerRef={sendFeedbackRef}
+                  title="Send Feedback"
+                  theme={theme}
+                >
                   <textarea
                     placeholder="Enter your feedback about the completed work..."
                     value={formData.feedback}
                     onChange={(e) =>
                       setFormData({ ...formData, feedback: e.target.value })
                     }
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    className={inputClasses}
                     rows="4"
                   />
                   <button
