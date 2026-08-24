@@ -1,0 +1,30 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+  safelist: [
+    "shadow-emerald-500/40",
+    "shadow-sky-500/40",
+    "shadow-amber-500/40",
+    "shadow-orange-500/40",
+    "shadow-indigo-500/40",
+    "shadow-emerald-500/25",
+    "shadow-sky-500/25",
+    "shadow-amber-500/25",
+    "shadow-orange-500/25",
+    "shadow-indigo-500/25",
+    "ring-emerald-500/10",
+    "ring-sky-500/10",
+    "ring-amber-500/10",
+    "ring-orange-500/10",
+    "ring-indigo-500/10",
+    "border-t-emerald-500",
+    "border-t-sky-500",
+    "border-t-amber-500",
+    "border-t-orange-500",
+    "border-t-indigo-500",
+  ],
+};

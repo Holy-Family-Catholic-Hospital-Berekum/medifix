@@ -13,6 +13,7 @@ export default function NavBar({
     navBg = "bg-gradient-to-r from-[#F38130]/95 via-[#ff9b52]/90 to-[#ffb36e]/85 backdrop-blur-3xl supports-[backdrop-filter]:bg-white/10",
 
     navBorder = "border border-white/20 shadow-[0_8px_32px_rgba(243,129,48,0.22)]",
+    navShadow,
 
     logoFrom = "from-[#7C2D12]",
 
@@ -66,7 +67,7 @@ export default function NavBar({
 
   return (
     <nav
-      className={`flex justify-between items-center gap-6 ${navBg} ${navBorder} ${accent} pl-4 md:pl-0 py-4 pr-6 w-full z-[100] fixed top-0`}
+      className={`flex justify-between items-center gap-6 ${navBg} ${navBorder} ${navShadow} ${accent} pl-4 md:pl-0 py-4 pr-6 w-full z-[100] fixed top-0`}
     >
       {/* Subtle top glow line */}
       <div

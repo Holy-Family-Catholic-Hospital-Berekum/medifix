@@ -62,7 +62,7 @@ function Countdown({ dateDue, status, bgColor }) {
     );
   return (
     <div
-      className={`flex items-center gap-1.5 ${bgColor} border border-white/10 px-2 py-1 rounded-lg`}
+      className={`flex items-center gap-1.5 ${bgColor} border border-white/10 px-2 py-1 rounded-lg shadow-sm`}
     >
       {t.days > 0 && (
         <span className="text-[12px] font-mono text-slate-900">{t.days}d</span>
@@ -219,7 +219,7 @@ function BirthdayBanner({ name, onDismiss }) {
   return (
     <div className="fixed top-0 inset-x-0 z-[120] flex justify-center px-4 pt-4 pointer-events-none">
       <div
-        className={`pointer-events-auto relative max-w-md w-full rounded-xl overflow-hidden shadow-md border border-white/20 bg-slate-900/95 text-white px-4 py-3 flex items-center gap-3 transition-all duration-300 ${
+        className={`pointer-events-auto relative max-w-md w-full rounded-xl overflow-hidden shadow-lg border border-white/20 bg-slate-900/95 text-white px-4 py-3 flex items-center gap-3 transition-all duration-300 ${
           entered ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"
         }`}
       >
@@ -351,20 +351,27 @@ const cardConfig = (status, priority, theme) => {
 // NOTE: Tailwind's class scanner needs complete, literal class strings in
 // the source — so each theme below is still written out in full (not
 // assembled from partial fragments at runtime), it's just far shorter
-// because the values themselves are restrained and consistent.
+// because the values themselves are restrained and consistent. Any class
+// built from the `ringColor` template below (shadow-*, ring-*, border-t-*)
+// must be safelisted in tailwind.config.js since the scanner can't see
+// through the interpolation — see the safelist block at the bottom of
+// this file's accompanying config.
 function makeTheme({ accent, accentDark, accentSoft, ring }) {
+  const ringColor = ring.replace("bg-", ""); // e.g. "emerald-500"
+
   return {
     // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-slate-50",
+    pageBg: "bg-gradient-to-b from-slate-50 to-slate-100/60",
     sidebarBg: "bg-white/90 backdrop-blur-xl",
     sidebarBorder: "border border-slate-200 shadow-sm",
     contentBg: "bg-transparent",
 
     // ─── Navbar ──────────────────────────────────────────
     navBg: `bg-gradient-to-r ${accent}`,
-    navBorder: "border border-white/10 shadow-sm",
+    navBorder: "border border-white/10",
+    navShadow: `shadow-[0_4px_20px_-4px_var(--tw-shadow-color)] shadow-${ringColor}/40`,
     logoFrom: "from-white",
-    logoTo: "to-white",
+    logoTo: "to-white/80",
     logoSub: "text-white/70",
 
     liveColor: "bg-white",
@@ -386,9 +393,9 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
     glowLine: "via-white/30",
 
     // ─── Sidebar nav ─────────────────────────────────────
-    sideNavActive: `text-slate-900 ${accentSoft} border border-slate-200 shadow-sm`,
+    sideNavActive: `text-slate-900 ${accentSoft} border border-slate-200/80 shadow-sm ring-1 ring-${ringColor}/10`,
     sideNavIdle:
-      "text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent",
+      "text-slate-500 hover:text-slate-800 hover:bg-slate-100/80 border border-transparent",
     sideNavDotActive: accentDark,
     sideNavDotIdle: "bg-slate-300 group-hover:bg-slate-400",
     sideNavLabel: "text-slate-400",
@@ -404,22 +411,25 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
     sectionDivider: "border-slate-200",
 
     // ─── Cards ───────────────────────────────────────────
-    cardBg: "bg-white border border-slate-200",
+    cardBg:
+      "bg-gradient-to-b from-white to-slate-50/80 border border-slate-200",
+    cardHoverShadow: `hover:shadow-[0_8px_24px_-8px_var(--tw-shadow-color)] hover:shadow-${ringColor}/25`,
 
     cardNormalBorder: "border-l-emerald-400",
-    cardNormalBadge: "bg-emerald-600 text-white",
+    cardNormalBadge:
+      "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white",
     cardNormalDot: "bg-emerald-400",
     cardNormalAccent: "bg-emerald-400",
     cardNormalPriority: "text-emerald-600",
 
     cardEmergencyBorder: "border-l-red-500",
-    cardEmergencyBadge: "bg-red-600 text-white",
+    cardEmergencyBadge: "bg-gradient-to-r from-red-600 to-red-500 text-white",
     cardEmergencyDot: "bg-red-500",
     cardEmergencyAccent: "bg-red-500",
     cardEmergencyPriority: "text-red-600",
 
     cardUrgentBorder: "border-l-amber-400",
-    cardUrgentBadge: "bg-amber-500 text-white",
+    cardUrgentBadge: "bg-gradient-to-r from-amber-500 to-amber-400 text-white",
     cardUrgentDot: "bg-amber-400",
     cardUrgentAccent: "bg-amber-400",
     cardUrgentPriority: "text-amber-600",
@@ -469,7 +479,7 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
     linkHoverBg: "hover:bg-slate-50",
 
     // ─── Spinner ─────────────────────────────────────────
-    spinnerOuter: `border-t-${ring.replace("bg-", "")}`,
+    spinnerOuter: `border-t-${ringColor}`,
     spinnerInner: "border-t-slate-300",
     dotColor: ring,
     textColor: "text-slate-400",
@@ -485,6 +495,10 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
 // Per-role identity lives in exactly four values. Everything else is
 // derived by makeTheme() above, so the whole theme system fits on one
 // screen instead of being spread across hundreds of hand-tuned lines.
+//
+// Procurement uses indigo — distinct from admin (emerald), estate (sky),
+// worker (amber), and manager (orange); reads as "purchasing/logistics"
+// rather than the alert-red it used to borrow.
 export const THEMES = {
   admin: makeTheme({
     accent: "from-emerald-600 to-emerald-500",
@@ -511,10 +525,10 @@ export const THEMES = {
     ring: "bg-orange-500",
   }),
   procurement: makeTheme({
-    accent: "from-rose-600 to-rose-500",
-    accentDark: "bg-rose-500",
-    accentSoft: "bg-rose-50",
-    ring: "bg-rose-500",
+    accent: "from-indigo-600 to-indigo-500",
+    accentDark: "bg-indigo-500",
+    accentSoft: "bg-indigo-50",
+    ring: "bg-indigo-500",
   }),
 };
 
@@ -529,7 +543,7 @@ const PaginationControls = ({ page, totalPages, onChange, theme }) => {
         type="button"
         disabled={page <= 1}
         onClick={() => onChange(page - 1)}
-        className={`flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50`}
+        className={`flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} shadow-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 hover:shadow`}
       >
         <span className="material-symbols-outlined text-sm">chevron_left</span>
         Prev
@@ -543,7 +557,7 @@ const PaginationControls = ({ page, totalPages, onChange, theme }) => {
         type="button"
         disabled={page >= totalPages}
         onClick={() => onChange(page + 1)}
-        className={`flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50`}
+        className={`flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border ${theme.sectionCountBg} ${theme.sectionCountBorder} ${theme.sectionCountText} shadow-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 hover:shadow`}
       >
         Next
         <span className="material-symbols-outlined text-sm">chevron_right</span>
@@ -1309,12 +1323,17 @@ export default function Home({
   };
 
   // ─── Report Card ───────────────────────────────────────────────────────────
-  // A single restrained hover state (subtle lift, no scale/rotate stacking),
-  // a left accent bar instead of a full glow, and status badges that appear
-  // once via a short fade/scale-in rather than looping forever.
+  // A single restrained hover state (subtle lift + role-colored shadow, no
+  // scale/rotate stacking), a left accent bar instead of a full glow, a
+  // faint corner accent that fades in on hover, and status badges that
+  // appear once via a short fade/scale-in rather than looping forever.
+  // Emergency-priority active items get a gentle pulse on the priority dot.
   const ReportCard = ({ report, reportDate }) => {
     const cfg = cardConfig(report.status, report.priorityLevel, theme);
     const { label: dateLabel, value: dateValue } = getDisplayDate(report);
+    const isActiveEmergency =
+      !TERMINAL_STATUSES.includes(report.status) &&
+      report.priorityLevel === "emergency";
     return (
       <div className="relative w-full max-w-[250px] md:max-w-[300px] flex justify-center">
         {/* Feedback badge */}
@@ -1330,7 +1349,7 @@ export default function Home({
         )}
 
         {isNewForUser(report) && (
-          <span className="absolute -top-2 -left-2 bg-sky-600 text-white text-[10px] font-semibold pl-1.5 pr-2 py-0.5 rounded-full z-10 tracking-wide flex items-center gap-0.5 animate-badge-in">
+          <span className="absolute -top-2 -left-2 bg-gradient-to-r from-sky-600 to-sky-500 text-white text-[10px] font-semibold pl-1.5 pr-2 py-0.5 rounded-full z-10 tracking-wide flex items-center gap-0.5 animate-badge-in shadow-sm">
             <span className="material-symbols-outlined text-[12px] leading-none">
               fiber_new
             </span>
@@ -1338,15 +1357,20 @@ export default function Home({
           </span>
         )}
         <div
-          className={`relative group select-none border-l-4 ${cfg.border} ${theme.cardBg} flex flex-col gap-3 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 rounded-xl w-full max-w-[250px] md:max-w-[280px] p-4 overflow-hidden`}
+          className={`relative group select-none border-l-4 ${cfg.border} ${theme.cardBg} flex flex-col gap-3 cursor-pointer transition-all duration-200 shadow-sm ${theme.cardHoverShadow} hover:-translate-y-1 rounded-xl w-full max-w-[250px] md:max-w-[280px] p-4 overflow-hidden`}
           onClick={() => displayReportDetails(report)}
         >
           {/* Priority row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full ${cfg.dot} flex-shrink-0`}
-              />
+              <span className="relative flex w-2 h-2">
+                {isActiveEmergency && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60" />
+                )}
+                <span
+                  className={`relative inline-flex rounded-full w-2 h-2 ${cfg.dot}`}
+                />
+              </span>
               <span
                 className={`text-xs font-semibold tracking-wide uppercase ${cfg.priorityColor}`}
               >
@@ -1359,7 +1383,7 @@ export default function Home({
               {report.status}
             </span>
           </div>
-          <div className="h-px bg-slate-100" />
+          <div className="h-px bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100" />
           {getStatusMessage(report) && (
             <p
               className={`text-[12px] leading-relaxed font-medium -mt-1 ${theme.cardDateLabel}`}
@@ -1386,7 +1410,7 @@ export default function Home({
           </div>
 
           {report.overdue && (
-            <div className="flex flex-col gap-1 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <div className="flex flex-col gap-1 bg-gradient-to-r from-red-50 to-red-50/50 border border-red-200 rounded-lg px-3 py-2">
               <span className="text-[10px] font-semibold text-red-600 tracking-wide uppercase flex items-center gap-1">
                 <span className="material-symbols-outlined text-[13px] leading-none">
                   warning
@@ -1407,6 +1431,11 @@ export default function Home({
               bgColor={PRIORITY_BG[report.priorityLevel] ?? "bg-emerald-700"}
             />
           )}
+
+          {/* Subtle role-colored corner accent, only visible on hover */}
+          <div
+            className={`absolute -right-6 -top-6 w-16 h-16 rounded-full ${cfg.accent} opacity-0 group-hover:opacity-[0.06] transition-opacity duration-300 pointer-events-none`}
+          />
         </div>
       </div>
     );
@@ -1429,16 +1458,16 @@ export default function Home({
     <div className="w-full flex items-center gap-4 px-6 md:pl-[calc(20%+24px)]">
       <div className="flex items-center gap-3">
         <div
-          className={`w-1 h-6 bg-gradient-to-b ${theme.sectionAccentBar} rounded-full`}
+          className={`w-1.5 h-8 bg-gradient-to-b ${theme.sectionAccentBar} rounded-full shadow-sm`}
         />
         <div>
           <p
-            className={`text-[10px] ${theme.sectionLabel} tracking-[0.2em] uppercase font-medium`}
+            className={`text-[10px] ${theme.sectionLabel} tracking-[0.2em] uppercase font-semibold`}
           >
             Reports
           </p>
           <h1
-            className={`text-lg md:text-xl font-semibold tracking-tight ${theme.sectionTitle} leading-tight`}
+            className={`text-xl md:text-2xl font-bold tracking-tight ${theme.sectionTitle} leading-tight`}
           >
             {title}
           </h1>
@@ -1446,33 +1475,40 @@ export default function Home({
       </div>
       {count !== undefined && (
         <span
-          className={`ml-auto flex items-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} px-3 py-1 rounded-full`}
+          className={`ml-auto flex items-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} px-3 py-1 rounded-full shadow-sm`}
         >
           <span
             className={`w-1.5 h-1.5 rounded-full ${theme.sectionCountDot}`}
           />
           <span
-            className={`text-xs ${theme.sectionCountText} font-medium tabular-nums`}
+            className={`text-xs ${theme.sectionCountText} font-semibold tabular-nums`}
           >
             {count}
           </span>
         </span>
       )}
-      <div className="flex-1 h-px bg-slate-200 ml-2 hidden md:block" />
+      <div className="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent ml-2 hidden md:block" />
     </div>
   );
 
   // ─── Empty state ───────────────────────────────────────────────────────────
   const EmptyState = ({ filtered }) => (
     <div className="flex flex-col items-center gap-3 my-16">
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-        <span className="material-symbols-outlined text-2xl">inbox</span>
+      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200 shadow-sm flex items-center justify-center text-slate-400">
+        <span className="material-symbols-outlined text-3xl">
+          {filtered ? "search_off" : "inbox"}
+        </span>
       </div>
-      <p className="text-slate-400 text-sm tracking-wide font-medium">
+      <p className="text-slate-500 text-sm tracking-wide font-medium">
         {filtered
           ? "No reports match your search"
           : "Nothing to display here yet"}
       </p>
+      {filtered && (
+        <p className="text-slate-400 text-xs">
+          Try adjusting your search or time filter
+        </p>
+      )}
     </div>
   );
 
@@ -1775,7 +1811,7 @@ export default function Home({
           {specificReportsPage && (
             <div className="w-full px-6 md:pl-[calc(20%+24px)] flex flex-col md:flex-row md:items-center gap-3">
               <div
-                className={`flex-1 flex items-center gap-2 ${theme.sectionCountBg} border ${theme.sectionCountBorder} rounded-full px-4 py-2 min-w-0`}
+                className={`flex-1 flex items-center gap-2 ${theme.sectionCountBg} border ${theme.sectionCountBorder} rounded-full px-4 py-2 min-w-0 shadow-sm`}
               >
                 <span
                   className={`material-symbols-outlined text-base ${theme.sectionCountText} opacity-60`}
@@ -1804,7 +1840,7 @@ export default function Home({
               <select
                 value={timeFilter}
                 onChange={(e) => setTimeFilter(e.target.value)}
-                className={`${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-medium outline-none cursor-pointer`}
+                className={`${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-medium outline-none cursor-pointer shadow-sm`}
               >
                 {TIME_FILTERS.map((f) => (
                   <option key={f.value} value={f.value}>
@@ -1817,7 +1853,7 @@ export default function Home({
                 <button
                   type="button"
                   onClick={handleMarkAllAsRead}
-                  className={`flex items-center justify-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors whitespace-nowrap`}
+                  className={`flex items-center justify-center gap-1.5 ${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-sm font-medium shadow-sm hover:bg-slate-50 hover:shadow transition-all whitespace-nowrap`}
                 >
                   <span className="material-symbols-outlined text-base">
                     done_all
