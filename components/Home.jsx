@@ -512,6 +512,46 @@ function makeTheme({
     detailsCloseText: dark ? "text-slate-400" : "text-slate-500",
     detailsLabelColor: dark ? "text-slate-500" : "text-slate-500",
     detailsValueColor: dark ? "text-slate-200" : "text-slate-800",
+    mode,
+
+    // ─── Report details (extended surfaces) ──────────────
+    detailsHeaderBg: dark
+      ? "bg-slate-900/90 backdrop-blur"
+      : "bg-white/90 backdrop-blur",
+    detailsHeaderBorder: dark ? "border-slate-800" : "border-gray-100",
+    detailsCloseText: dark ? "text-slate-500" : "text-gray-400",
+    detailsCloseHover: dark
+      ? "hover:text-slate-100 hover:bg-slate-800"
+      : "hover:text-gray-700 hover:bg-gray-100",
+    detailsMutedText: dark ? "text-slate-500" : "text-gray-400",
+
+    surfaceBg: dark
+      ? "bg-slate-800 border border-slate-700"
+      : "bg-white border border-gray-200",
+    surfaceHeading: dark ? "text-slate-100" : "text-gray-800",
+    surfaceHint: dark ? "text-slate-400" : "text-gray-500",
+
+    inputBg: dark ? "bg-slate-900" : "bg-white",
+    inputBorder: dark ? "border-slate-600" : "border-gray-300",
+    inputText: dark
+      ? "text-slate-100 placeholder:text-slate-500"
+      : "text-gray-900 placeholder:text-gray-400",
+
+    tableHeaderBg: dark
+      ? "bg-slate-900 text-slate-400"
+      : "bg-gray-50 text-gray-600",
+    tableBorder: dark ? "border-slate-700" : "border-gray-200",
+    tableCellBorder: dark ? "border-slate-700" : "border-gray-100",
+    tableRowBg: dark ? "bg-slate-800" : "bg-white",
+    tableAltRowBg: dark ? "bg-slate-900/60" : "bg-gray-50",
+    tableCellText: dark ? "text-slate-200" : "text-gray-800",
+    tableMutedText: dark ? "text-slate-500" : "text-gray-400",
+
+    uploaderBg: dark
+      ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200"
+      : "bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700",
+
+    timelineLine: dark ? "bg-slate-700" : "bg-gray-200",
   };
 }
 
