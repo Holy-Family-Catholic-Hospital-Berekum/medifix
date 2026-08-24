@@ -5,6 +5,8 @@ import SlideInRight from "../components/slideInRight";
 import { NavLink } from "react-router";
 import ReportDetailsContainer from "./reportDetails";
 import ReportsHiddenOnMobile from "./reportsHiddenOnMobile";
+import { useThemeMode } from "../src/ThemeModeContext";
+
 import {
   collection,
   query,
@@ -356,14 +358,28 @@ const cardConfig = (status, priority, theme) => {
 // must be safelisted in tailwind.config.js since the scanner can't see
 // through the interpolation — see the safelist block at the bottom of
 // this file's accompanying config.
-function makeTheme({ accent, accentDark, accentSoft, ring }) {
-  const ringColor = ring.replace("bg-", ""); // e.g. "emerald-500"
+function makeTheme({
+  accent,
+  accentDark,
+  accentSoft,
+  accentSoftDark,
+  ring,
+  mode = "light",
+}) {
+  const ringColor = ring.replace("bg-", "");
+  const dark = mode === "dark";
 
   return {
     // ─── Page ─────────────────────────────────────────────
-    pageBg: "bg-gradient-to-b from-slate-50 to-slate-100/60",
-    sidebarBg: "bg-white/90 backdrop-blur-xl",
-    sidebarBorder: "border border-slate-200 shadow-sm",
+    pageBg: dark
+      ? "bg-gradient-to-b from-slate-950 to-slate-900"
+      : "bg-gradient-to-b from-slate-50 to-slate-100/60",
+    sidebarBg: dark
+      ? "bg-slate-900/90 backdrop-blur-xl"
+      : "bg-white/90 backdrop-blur-xl",
+    sidebarBorder: dark
+      ? "border border-slate-800 shadow-sm"
+      : "border border-slate-200 shadow-sm",
     contentBg: "bg-transparent",
 
     // ─── Navbar ──────────────────────────────────────────
@@ -384,7 +400,6 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
 
     logoutBorder: "border-white/20",
     logoutText: "text-white",
-
     logoutHoverBorder: "hover:border-red-300/60",
     logoutHoverText: "hover:text-red-100",
     logoutHoverBg: "hover:bg-red-500/10",
@@ -393,26 +408,34 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
     glowLine: "via-white/30",
 
     // ─── Sidebar nav ─────────────────────────────────────
-    sideNavActive: `text-slate-900 ${accentSoft} border border-slate-200/80 shadow-sm ring-1 ring-${ringColor}/10`,
-    sideNavIdle:
-      "text-slate-500 hover:text-slate-800 hover:bg-slate-100/80 border border-transparent",
+    sideNavActive: dark
+      ? `text-white ${accentSoftDark || "bg-white/5"} border border-white/10 shadow-sm ring-1 ring-${ringColor}/20`
+      : `text-slate-900 ${accentSoft} border border-slate-200/80 shadow-sm ring-1 ring-${ringColor}/10`,
+    sideNavIdle: dark
+      ? "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent"
+      : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/80 border border-transparent",
     sideNavDotActive: accentDark,
-    sideNavDotIdle: "bg-slate-300 group-hover:bg-slate-400",
-    sideNavLabel: "text-slate-400",
+    sideNavDotIdle: dark
+      ? "bg-slate-600 group-hover:bg-slate-500"
+      : "bg-slate-300 group-hover:bg-slate-400",
+    sideNavLabel: dark ? "text-slate-500" : "text-slate-400",
 
     // ─── Section headers ─────────────────────────────────
     sectionAccentBar: accent,
-    sectionLabel: "text-slate-400",
-    sectionTitle: "text-slate-900",
-    sectionCountBg: "bg-white border border-slate-200",
-    sectionCountBorder: "border-slate-200",
+    sectionLabel: dark ? "text-slate-500" : "text-slate-400",
+    sectionTitle: dark ? "text-slate-100" : "text-slate-900",
+    sectionCountBg: dark
+      ? "bg-slate-800 border border-slate-700"
+      : "bg-white border border-slate-200",
+    sectionCountBorder: dark ? "border-slate-700" : "border-slate-200",
     sectionCountDot: accentDark,
-    sectionCountText: "text-slate-700",
-    sectionDivider: "border-slate-200",
+    sectionCountText: dark ? "text-slate-200" : "text-slate-700",
+    sectionDivider: dark ? "border-slate-800" : "border-slate-200",
 
     // ─── Cards ───────────────────────────────────────────
-    cardBg:
-      "bg-gradient-to-b from-white to-slate-50/80 border border-slate-200",
+    cardBg: dark
+      ? "bg-gradient-to-b from-slate-800 to-slate-800/80 border border-slate-700"
+      : "bg-gradient-to-b from-white to-slate-50/80 border border-slate-200",
     cardHoverShadow: `hover:shadow-[0_8px_24px_-8px_var(--tw-shadow-color)] hover:shadow-${ringColor}/25`,
 
     cardNormalBorder: "border-l-emerald-400",
@@ -420,77 +443,136 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
       "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white",
     cardNormalDot: "bg-emerald-400",
     cardNormalAccent: "bg-emerald-400",
-    cardNormalPriority: "text-emerald-600",
+    cardNormalPriority: dark ? "text-emerald-400" : "text-emerald-600",
 
     cardEmergencyBorder: "border-l-red-500",
     cardEmergencyBadge: "bg-gradient-to-r from-red-600 to-red-500 text-white",
     cardEmergencyDot: "bg-red-500",
     cardEmergencyAccent: "bg-red-500",
-    cardEmergencyPriority: "text-red-600",
+    cardEmergencyPriority: dark ? "text-red-400" : "text-red-600",
 
     cardUrgentBorder: "border-l-amber-400",
     cardUrgentBadge: "bg-gradient-to-r from-amber-500 to-amber-400 text-white",
     cardUrgentDot: "bg-amber-400",
     cardUrgentAccent: "bg-amber-400",
-    cardUrgentPriority: "text-amber-600",
+    cardUrgentPriority: dark ? "text-amber-400" : "text-amber-600",
 
-    cardDateLabel: "text-slate-400",
-    cardDateValue: "text-slate-700",
+    cardDateLabel: dark ? "text-slate-500" : "text-slate-400",
+    cardDateValue: dark ? "text-slate-300" : "text-slate-700",
 
-    cardStatusBg: "bg-slate-100",
-    cardStatusBorder: "border-slate-200",
-    cardStatusText: "text-slate-600",
+    cardStatusBg: dark ? "bg-slate-700/60" : "bg-slate-100",
+    cardStatusBorder: dark ? "border-slate-600" : "border-slate-200",
+    cardStatusText: dark ? "text-slate-300" : "text-slate-600",
 
     // ─── Feedback badge ──────────────────────────────────
     feedbackBadge: `${ring} text-white shadow-sm`,
 
     // ─── Mobile toggle ───────────────────────────────────
-    mobileToggleBg: "bg-white",
-    mobileToggleBorder: "border-slate-200",
-    mobileToggleText: "text-slate-700",
-    mobileToggleHover: "hover:bg-slate-50",
+    mobileToggleBg: dark ? "bg-slate-800" : "bg-white",
+    mobileToggleBorder: dark ? "border-slate-700" : "border-slate-200",
+    mobileToggleText: dark ? "text-slate-200" : "text-slate-700",
+    mobileToggleHover: dark ? "hover:bg-slate-700" : "hover:bg-slate-50",
 
-    mobileBottomBg: "bg-white",
-    mobileBottomBorder: "border-slate-200",
+    mobileBottomBg: dark ? "bg-slate-800" : "bg-white",
+    mobileBottomBorder: dark ? "border-slate-700" : "border-slate-200",
     mobileBottomDot: accentDark,
-    mobileBottomText: "text-slate-700",
+    mobileBottomText: dark ? "text-slate-200" : "text-slate-700",
 
     // ─── Bottom sheet ────────────────────────────────────
-    sheetBg: "bg-white",
-    sheetBorder: "border-slate-200",
+    sheetBg: dark ? "bg-slate-900" : "bg-white",
+    sheetBorder: dark ? "border-slate-700" : "border-slate-200",
     sheetTopBar: accent,
-    titleColor: "text-slate-900",
-    emptyText: "text-slate-400",
+    titleColor: dark ? "text-slate-100" : "text-slate-900",
+    emptyText: dark ? "text-slate-500" : "text-slate-400",
 
     // ─── Slide panel ─────────────────────────────────────
-    slideBg: "bg-white",
-    slideBorder: "border-slate-200",
+    slideBg: dark ? "bg-slate-900" : "bg-white",
+    slideBorder: dark ? "border-slate-700" : "border-slate-200",
     slideTopBar: accent,
 
-    linkActiveBg: accentSoft,
-    linkActiveBorder: "border-slate-200",
-    linkActiveText: "text-slate-900",
+    linkActiveBg: dark ? accentSoftDark || "bg-white/5" : accentSoft,
+    linkActiveBorder: dark ? "border-slate-700" : "border-slate-200",
+    linkActiveText: dark ? "text-slate-100" : "text-slate-900",
 
     linkIdleBorder: "border-transparent",
-    linkIdleText: "text-slate-500",
+    linkIdleText: dark ? "text-slate-400" : "text-slate-500",
 
-    linkHoverText: "hover:text-slate-900",
-    linkHoverBorder: "hover:border-slate-200",
-    linkHoverBg: "hover:bg-slate-50",
+    linkHoverText: dark ? "hover:text-slate-100" : "hover:text-slate-900",
+    linkHoverBorder: dark ? "hover:border-slate-700" : "hover:border-slate-200",
+    linkHoverBg: dark ? "hover:bg-slate-800" : "hover:bg-slate-50",
 
     // ─── Spinner ─────────────────────────────────────────
     spinnerOuter: `border-t-${ringColor}`,
-    spinnerInner: "border-t-slate-300",
+    spinnerInner: dark ? "border-t-slate-600" : "border-t-slate-300",
     dotColor: ring,
-    textColor: "text-slate-400",
+    textColor: dark ? "text-slate-500" : "text-slate-400",
 
     // ─── Report details ──────────────────────────────────
-    detailsBg: "bg-white",
-    detailsCloseText: "text-slate-500",
-    detailsLabelColor: "text-slate-500",
-    detailsValueColor: "text-slate-800",
+    detailsBg: dark ? "bg-slate-900" : "bg-white",
+    detailsCloseText: dark ? "text-slate-400" : "text-slate-500",
+    detailsLabelColor: dark ? "text-slate-500" : "text-slate-500",
+    detailsValueColor: dark ? "text-slate-200" : "text-slate-800",
   };
 }
+
+// Per-role identity: accent + a translucent "soft" accent for dark mode,
+// since the light-mode -50 tints (e.g. bg-emerald-50) go invisible on a
+// dark surface — a translucent version of the same hue reads correctly
+// in both.
+const ROLE_ACCENTS = {
+  admin: {
+    accent: "from-emerald-600 to-emerald-500",
+    accentDark: "bg-emerald-500",
+    accentSoft: "bg-emerald-50",
+    accentSoftDark: "bg-emerald-500/10",
+    ring: "bg-emerald-500",
+  },
+  estate: {
+    accent: "from-sky-600 to-sky-500",
+    accentDark: "bg-sky-500",
+    accentSoft: "bg-sky-50",
+    accentSoftDark: "bg-sky-500/10",
+    ring: "bg-sky-500",
+  },
+  worker: {
+    accent: "from-amber-500 to-amber-400",
+    accentDark: "bg-amber-500",
+    accentSoft: "bg-amber-50",
+    accentSoftDark: "bg-amber-500/10",
+    ring: "bg-amber-500",
+  },
+  manager: {
+    accent: "from-orange-500 to-orange-400",
+    accentDark: "bg-orange-500",
+    accentSoft: "bg-orange-50",
+    accentSoftDark: "bg-orange-500/10",
+    ring: "bg-orange-500",
+  },
+  procurement: {
+    accent: "from-indigo-600 to-indigo-500",
+    accentDark: "bg-indigo-500",
+    accentSoft: "bg-indigo-50",
+    accentSoftDark: "bg-indigo-500/10",
+    ring: "bg-indigo-500",
+  },
+};
+
+// Pre-build both mode variants once (avoids rebuilding token objects on
+// every render) and look them up by [mode][role].
+const THEME_CACHE = { light: {}, dark: {} };
+for (const mode of ["light", "dark"]) {
+  for (const [role, cfg] of Object.entries(ROLE_ACCENTS)) {
+    THEME_CACHE[mode][role] = makeTheme({ ...cfg, mode });
+  }
+}
+
+export function getTheme(role, mode = "light") {
+  return THEME_CACHE[mode]?.[role] || THEME_CACHE[mode]?.admin;
+}
+
+// Kept for any other file still importing THEMES directly — defaults to
+// light mode. Prefer getTheme(role, mode) going forward.
+export const THEMES = THEME_CACHE.light;
 
 // Per-role identity lives in exactly four values. Everything else is
 // derived by makeTheme() above, so the whole theme system fits on one
@@ -499,38 +581,6 @@ function makeTheme({ accent, accentDark, accentSoft, ring }) {
 // Procurement uses indigo — distinct from admin (emerald), estate (sky),
 // worker (amber), and manager (orange); reads as "purchasing/logistics"
 // rather than the alert-red it used to borrow.
-export const THEMES = {
-  admin: makeTheme({
-    accent: "from-emerald-600 to-emerald-500",
-    accentDark: "bg-emerald-500",
-    accentSoft: "bg-emerald-50",
-    ring: "bg-emerald-500",
-  }),
-  estate: makeTheme({
-    accent: "from-sky-600 to-sky-500",
-    accentDark: "bg-sky-500",
-    accentSoft: "bg-sky-50",
-    ring: "bg-sky-500",
-  }),
-  worker: makeTheme({
-    accent: "from-amber-500 to-amber-400",
-    accentDark: "bg-amber-500",
-    accentSoft: "bg-amber-50",
-    ring: "bg-amber-500",
-  }),
-  manager: makeTheme({
-    accent: "from-orange-500 to-orange-400",
-    accentDark: "bg-orange-500",
-    accentSoft: "bg-orange-50",
-    ring: "bg-orange-500",
-  }),
-  procurement: makeTheme({
-    accent: "from-indigo-600 to-indigo-500",
-    accentDark: "bg-indigo-500",
-    accentSoft: "bg-indigo-50",
-    ring: "bg-indigo-500",
-  }),
-};
 
 // ─── Pagination controls ───────────────────────────────────────────────────
 const PAGE_SIZE = 9;
@@ -853,7 +903,8 @@ export default function Home({
   dashboardRedirect,
   role,
 }) {
-  const theme = THEMES[role] || THEMES[(role = "admin")];
+  const { mode } = useThemeMode();
+  const theme = getTheme(role || "admin", mode);
   const [sidePopup, setSidePopup] = useState(false);
   const [showReportsHiddenOnMobile, SetShowReportsHiddenOnMobile] =
     useState(false);
