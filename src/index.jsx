@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { BrowserRouter } from "react-router";
 
-import { ThemeModeProvider } from "./src/ThemeModeContext";
+import { ThemeModeProvider } from "./ThemeModeContext";
 
 function startVersionPoller() {
   let currentVersion = null;
