@@ -426,7 +426,7 @@ export default function SlideInRight({
 
           <button
             onClick={handleLogout}
-            className={`text-xs tracking-widest uppercase md:hidden font-semibold px-3 py-1.5 my-10 rounded border transition-all duration-200 cursor-pointer  border-red-500 text-red-500`}
+            className={`text-xs tracking-widest uppercase md:hidden font-semibold px-3 py-1.5 my-10 rounded border transition-all duration-200 cursor-pointer  border-red-400 text-red-400`}
           >
             Logout
           </button>

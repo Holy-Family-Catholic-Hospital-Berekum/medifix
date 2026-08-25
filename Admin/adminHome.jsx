@@ -18,7 +18,7 @@ export default function AdminHome() {
       navBarColor="bg-green-300"
       slideInBgColor="bg-green-300"
       reportDetailsBgColor="bg-green-300"
-      reportsHiddenOnMobileTitle="Material Requests"
+      reportsHiddenOnMobileTitle="Materials Requests"
       completedRedirect={"/ac"}
       acceptedRedirect={"/aip"}
       logoBGColor="md:bg-green-500"
