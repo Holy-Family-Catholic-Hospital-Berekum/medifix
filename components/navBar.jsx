@@ -120,7 +120,7 @@ export default function NavBar({
         <ThemeToggle />
         <button
           onClick={handleLogout}
-          className={`text-xs tracking-widest uppercase hidden md:flex font-semibold px-3 py-1.5 rounded border transition-all duration-200 cursor-pointer ${logoutBorder} ${logoutText} ${logoutHoverBorder} ${logoutHoverText} ${logoutHoverBg}`}
+          className={`text-xs tracking-widest uppercase ${!user?.role === "manager" ? "hidden" : ""} md:flex font-semibold px-3 py-1.5 rounded border transition-all duration-200 cursor-pointer ${logoutBorder} ${logoutText} ${logoutHoverBorder} ${logoutHoverText} ${logoutHoverBg}`}
         >
           Logout
         </button>
