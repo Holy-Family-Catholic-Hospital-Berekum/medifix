@@ -22,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 // Firebase Console → App Check → your web app → Manage debug tokens.
 // Gated behind import.meta.env.DEV so this never runs in a production build.
 if (import.meta.env.DEV) {
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = "9f910cb1-2966-49d1-8ad6-5584919888d8";
 }
 
 // Must be initialized before any Firestore/Auth calls elsewhere in the app

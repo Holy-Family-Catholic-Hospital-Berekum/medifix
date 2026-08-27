@@ -250,7 +250,7 @@ export default function StaffHome() {
   };
 
   const pageContent = (
-    <main className="bg-white pt-20 md:pt-24 pb-20 min-h-screen">
+    <main className="bg-blue-50 pt-20 md:pt-24 pb-20 min-h-screen">
       <span
         className="material-symbols-outlined md:hidden z-50 fixed cursor-pointer top-1/2 rounded-l-full py-2 pl-2 left-auto right-0 text-white shadow-lg"
         style={{ backgroundColor: ORANGE }}
