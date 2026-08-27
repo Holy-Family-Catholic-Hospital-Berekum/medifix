@@ -373,7 +373,7 @@ function makeTheme({
     // ─── Page ─────────────────────────────────────────────
     pageBg: dark
       ? "bg-gradient-to-b from-slate-950 to-slate-900"
-      : "bg-gradient-to-b from-blue-50 to-sky-50/60",
+      : "bg-gradient-to-b from-slate-50 to-slate-100/60",
     sidebarBg: dark
       ? "bg-slate-900/90 backdrop-blur-xl"
       : "bg-white/90 backdrop-blur-xl",
