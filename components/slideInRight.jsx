@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router";
 import { signOut } from "firebase/auth";
 import { auth } from "../src/firebase";
+import { useNavigate } from "react-router";
 const icons = {
   assigned: (
     <svg
@@ -129,6 +130,7 @@ export default function SlideInRight({
 }) {
   const [closing, setClosing] = useState(false);
   const [visible, setVisible] = useState(false);
+  const navigate = useNavigate();
 
   const {
     slideBg = "bg-slate-950/98",

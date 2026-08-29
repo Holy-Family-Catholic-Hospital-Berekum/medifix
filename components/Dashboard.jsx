@@ -136,17 +136,28 @@ const paginate = (arr, page, pageSize) =>
 const REG_ID_LENGTH = 6;
 const REG_ID_MAX_GENERATION_ATTEMPTS = 10;
 
+// Cryptographically random digit, 0–9, with no modulo bias.
+// 256 % 10 = 6, so without rejection, digits 0–5 would be drawn very
+// slightly more often than 6–9 — negligible for most uses, but free to
+// eliminate, so we do.
+function secureRandomDigit() {
+  const arr = new Uint8Array(1);
+  let byte;
+  do {
+    crypto.getRandomValues(arr);
+    byte = arr[0];
+  } while (byte >= 250);
+  return byte % 10;
+}
+
 async function generateUniqueRegistrationId() {
   for (let attempt = 0; attempt < REG_ID_MAX_GENERATION_ATTEMPTS; attempt++) {
     const candidate = Array.from({ length: REG_ID_LENGTH }, () =>
-      Math.floor(Math.random() * 10),
+      secureRandomDigit(),
     ).join("");
     const snap = await getDoc(doc(db, "registrationIDs", candidate));
     if (!snap.exists()) return candidate;
   }
-  // Vanishingly unlikely at 1M possible codes and normal generation
-  // volume, but fail loudly rather than silently overwriting an existing
-  // active PIN if it ever does happen.
   throw new Error(
     "Could not generate a unique registration PIN please try again.",
   );
@@ -1310,6 +1321,10 @@ function GenIDModal({ role, onClose }) {
   const [genType, setGenType] = useState(allowedTypes[0]);
   const [genLoading, setGenLoading] = useState(false);
   const [generatedID, setGeneratedID] = useState("");
+  // Tracks whether the ID was just copied, purely to drive the brief
+  // "Copied!" confirmation below — resets on its own after a short delay,
+  // and also resets whenever a fresh ID is generated (see handleGenerate).
+  const [copied, setCopied] = useState(false);
 
   const handleGenerate = async () => {
     if (genLoading) return;
@@ -1325,6 +1340,7 @@ function GenIDModal({ role, onClose }) {
         createdAt: serverTimestamp(),
       });
       setGeneratedID(id);
+      setCopied(false);
     } catch (e) {
       console.error("Failed to generate ID:", e);
       alert(
@@ -1332,6 +1348,17 @@ function GenIDModal({ role, onClose }) {
       );
     } finally {
       setGenLoading(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedID);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch (e) {
+      console.error("Failed to copy registration ID:", e);
+      alert("Couldn't copy the PIN — please copy it manually.");
     }
   };
 
@@ -1410,10 +1437,20 @@ function GenIDModal({ role, onClose }) {
               </span>
               <button
                 type="button"
-                onClick={() => navigator.clipboard.writeText(generatedID)}
-                className={`material-symbols-outlined transition cursor-pointer text-lg ${dark ? "text-slate-400 hover:text-slate-100" : "text-gray-500 hover:text-gray-800"}`}
+                onClick={handleCopy}
+                title={copied ? "Copied!" : "Copy PIN"}
+                className={`flex items-center gap-1 transition cursor-pointer text-lg ${
+                  copied
+                    ? "text-green-500"
+                    : dark
+                      ? "text-slate-400 hover:text-slate-100"
+                      : "text-gray-500 hover:text-gray-800"
+                }`}
               >
-                content_copy
+                <span className="material-symbols-outlined text-lg">
+                  {copied ? "check" : "content_copy"}
+                </span>
+                {copied && <span className="text-xs font-medium">Copied!</span>}
               </button>
             </div>
             <p
@@ -1427,6 +1464,7 @@ function GenIDModal({ role, onClose }) {
                 onClick={() => {
                   setGeneratedID("");
                   setGenType(allowedTypes[0]);
+                  setCopied(false);
                 }}
                 className={`flex-1 py-2 rounded-lg border transition cursor-pointer ${
                   dark

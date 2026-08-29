@@ -4,6 +4,47 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import EnableNotificationsButton from "../components/EnableNotificationsButton";
+import { MFA_REQUIRED_ROLES } from "../src/lib/mfaConfig";
+
+// *** THE FIX ***
+// This file used to gate admin/manager access on
+// `firebaseUser.multiFactor.enrolledFactors.length > 0`, refreshed via
+// reload() and retried up to 3 times. That check answers "does this
+// account have a factor enrolled at all" — a DIFFERENT question from what
+// firestore.rules actually enforces via hasVerifiedSecondFactor(), which
+// checks whether THIS SESSION's ID token carries the
+// `sign_in_second_factor` claim (only set when sign-in itself was
+// challenged and resolved via resolver.resolveSignIn()).
+//
+// Those two signals can disagree — e.g. immediately after
+// multiFactor(user).enroll() on an already-open password-only session,
+// enrolledFactors may eventually read non-empty, but sign_in_second_factor
+// is NEVER set on that session no matter how long you wait or how many
+// times you refresh the token. Polling enrolledFactors could therefore
+// either (a) time out and wrongly sign a legitimately-enrolled user back
+// out, or (b) "pass" while every subsequent admin/manager Firestore read
+// still fails permission-denied, since the rules check a claim this check
+// never looked at.
+//
+// The real fix (see SignUp.jsx's completeMfaEnrollment) is to force a
+// sign-out + re-login immediately after enrollment, so the resulting
+// session is always one that went through resolveSignIn() and therefore
+// always carries the claim. Given that, THIS check can — and should —
+// look at the exact same claim the Firestore rules use, instead of a
+// different, racier signal. That keeps client-side gating and
+// server-side enforcement permanently in agreement, and removes the need
+// for a multi-second retry loop: the claim is embedded in the ID token
+// itself, available the moment sign-in resolves, with no separate
+// account-info fetch to wait on.
+async function hasVerifiedSecondFactor(firebaseUser, forceRefresh = false) {
+  try {
+    const tokenResult = await firebaseUser.getIdTokenResult(forceRefresh);
+    return !!tokenResult.claims?.firebase?.sign_in_second_factor;
+  } catch (err) {
+    console.error("Failed to read ID token claims for MFA check:", err);
+    return false;
+  }
+}
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const [user, setUser] = useState(null);
@@ -13,7 +54,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   useEffect(() => {
     let unsubscribeUserDoc = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       // Auth state changed — drop any previous per-user doc listener
       // before attaching a new one (or none, if signed out).
       if (unsubscribeUserDoc) {
@@ -36,7 +77,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       // never trusted on its own.
       unsubscribeUserDoc = onSnapshot(
         doc(db, "users", firebaseUser.uid),
-        (userSnap) => {
+        async (userSnap) => {
           if (!userSnap.exists()) {
             auth.signOut().catch((err) => console.error(err));
             localStorage.removeItem("user");
@@ -48,6 +89,39 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           const freshData = userSnap.data();
 
           if (freshData.deactivated === true) {
+            auth.signOut().catch((err) => console.error(err));
+            localStorage.removeItem("user");
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+
+          // SECURITY GATE: admin/manager accounts must have signed in
+          // THIS SESSION with a verified second factor — checked via the
+          // same `sign_in_second_factor` ID token claim Firestore's
+          // hasVerifiedSecondFactor() rule checks (see the note above the
+          // hasVerifiedSecondFactor() helper for why this, and not
+          // multiFactor.enrolledFactors, is the correct signal here).
+          //
+          // A single forced-refresh retry is kept as a safety net for the
+          // rare case where the SDK's cached token predates a claim
+          // change — but this should not be needed in normal operation,
+          // since resolver.resolveSignIn() already mints a token carrying
+          // the claim before this component ever observes the user.
+          const needsMfa = MFA_REQUIRED_ROLES.includes(freshData.role);
+          let verified = needsMfa
+            ? await hasVerifiedSecondFactor(firebaseUser)
+            : true;
+
+          if (needsMfa && !verified) {
+            verified = await hasVerifiedSecondFactor(firebaseUser, true);
+          }
+
+          if (needsMfa && !verified) {
+            console.warn(
+              `[MFA] ${freshData.role} account's current session was not ` +
+                `authenticated with a verified second factor — signing out.`,
+            );
             auth.signOut().catch((err) => console.error(err));
             localStorage.removeItem("user");
             setUser(null);
