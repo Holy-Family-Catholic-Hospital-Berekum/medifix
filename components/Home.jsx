@@ -192,8 +192,6 @@ function sortByDateFieldForDisplay(docs, dateField) {
 }
 
 // ─── Birthday celebration helpers ───────────────────────────────────────────
-// birthdate is stored as "YYYY-MM-DD" (see SignUp.jsx). Only month/day need
-// to match today — the year is irrelevant.
 function isBirthdayToday(birthdate) {
   if (!birthdate || typeof birthdate !== "string") return false;
   const parts = birthdate.split("-").map(Number);
@@ -204,51 +202,214 @@ function isBirthdayToday(birthdate) {
   return month === today.getMonth() + 1 && day === today.getDate();
 }
 
+function getBirthdaySeenKey(userObj) {
+  if (!userObj?.birthdate || typeof userObj.birthdate !== "string") return null;
+  const parts = userObj.birthdate.split("-").map(Number);
+  if (parts.length !== 3) return null;
+  const [, month, day] = parts;
+  if (!month || !day) return null;
+  const year = new Date().getFullYear();
+  const userKey = userObj.ID || userObj.email || "guest";
+  return `birthdayCelebration:${userKey}:${year}-${month}-${day}`;
+}
+
 function getFirstName(userObj) {
   return userObj?.name?.trim().split(" ")[0] || "there";
 }
 
-// Quiet, dismissible toast — no confetti, no bounce. A single restrained
-// fade/slide on entry is enough to draw the eye without turning a work
-// dashboard into a party popper.
-function BirthdayBanner({ name, onDismiss }) {
+function BirthdayBanner({ name, onDismiss, isDarkMode }) {
   const [entered, setEntered] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setEntered(true), 10);
+    const t = setTimeout(() => setEntered(true), 20);
     return () => clearTimeout(t);
   }, []);
 
+  const palette = isDarkMode
+    ? {
+        shell:
+          "border border-white/10 bg-[#160f24] shadow-[0_30px_80px_rgba(0,0,0,0.6)]",
+        headlineFrom: "from-[#FF5FA2]",
+        headlineVia: "via-[#FFB84D]",
+        headlineTo: "to-[#7C6FFF]",
+        sub: "text-white/60",
+        badge: "border border-white/15 bg-white/5 text-white/80",
+        button:
+          "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white",
+        balloons: ["#FF5FA2", "#7C6FFF", "#3EE0C4", "#FFB84D"],
+        sparkle: "#FFD84D",
+      }
+    : {
+        shell:
+          "border border-white/60 bg-white shadow-[0_30px_70px_rgba(255,62,138,0.25)]",
+        headlineFrom: "from-[#FF3E8A]",
+        headlineVia: "via-[#FF7A3E]",
+        headlineTo: "to-[#7C4DFF]",
+        sub: "text-slate-500",
+        badge: "border border-[#FF3E8A]/20 bg-[#FFF1F6] text-[#D6256B]",
+        button:
+          "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+        balloons: ["#FF3E8A", "#7C4DFF", "#1FC8A0", "#FF9F3E"],
+        sparkle: "#FF9F3E",
+      };
+
   return (
-    <div className="fixed top-0 inset-x-0 z-[120] flex justify-center px-4 pt-4 pointer-events-none">
+    <div className="fixed inset-x-0 top-4 z-[120] flex justify-center px-4 pointer-events-none">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
+        @keyframes balloon-float {
+          0%, 100% { transform: translateY(0) rotate(-3deg); }
+          50% { transform: translateY(-10px) rotate(3deg); }
+        }
+        @keyframes sparkle-twinkle {
+          0%, 100% { opacity: 0.2; transform: scale(0.7) rotate(0deg); }
+          50% { opacity: 1; transform: scale(1.15) rotate(20deg); }
+        }
+        @keyframes banner-pop {
+          0% { transform: scale(0.85) translateY(-14px); opacity: 0; }
+          65% { transform: scale(1.02) translateY(2px); opacity: 1; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .banner-pop-in { animation: banner-pop 520ms cubic-bezier(.22,1.4,.36,1) both; }
+        .balloon { animation: balloon-float 3.4s ease-in-out infinite; }
+        .sparkle { animation: sparkle-twinkle 2.2s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .banner-pop-in, .balloon, .sparkle { animation: none !important; }
+        }
+      `}</style>
+
       <div
-        className={`pointer-events-auto relative max-w-md w-full rounded-xl overflow-hidden shadow-lg border border-white/20 bg-slate-900/95 text-white px-4 py-3 flex items-center gap-3 transition-all duration-300 ${
-          entered ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"
+        className={`pointer-events-auto relative w-full max-w-lg overflow-hidden rounded-[28px] ${palette.shell} ${
+          entered ? "banner-pop-in" : "opacity-0"
         }`}
       >
-        <span className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-          <span className="material-symbols-outlined text-[18px] leading-none">
-            cake
-          </span>
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm leading-tight">
-            Happy birthday, {name}
-          </p>
-          <p className="text-xs text-white/70 mt-0.5">
-            Wishing you a great day from the whole team.
-          </p>
+        {/* Balloons drifting along the bottom edge, clipped to the card */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 overflow-hidden">
+          {palette.balloons.map((color, i) => (
+            <span
+              key={i}
+              className="balloon absolute bottom-[-6px] block h-7 w-6 rounded-[50%_50%_50%_50%/60%_60%_40%_40%]"
+              style={{
+                left: `${10 + i * 24}%`,
+                backgroundColor: color,
+                opacity: 0.85,
+                animationDelay: `${i * 0.35}s`,
+                animationDuration: `${3 + i * 0.4}s`,
+              }}
+            />
+          ))}
         </div>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="text-white/60 hover:text-white transition-colors flex-shrink-0"
-          aria-label="Dismiss birthday message"
+
+        {/* Sparkles */}
+        <span
+          className="sparkle absolute right-10 top-4 text-lg"
+          style={{ color: palette.sparkle }}
         >
-          <span className="material-symbols-outlined text-[18px] leading-none">
-            close
-          </span>
-        </button>
+          ✦
+        </span>
+        <span
+          className="sparkle absolute right-24 top-8 text-xs"
+          style={{ color: palette.sparkle, animationDelay: "0.6s" }}
+        >
+          ✦
+        </span>
+        <span
+          className="sparkle absolute left-16 top-3 text-sm"
+          style={{ color: palette.sparkle, animationDelay: "1.1s" }}
+        >
+          ✦
+        </span>
+
+        <div className="relative flex items-start gap-4 px-6 py-5">
+          <div className="min-w-0 flex-1">
+            <span
+              className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${palette.badge}`}
+            >
+              It's your day
+            </span>
+            <p
+              className={`mt-2 bg-gradient-to-r ${palette.headlineFrom} ${palette.headlineVia} ${palette.headlineTo} bg-clip-text text-transparent text-3xl md:text-4xl leading-none`}
+              style={{ fontFamily: "'Fredoka', sans-serif", fontWeight: 600 }}
+            >
+              Happy Birthday, {name}!
+            </p>
+            <p className={`mt-2 text-sm ${palette.sub}`}>
+              Phix wishes you a birthday as great as you are.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onDismiss}
+            className={`shrink-0 rounded-full p-2 transition ${palette.button}`}
+            aria-label="Dismiss birthday message"
+          >
+            <span className="material-symbols-outlined text-[18px] leading-none">
+              close
+            </span>
+          </button>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// Small helper so the shell string stays readable above
+function classes(palette) {
+  return palette.shell;
+}
+
+function BirthdayConfetti() {
+  const [pieces] = useState(() =>
+    Array.from({ length: 90 }, (_, index) => ({
+      id: index,
+      left: Math.random() * 100,
+      delay: Math.random() * 1.4,
+      duration: 2.6 + Math.random() * 2.8,
+      width: 6 + Math.random() * 8,
+      height: 14 + Math.random() * 18,
+      color: ["#FF3E8A", "#7C4DFF", "#1FC8A0", "#FF9F3E", "#FFD84D", "#FF5FA2"][
+        Math.floor(Math.random() * 6)
+      ],
+      drift: (Math.random() - 0.5) * 260,
+    })),
+  );
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-x-0 z-[110] overflow-hidden"
+      style={{ top: "72px", height: "calc(100vh - 72px)" }}
+    >
+      <style>{`
+        @keyframes birthday-confetti {
+          0% {
+            transform: translateY(-20px) translateX(0) rotate(0deg);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(calc(100vh - 72px)) translateX(var(--drift)) rotate(720deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
+
+      {pieces.map((piece) => (
+        <span
+          key={piece.id}
+          className="absolute top-0 rounded-sm"
+          style={{
+            left: `${piece.left}%`,
+            width: `${piece.width}px`,
+            height: `${piece.height}px`,
+            backgroundColor: piece.color,
+            animation: `birthday-confetti ${piece.duration}s ease-in ${piece.delay}s forwards`,
+            opacity: 0,
+            "--drift": `${piece.drift}px`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -952,6 +1113,7 @@ export default function Home({
   const [currentReportId, setCurrentReportId] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [showBirthdayBanner, setShowBirthdayBanner] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState("overall");
@@ -970,23 +1132,26 @@ export default function Home({
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  // Show the birthday banner once per day, on the user's actual birthday
-  // only. Dismissal is remembered in localStorage so it doesn't keep
-  // popping back up on every navigation/refresh for the rest of the day,
-  // but it'll return next year.
+  // Show the birthday card and confetti only once for this year's birthday.
+  // The celebration key is stored in localStorage so it won't replay on every
+  // refresh or re-navigation until the next birthday year.
   useEffect(() => {
     if (!user?.birthdate || !isBirthdayToday(user.birthdate)) return;
-    const todayKey = new Date().toISOString().split("T")[0];
-    const dismissKey = `birthdayDismissed:${user.ID || user.email}:${todayKey}`;
-    if (localStorage.getItem(dismissKey)) return;
+    const seenKey = getBirthdaySeenKey(user);
+    if (!seenKey || localStorage.getItem(seenKey)) return;
+
     setShowBirthdayBanner(true);
-  }, []);
+    setShowConfetti(true);
+    localStorage.setItem(seenKey, "1");
+
+    const confettiTimer = setTimeout(() => setShowConfetti(false), 10000);
+    return () => clearTimeout(confettiTimer);
+  }, [user?.ID, user?.birthdate]);
 
   const dismissBirthdayBanner = () => {
     setShowBirthdayBanner(false);
-    const todayKey = new Date().toISOString().split("T")[0];
-    const dismissKey = `birthdayDismissed:${user?.ID || user?.email}:${todayKey}`;
-    localStorage.setItem(dismissKey, "1");
+    const seenKey = getBirthdaySeenKey(user);
+    if (seenKey) localStorage.setItem(seenKey, "1");
   };
 
   const handleClose = () => {
@@ -1617,10 +1782,13 @@ export default function Home({
         }
       `}</style>
 
+      {showConfetti && <BirthdayConfetti />}
+
       {showBirthdayBanner && (
         <BirthdayBanner
           name={getFirstName(user)}
           onDismiss={dismissBirthdayBanner}
+          isDarkMode={mode === "dark"}
         />
       )}
 
