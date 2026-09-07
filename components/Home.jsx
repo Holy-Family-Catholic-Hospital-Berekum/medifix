@@ -1155,6 +1155,70 @@ export default function Home({
   const uid = useAuthUid();
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
+  // ─── Desktop-only floating overlay for the second section ─────────────
+  // Only admin/estate get the "second section floats up from the bottom
+  // and covers the first section" treatment — every other role keeps the
+  // original static two-sections-in-flow layout untouched. This never
+  // touches mobile: the overlay markup below is gated by `hidden md:...`,
+  // and the existing mobile bottom-sheet (ReportsHiddenOnMobile) path is
+  // completely separate and unmodified.
+  //
+  // Behavior:
+  //  - `secondSectionRevealed` starts false: the second section sits
+  //    entirely off-screen (translated fully below the viewport) and is
+  //    not interactive (pointer-events-none) so it can never block clicks
+  //    on the first section underneath it.
+  //  - Scrolling/trackpad-swiping down once the first section's scroll
+  //    container has hit its bottom flips it to true, sliding the panel
+  //    up over the first section with its own solid background (reusing
+  //    the existing sheetBg/sheetBorder/sheetTopBar tokens) so the first
+  //    section is fully hidden underneath, not just overlapped.
+  //  - Scrolling/swiping up while already at the top of the open panel's
+  //    own internal scroll flips it back to false, sliding it back down
+  //    and out of view — mirroring the mobile bottom sheet's open/close
+  //    feel, just triggered by scroll instead of a tap.
+  //  - A small "peek" pill near the bottom offers a click-to-open
+  //    fallback, since a pure scroll trigger is easy to miss the first
+  //    time.
+  const isScrollRevealRole = ["admin", "estate"].includes(role);
+  const [secondSectionRevealed, setSecondSectionRevealed] = useState(false);
+  const mainScrollRef = useRef(null);
+  const secondPanelScrollRef = useRef(null);
+
+  // Collapse the overlay whenever the underlying data changes shape (role,
+  // page type, filters) so it never shows stale content sitting open.
+  useEffect(() => {
+    setSecondSectionRevealed(false);
+  }, [role, specificReportsPage, timeFilter, debouncedSearchQuery]);
+
+  const handleMainAreaWheel = useCallback(
+    (e) => {
+      if (!isScrollRevealRole || specificReportsPage || secondSectionRevealed)
+        return;
+      const el = mainScrollRef.current;
+      if (!el) return;
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 4;
+      if (atBottom && e.deltaY > 0) {
+        setSecondSectionRevealed(true);
+      }
+    },
+    [isScrollRevealRole, specificReportsPage, secondSectionRevealed],
+  );
+
+  const handleOverlayWheel = useCallback(
+    (e) => {
+      if (!isScrollRevealRole || specificReportsPage || !secondSectionRevealed)
+        return;
+      const el = secondPanelScrollRef.current;
+      if (!el) return;
+      const atTop = el.scrollTop <= 0;
+      if (atTop && e.deltaY < 0) {
+        setSecondSectionRevealed(false);
+      }
+    },
+    [isScrollRevealRole, specificReportsPage, secondSectionRevealed],
+  );
+
   useEffect(() => {
     markOverdueReports(user);
   }, []);
@@ -1559,7 +1623,7 @@ export default function Home({
   // 500-operation-per-batch hard limit.
   const handleMarkAllAsRead = useCallback(async () => {
     if (!user?.ID || !uid) return;
-    
+
     const relevant = allBadgeReports.filter(
       (r) =>
         pageStatuses.includes(r.status) &&
@@ -1846,6 +1910,36 @@ export default function Home({
     </div>
   );
 
+  // ─── Second section header/body — shared between the static in-flow
+  // render (non admin/estate roles) and the floating overlay panel
+  // (admin/estate) so the pagination/empty-state logic is written once. ──
+  const secondSectionHeader = (
+    <div className={`w-full py-6 border-y ${theme.sectionDivider}`}>
+      <SectionHeader
+        title={title2}
+        count={secondSection.loading ? undefined : secondSection.totalCount}
+      />
+    </div>
+  );
+
+  const secondSectionBody = secondSection.loading ? (
+    <Preloader theme={theme} />
+  ) : secondSection.totalCount > 0 ? (
+    <div className="flex flex-col items-center w-full">
+      <div className="flex lg:max-w-[80%] md:pl-[200px] gap-4 md:gap-6 justify-center w-full flex-wrap py-4 px-4">
+        {secondReportsCard}
+      </div>
+      <PaginationControls
+        page={secondSection.page}
+        totalPages={secondSection.totalPages}
+        onChange={secondSection.setPage}
+        theme={theme}
+      />
+    </div>
+  ) : (
+    <EmptyState filtered={hasActiveFilters} />
+  );
+
   return (
     <>
       {/* One-time entrance keyframe for status badges — plays once on
@@ -1857,6 +1951,13 @@ export default function Home({
         }
         .animate-badge-in {
           animation: badge-pop 220ms ease-out both;
+        }
+        @keyframes peek-bounce {
+          0%, 100% { transform: translate(-50%, 0); }
+          50% { transform: translate(-50%, -4px); }
+        }
+        .animate-peek-bounce {
+          animation: peek-bounce 1.8s ease-in-out infinite;
         }
       `}</style>
 
@@ -1950,6 +2051,78 @@ export default function Home({
           </span>
         </div>
       )}
+
+      {/* ── Desktop floating overlay for the second section (admin/estate
+          only) — starts fully below the viewport, slides up over the
+          first section with its own solid background on scroll-down at
+          the bottom of the first section, and slides back down out of
+          view on scroll-up at the top of its own content. Hidden on
+          mobile; the mobile bottom sheet above is unaffected. ────────── */}
+      {isScrollRevealRole && !specificReportsPage && (
+        <div
+          className={`hidden md:flex flex-col fixed z-30 top-20 bottom-0 left-0 right-0 md:left-[20%] ${theme.sheetBg} border-t ${theme.sheetBorder} shadow-[0_-16px_50px_rgba(0,0,0,0.25)] rounded-t-3xl overflow-hidden transition-transform duration-500 ease-out ${
+            secondSectionRevealed
+              ? "translate-y-0 pointer-events-auto"
+              : "translate-y-full pointer-events-none"
+          }`}
+        >
+          {/* Top accent bar */}
+          <div
+            className={`h-1.5 w-full bg-gradient-to-r ${theme.sheetTopBar} shrink-0`}
+          />
+
+          {/* Drag-handle style header — also doubles as a click-to-close
+              affordance, mirroring the mobile bottom sheet's "Close" tap. */}
+          <button
+            type="button"
+            onClick={() => setSecondSectionRevealed(false)}
+            className={`w-full flex flex-col items-center gap-1 py-2.5 shrink-0 ${theme.sheetBg} hover:brightness-95 transition`}
+            aria-label="Hide second section"
+          >
+            <span
+              className={`w-10 h-1.5 rounded-full ${theme.sectionCountBorder} bg-slate-300/70`}
+            />
+            <span
+              className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${theme.emptyText}`}
+            >
+              Scroll up or tap to close
+            </span>
+          </button>
+
+          <div
+            ref={secondPanelScrollRef}
+            onWheel={handleOverlayWheel}
+            className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-10"
+          >
+            {secondSectionHeader}
+            {secondSectionBody}
+          </div>
+        </div>
+      )}
+
+      {/* Peek pill — click-to-open fallback for the overlay above, shown
+          only while it's closed and there's something to show. */}
+      {isScrollRevealRole &&
+        !specificReportsPage &&
+        !secondSectionRevealed &&
+        !secondSection.loading &&
+        secondSection.totalCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setSecondSectionRevealed(true)}
+            className={`hidden md:flex fixed z-20 bottom-6 left-[60%] -translate-x-1/2 items-center gap-2 ${theme.sectionCountBg} border ${theme.sectionCountBorder} ${theme.sectionCountText} rounded-full px-4 py-2 text-xs font-semibold shadow-md hover:shadow-lg transition-shadow animate-peek-bounce`}
+          >
+            <span className="material-symbols-outlined text-sm leading-none">
+              keyboard_double_arrow_up
+            </span>
+            {title2}
+            <span
+              className={`${theme.sectionCountBg} border ${theme.sectionCountBorder} rounded-full px-1.5 text-[10px] font-bold`}
+            >
+              {secondSection.totalCount}
+            </span>
+          </button>
+        )}
 
       {/* Main layout */}
       <main className={`flex ${theme.pageBg} min-h-screen`}>
@@ -2168,7 +2341,11 @@ export default function Home({
         </div>
 
         {/* Content area */}
-        <div className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-auto pt-20 pb-16 flex flex-col items-center z-0 gap-8">
+        <div
+          ref={mainScrollRef}
+          onWheel={handleMainAreaWheel}
+          className="w-full h-screen [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-auto pt-20 pb-16 flex flex-col items-center z-0 gap-8"
+        >
           {/* ── Search / filter / mark-all-as-read toolbar ─────────────────── */}
           {specificReportsPage && (
             <div className="w-full px-6 md:pl-[calc(20%+24px)] flex flex-col md:flex-row md:items-center gap-3">
@@ -2252,8 +2429,18 @@ export default function Home({
             <EmptyState filtered={hasActiveFilters} />
           )}
 
-          {/* Second reports section */}
-          {!specificReportsPage && (
+          {/* Extra bottom breathing room on admin/estate desktop so there's
+              always a little scroll headroom to trigger the overlay reveal,
+              even when the first section's content is short. Purely
+              cosmetic spacing — no effect on mobile or other roles. */}
+          {isScrollRevealRole && !specificReportsPage && (
+            <div className="hidden md:block w-full h-24" aria-hidden="true" />
+          )}
+
+          {/* Second reports section — only rendered in normal document flow
+              for roles OTHER than admin/estate. For admin/estate it lives
+              exclusively in the floating overlay above. */}
+          {!specificReportsPage && !isScrollRevealRole && (
             <>
               <div
                 className={`w-full py-6 border-y ${theme.sectionDivider} hidden md:block`}
@@ -2288,6 +2475,15 @@ export default function Home({
                 </div>
               )}
             </>
+          )}
+
+          {/* Mobile still needs the second section's cards rendered
+              somewhere in the tree for the existing bottom-sheet path
+              (ReportsHiddenOnMobile), regardless of role — this mirrors
+              the original markup exactly and is unrelated to the desktop
+              overlay above. */}
+          {!specificReportsPage && isScrollRevealRole && (
+            <div className="md:hidden w-full">{secondReportsCard}</div>
           )}
         </div>
       </main>
