@@ -100,11 +100,12 @@ export async function markOverdueReports(user) {
   }
 }
 
-export async function markReportViewed(reportId, userId, status) {
-  if (!reportId || !userId || !status) return;
+export async function markReportViewed(reportId, uid, status) {
+  if (!reportId || !uid || !status) return;
   try {
+    
     await updateDoc(doc(db, "reports", reportId), {
-      [`lastViewedStatus.${userId}`]: status,
+      [`lastViewedStatus.${uid}`]: status,
     });
   } catch (err) {
     console.error("markReportViewed failed:", err);
@@ -423,11 +424,12 @@ export const generatePDFReport = (
 
   if (workerName) {
     addSectionGap(6);
-
     addLine("Assigned Technician", 11, true);
-
-    addLine(workerName);
-
+    addLine(
+      report.serviceType === "external"
+        ? `${workerName} (External)`
+        : workerName,
+    );
     if (workerPhone) {
       addLine(`${workerPhone}`);
     }
@@ -1638,22 +1640,36 @@ export const canUserAcceptOrRejectJob = (user, report) => {
   );
 };
 
-export function canUserDropJob(user, report) {
-  return (
-    user?.role === "worker" &&
-    report?.assignedTo === user?.ID &&
-    ["accepted", "reopened"].includes(report?.status)
-  );
-}
-
-// Completing work now requires the worker to have accepted the job first.
+// Completing work: the assigned worker for internal jobs, or the estate
+// manager for external jobs (since the external technician has no account
+// to do this themselves).
 export const canUserComplete = (user, report) => {
+  if (report?.serviceType === "external") {
+    return (
+      user?.role === "estate" &&
+      ["accepted", "reopened"].includes(report?.status)
+    );
+  }
   return (
     user?.role === "worker" &&
     ["accepted", "reopened"].includes(report?.status) &&
     report?.assignedTo === user?.ID
   );
 };
+
+export function canUserDropJob(user, report) {
+  if (report?.serviceType === "external") {
+    return (
+      user?.role === "estate" &&
+      ["accepted", "reopened"].includes(report?.status)
+    );
+  }
+  return (
+    user?.role === "worker" &&
+    report?.assignedTo === user?.ID &&
+    ["accepted", "reopened"].includes(report?.status)
+  );
+}
 
 export const canUserReopenReport = (user, report) => {
   return (

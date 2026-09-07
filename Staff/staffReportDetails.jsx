@@ -25,6 +25,8 @@ const RESOLVED_GREEN = "#2F7D4F";
 const REOPENED_AMBER = "#B4740E";
 const DENIED_RED = "#B42318";
 const GOLD = "#D9A404";
+const EXTERNAL_INDIGO = "#4338CA";
+const EXTERNAL_INDIGO_BG = "#EEF2FF";
 
 const FONTS_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -67,6 +69,7 @@ const TIMELINE_COLORS = {
   dateConfirmed: INK_MUTED,
   dateAssigned: INK_MUTED,
   dateReAssigned: INK_MUTED,
+  dateAccepted: INK_MUTED,
   dateCompleted: ORANGE,
   dateReopened: REOPENED_AMBER,
   dateClosed: RESOLVED_GREEN,
@@ -118,6 +121,15 @@ function buildTimeline(report, denialInfo) {
       date: report.dateReAssigned,
     },
     {
+      // Fires for internal jobs once the worker taps Accept, and for
+      // external jobs at the same moment they're assigned (there's no
+      // worker account to confirm through, so acceptance is immediate).
+      key: "dateAccepted",
+      label: "Accepted",
+      icon: "task_alt",
+      date: report.dateAccepted,
+    },
+    {
       key: "dateCompleted",
       label: "Completed",
       icon: "task_alt",
@@ -149,6 +161,7 @@ function buildTimeline(report, denialInfo) {
 }
 
 const STATUS_META = {
+  accepted: { label: "Accepted", bg: "#E0F2FE", text: "#0369A1" },
   completed: { label: "Completed", bg: "#FFF3E6", text: ORANGE },
   closed: { label: "Closed", bg: "#EAF3EC", text: RESOLVED_GREEN },
   reopened: { label: "Reopened", bg: "#FBEEDD", text: REOPENED_AMBER },
@@ -246,9 +259,13 @@ export default function StaffReportDetails({
 
   // Fetch the assigned technician's contact info so it can be shown here —
   // this component doesn't otherwise have access to the workers list.
+  // Only relevant for internal jobs — external jobs carry their
+  // technician's contact details directly on the report
+  // (report.externalTechnician), so there's nothing to fetch for those.
   useEffect(() => {
-    const assignedTo = currentReport?.[0]?.assignedTo;
-    if (!displayDetails || !assignedTo) {
+    const report = currentReport?.[0];
+    const assignedTo = report?.assignedTo;
+    if (!displayDetails || !assignedTo || report?.serviceType === "external") {
       setAssignedWorker(null);
       setLoadingWorker(false);
       return;
@@ -336,6 +353,10 @@ export default function StaffReportDetails({
   const statusMeta = STATUS_META[report.status];
   const priorityMeta =
     PRIORITY_META[report.priorityLevel] || PRIORITY_META.routine;
+  const isExternalTech = report.serviceType === "external";
+  const hasTechnician = isExternalTech
+    ? !!report.externalTechnician
+    : !!report.assignedTo;
 
   const handleReopenReport = async () => {
     if (!canUserSendFeedback(user, report)) return; // same reporter/status gate as confirming
@@ -453,14 +474,27 @@ export default function StaffReportDetails({
             >
               {report.category}
             </h1>
-            {statusMeta && (
-              <span
-                className="text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full flex-shrink-0"
-                style={{ background: statusMeta.bg, color: statusMeta.text }}
-              >
-                {statusMeta.label}
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+              {isExternalTech && (
+                <span
+                  className="text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full"
+                  style={{
+                    background: EXTERNAL_INDIGO_BG,
+                    color: EXTERNAL_INDIGO,
+                  }}
+                >
+                  External Technician
+                </span>
+              )}
+              {statusMeta && (
+                <span
+                  className="text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full"
+                  style={{ background: statusMeta.bg, color: statusMeta.text }}
+                >
+                  {statusMeta.label}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 mt-2">
@@ -569,19 +603,51 @@ export default function StaffReportDetails({
           </div>
         )}
 
-        {/* ── Technician ─────────────────────────────────────── */}
-        {report.assignedTo && (
+        {/* ── Technician — internal worker OR external technician ──── */}
+        {hasTechnician && (
           <div
             className="bg-white rounded-xl border p-5"
             style={{ borderColor: RULE }}
           >
-            <p
-              className="srd-mono text-[11px] font-semibold uppercase tracking-wide mb-3"
-              style={{ color: INK_MUTED }}
-            >
-              Technician
-            </p>
-            {assignedWorker?.phoneNumber ? (
+            <div className="flex items-center justify-between mb-3">
+              <p
+                className="srd-mono text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: INK_MUTED }}
+              >
+                Technician
+              </p>
+              {isExternalTech && (
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
+                  style={{
+                    background: EXTERNAL_INDIGO_BG,
+                    color: EXTERNAL_INDIGO,
+                  }}
+                >
+                  External
+                </span>
+              )}
+            </div>
+
+            {isExternalTech ? (
+              report.externalTechnician ? (
+                <div>
+                  <PhoneCallButton
+                    phoneNumber={report.externalTechnician.phoneNumber}
+                    label={report.externalTechnician.name}
+                  />
+                  {report.externalTechnician.profession && (
+                    <p className="text-xs mt-1.5" style={{ color: INK_MUTED }}>
+                      {report.externalTechnician.profession}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm italic" style={{ color: INK_MUTED }}>
+                  No technician details on file
+                </p>
+              )
+            ) : assignedWorker?.phoneNumber ? (
               <PhoneCallButton
                 phoneNumber={assignedWorker.phoneNumber}
                 label={assignedWorker.name}

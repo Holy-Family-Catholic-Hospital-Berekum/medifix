@@ -5,6 +5,7 @@ export default function WorkerReOpened() {
     <Home
       bgColor="bg-[#eff6ff]"
       firstReportsStatus="reopened"
+      firstReportsServiceType="internal" 
       primaryColor="text-red-800"
       title1="Reopened Jobs"
       secColor={"bg-yellow-500"}

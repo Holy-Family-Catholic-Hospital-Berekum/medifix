@@ -5,6 +5,7 @@ export default function EstateInProgress() {
     <Home
       bgColor="bg-[#eff6ff]"
       firstReportsStatus="accepted"
+      firstReportsServiceType="internal"
       primaryColor="text-red-800"
       title1="Works in Progress"
       secColor={"bg-yellow-500"}
@@ -24,6 +25,7 @@ export default function EstateInProgress() {
       logoBGColor="md:bg-yellow-500"
       homeRedirect="/eh"
       closedRedirect={"/ecl"}
+      externalRedirect={"/eext"}
       droppedRedirect={"/edr"}
       dashboardRedirect={"/ed"}
       role={"estate"}

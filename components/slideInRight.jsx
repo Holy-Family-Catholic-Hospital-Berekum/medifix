@@ -67,6 +67,19 @@ const icons = {
     </svg>
   ),
 
+  external: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <path d="M15 3h6v6" />
+      <path d="M10 14L21 3" />
+    </svg>
+  ),
+
   completed: (
     <svg
       viewBox="0 0 24 24"
@@ -113,6 +126,8 @@ export default function SlideInRight({
   rejectedRedirect,
   acceptedRedirect,
   droppedRedirect,
+  externalRedirect,
+  newExternalCount,
   completedWithFeedback,
   newAssignedCount,
   newRejectedCount,
@@ -191,6 +206,8 @@ export default function SlideInRight({
     user?.role,
   );
 
+  const isExternalRole = ["admin", "estate"].includes(user?.role);
+
   const items = [
     {
       label: "Assigned",
@@ -215,6 +232,14 @@ export default function SlideInRight({
       redirect: droppedRedirect,
       icon: icons.dropped,
       count: newDroppedCount,
+    },
+    // Only admin/estate manage external technicians — the same guard
+    // used for the desktop sidebar link in Home.jsx.
+    {
+      label: "External Jobs",
+      redirect: isExternalRole ? externalRedirect : null,
+      icon: icons.external,
+      count: newExternalCount,
     },
     {
       label: "Completed",

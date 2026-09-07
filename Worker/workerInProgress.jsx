@@ -5,6 +5,7 @@ export default function WorkerInProgress() {
     <Home
       bgColor="bg-[#eff6ff]"
       firstReportsStatus="accepted"
+      firstReportsServiceType="internal"
       primaryColor="text-red-800"
       title1="Accepted Jobs"
       secColor={"bg-yellow-500"}

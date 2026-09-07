@@ -22,6 +22,7 @@ export default function EstateCompleted() {
       rejectedRedirect={"/er"}
       acceptedRedirect={"/eip"}
       closedRedirect={"/ecl"}
+      externalRedirect={"/eext"}
       homeRedirect="/eh"
       droppedRedirect={"/edr"}
       dashboardRedirect={"/ed"}

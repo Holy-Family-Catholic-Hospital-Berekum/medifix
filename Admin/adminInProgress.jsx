@@ -5,6 +5,7 @@ export default function AdminInProgress() {
     <Home
       bgColor="bg-[#eff6ff]"
       firstReportsStatus="accepted"
+      firstReportsServiceType="internal"
       primaryColor="text-red-800"
       title1="Works in Progress"
       secColor={"bg-yellow-500"}
@@ -23,6 +24,7 @@ export default function AdminInProgress() {
       closedRedirect={"/acl"}
       reopenedRedirect={"/aro"}
       dashboardRedirect={"/ad"}
+      externalRedirect={"/aext"}
       role={"admin"}
     />
   );

@@ -82,6 +82,17 @@ const isActive = (status) => !TERMINAL_STATUSES.includes(status);
 const isOverdueEligible = (report) =>
   report.overdue && !OVERDUE_EXCLUDED_STATUSES.includes(report.status);
 
+// ─── external vs internal work classification ─────────────────────────────
+// A report becomes "external" the moment ReportDetailsContainer.jsx assigns
+// it to an outside contractor (serviceType: "external") instead of a
+// registered worker. External jobs get their own dedicated tab/section and
+// are deliberately EXCLUDED from every internal-work calculation below
+// (worker leaderboard, pipeline stage timing, reassignment rate, denial
+// rate, cost trends, category demand, etc.) — external technicians are a
+// different workforce with no comparable performance history, so mixing
+// them in would distort those numbers for actual in-house workers.
+const isExternalReport = (report) => report?.serviceType === "external";
+
 // ─── worker performance weights ──────────────────────────────────────────
 // "Performance" blends three independent signals into one score:
 //  - quality: customer star rating (Bayesian-weighted)
@@ -111,10 +122,12 @@ const DASHBOARD_USERS_CAP = 5000;
 
 // ─── table pagination ────────────────────────────────────────────────────────
 // Purely client-side paging over the already-fetched (bounded) arrays above
-// — this just controls how many rows render in the Reports/Users tables at
-// once, so a large data set doesn't render hundreds of DOM rows in one go.
+// — this just controls how many rows render in the Reports/Users/External
+// tables at once, so a large data set doesn't render hundreds of DOM rows
+// in one go.
 const REPORTS_PAGE_SIZE = 20;
 const USERS_PAGE_SIZE = 20;
+const EXTERNAL_PAGE_SIZE = 20;
 
 const paginate = (arr, page, pageSize) =>
   arr.slice((page - 1) * pageSize, page * pageSize);
@@ -302,6 +315,11 @@ const CAT_COLORS = [
 ];
 const ALLOWED_ROLES = ["admin", "manager", "estate", "procurement"];
 
+// Indigo used consistently across the app (Pending.jsx, StaffReportDetails.jsx)
+// to flag work assigned to an outside contractor rather than a registered
+// worker — reused here for the External tab's accent color.
+const EXTERNAL_ACCENT = "#4F46E5";
+
 // ─── period selector options (shared by overview display + PDF download) ────
 const PERIOD_OPTIONS = [
   { value: "overall", label: "Overall" },
@@ -374,6 +392,11 @@ function getDenialSortDate(report) {
 // Computes report + cost stats for an arbitrary subset of reports.
 // Used to build the "overall / month / year / lastYear" period breakdowns
 // that drive the Overview tab and the PDF download period select.
+//
+// IMPORTANT: callers pass an INTERNAL-ONLY subset (external-technician
+// reports filtered out) — see the `internalReports` split inside the
+// `stats` useMemo below. This function itself is generic and doesn't know
+// or care about that filtering; it's the caller's job.
 function buildPeriodStats(subset) {
   const toDate = (v) => (v?.toDate ? v.toDate() : new Date(v));
   const diffDays = (from, to) =>
@@ -619,6 +642,114 @@ function buildPeriodStats(subset) {
   };
 }
 
+// Computes stats for external-technician assignments — deliberately kept
+// separate from buildPeriodStats and the internal worker-performance
+// pipeline in the `stats` useMemo below. External technicians aren't
+// registered users (no `users` doc, no login), so there's no equivalent
+// "leaderboard" for them — just a lightweight directory built directly off
+// whatever contact details were entered at assignment time
+// (report.externalTechnician).
+function buildExternalStats(subset) {
+  const total = subset.length;
+
+  const byStatus = {};
+  subset.forEach((r) => {
+    byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+  });
+
+  const active = subset.filter((r) => isActive(r.status)).length;
+  const overdue = subset.filter(isOverdueEligible).length;
+  const completed = subset.filter((r) => r.status === "completed").length;
+  const closed = subset.filter((r) => r.status === "closed").length;
+  const closureRate = total ? Math.round((closed / total) * 100) : 0;
+
+  const overdueByPriority = { emergency: 0, urgent: 0, routine: 0 };
+  subset.forEach((r) => {
+    if (isOverdueEligible(r) && r.priorityLevel in overdueByPriority) {
+      overdueByPriority[r.priorityLevel]++;
+    }
+  });
+
+  const getReportTotalCost = (r) =>
+    (Number(r.cost) || 0) + (Number(r.maintenanceCost) || 0);
+  const reportsWithCost = subset.filter(
+    (r) =>
+      (r.cost != null && !isNaN(r.cost)) ||
+      (r.maintenanceCost != null && !isNaN(r.maintenanceCost)),
+  );
+  const totalCost = reportsWithCost.reduce(
+    (sm, r) => sm + getReportTotalCost(r),
+    0,
+  );
+  const avgCost = reportsWithCost.length
+    ? totalCost / reportsWithCost.length
+    : null;
+  const maxCost = reportsWithCost.length
+    ? Math.max(...reportsWithCost.map(getReportTotalCost))
+    : null;
+
+  // Technician directory — grouped by name+phone since external techs
+  // have no stable user id. Best-effort: a technician whose phone number
+  // was entered slightly differently across assignments will show up as
+  // more than one row.
+  const techMap = new Map();
+  subset.forEach((r) => {
+    const tech = r.externalTechnician;
+    if (!tech?.name) return;
+    const key = `${tech.name.trim().toLowerCase()}|${(tech.phoneNumber || "").trim()}`;
+    if (!techMap.has(key)) {
+      techMap.set(key, {
+        name: tech.name,
+        phoneNumber: tech.phoneNumber || "",
+        profession: tech.profession || "",
+        jobs: 0,
+        done: 0,
+        ratingSum: 0,
+        ratingCount: 0,
+      });
+    }
+    const entry = techMap.get(key);
+    entry.jobs += 1;
+    if (["completed", "closed"].includes(r.status)) entry.done += 1;
+    if (typeof r.technicianRating === "number") {
+      entry.ratingSum += r.technicianRating;
+      entry.ratingCount += 1;
+    }
+  });
+
+  const technicians = Array.from(techMap.values())
+    .map((t) => ({
+      ...t,
+      avgRating: t.ratingCount ? t.ratingSum / t.ratingCount : null,
+    }))
+    .sort((a, b) => b.jobs - a.jobs);
+
+  const recent = [...subset]
+    .sort(
+      (a, b) =>
+        (b.dateSent?.toDate?.() ?? new Date(0)) -
+        (a.dateSent?.toDate?.() ?? new Date(0)),
+    )
+    .slice(0, 10);
+
+  return {
+    total,
+    byStatus,
+    active,
+    overdue,
+    completed,
+    closed,
+    closureRate,
+    overdueByPriority,
+    reportsWithCost: reportsWithCost.length,
+    totalCost,
+    avgCost,
+    maxCost,
+    technicians,
+    recent,
+  };
+}
+
 // ─── primitives ──────────────────────────────────────────────────────────────
 function Badge({ bg, text, children }) {
   return (
@@ -642,6 +773,7 @@ function Card({ children, style = {} }) {
   const s = useSurface();
   return (
     <div
+      className="dash-card"
       style={{
         background: s.card,
         borderRadius: 16,
@@ -655,7 +787,7 @@ function Card({ children, style = {} }) {
   );
 }
 
-function SectionTitle({ children }) {
+function SectionTitle({ children, accent }) {
   const s = useSurface();
   return (
     <h2
@@ -666,8 +798,21 @@ function SectionTitle({ children }) {
         margin: "28px 0 12px",
         letterSpacing: ".08em",
         textTransform: "uppercase",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
       }}
     >
+      <span
+        style={{
+          display: "inline-block",
+          width: 6,
+          height: 6,
+          borderRadius: 2,
+          background: accent || "#FF8825",
+          flexShrink: 0,
+        }}
+      />
       {children}
     </h2>
   );
@@ -784,6 +929,7 @@ function StatCard({ label, value, icon, accent, sub }) {
         display: "flex",
         flexDirection: "column",
         gap: 6,
+        borderTop: `3px solid ${accent}`,
       }}
     >
       <div
@@ -836,9 +982,10 @@ function StatCard({ label, value, icon, accent, sub }) {
 }
 
 // Small centered label/value block used inside the worker leaderboard's
-// metrics grid (see WorkerCard below). Pulled out as its own primitive so
-// the grid can lay out any number of these responsively without repeating
-// the same inline-style block four times per card.
+// metrics grid (see WorkerCard below) and the external technician
+// directory (see TechnicianCard below). Pulled out as its own primitive so
+// those grids can lay out any number of these responsively without
+// repeating the same inline-style block per card.
 function WorkerMetric({ label, value, sub, color, empty }) {
   const s = useSurface();
   return (
@@ -1030,6 +1177,104 @@ function WorkerCard({ w, rank }) {
           label="Performance"
           value={w.performancePct != null ? `${w.performancePct}%` : "—"}
           color={perfColor}
+        />
+      </div>
+    </Card>
+  );
+}
+
+// One directory row for an external technician — mirrors WorkerCard's
+// visual language (avatar, name, metrics grid) but stays simpler: there's
+// no blended "performance score" here, since external technicians aren't
+// part of the in-house worker pool the weighted quality/reliability/speed
+// model above was built for. Just the raw numbers we actually have.
+function TechnicianCard({ tech }) {
+  const s = useSurface();
+  return (
+    <Card style={{ padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
+            background: `${EXTERNAL_ACCENT}1A`,
+            color: EXTERNAL_ACCENT,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 800,
+            fontSize: 14,
+            flexShrink: 0,
+          }}
+        >
+          {tech.name?.charAt(0)?.toUpperCase() ?? "?"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 14,
+              color: s.textPrimary,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {tech.name}
+          </div>
+          {tech.profession && (
+            <div
+              style={{
+                fontSize: 11,
+                color: s.textFaint,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {tech.profession}
+            </div>
+          )}
+        </div>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 800,
+            color: EXTERNAL_ACCENT,
+            background: `${EXTERNAL_ACCENT}18`,
+            borderRadius: 999,
+            padding: "3px 9px",
+            flexShrink: 0,
+          }}
+        >
+          External
+        </span>
+      </div>
+      <div
+        className="worker-metrics"
+        style={{
+          marginTop: 12,
+          paddingTop: 12,
+          borderTop: `1px solid ${s.cardBorder}`,
+        }}
+      >
+        <WorkerMetric label="Jobs" value={tech.jobs} color={s.textMuted} />
+        <WorkerMetric label="Done" value={tech.done} color="#22c55e" />
+        {tech.avgRating != null ? (
+          <WorkerMetric
+            label="Rating"
+            value={`★ ${tech.avgRating.toFixed(2)}`}
+            sub={`${tech.ratingCount} rated`}
+            color="#f59e0b"
+          />
+        ) : (
+          <WorkerMetric label="Rating" empty="No ratings" />
+        )}
+        <WorkerMetric
+          label="Phone"
+          value={tech.phoneNumber || "—"}
+          color={s.textMuted}
         />
       </div>
     </Card>
@@ -1280,7 +1525,11 @@ function InlineNotice({ tone = "info", children }) {
 // overdue — is meant to demand attention rather than blend in with routine
 // "data may be stale" notices. Shown regardless of which Overview period is
 // selected, since "is anything on fire right now" shouldn't depend on the
-// dropdown. Kept as a fixed semantic red across modes.
+// dropdown. Unlike the rest of the internal-work sections, this count
+// deliberately includes external-technician jobs too — an emergency is an
+// emergency regardless of which workforce is on it, so this is the one
+// place internal and external numbers are combined. Kept as a fixed
+// semantic red across modes.
 function EmergencyOverdueBanner({ count }) {
   if (!count) return null;
   return (
@@ -1764,6 +2013,7 @@ export default function Dashboard({
   // ── table pagination state ────────────────────────────────────────────────
   const [reportsPage, setReportsPage] = useState(1);
   const [usersPage, setUsersPage] = useState(1);
+  const [externalPage, setExternalPage] = useState(1);
 
   // ── which period's stats to display on the Overview tab ──────────────────
   const [displayPeriod, setDisplayPeriod] = useState("overall");
@@ -1890,37 +2140,49 @@ export default function Dashboard({
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
-  // ── derived stats ─────────────────────────────────────────────────────────
+  // ── derived stats (INTERNAL work only — see internalReports below) ───────
   const stats = useMemo(() => {
-    const total = reports.length;
-    const completed = reports.filter((r) => r.status === "completed").length;
-    const closed = reports.filter((r) => r.status === "closed").length;
-    const reopenedCount = reports.filter((r) => r.status === "reopened").length;
-    const rejectedJobsCount = reports.filter(
+    // External-technician assignments are split out FIRST and excluded from
+    // everything below. They get their own calculation (buildExternalStats,
+    // via the separate `externalStats` useMemo further down) and their own
+    // tab — mixing them into worker leaderboards, pipeline timing, or
+    // reassignment/denial rates would distort those numbers for the actual
+    // in-house workforce they're meant to describe.
+    const internalReports = reports.filter((r) => !isExternalReport(r));
+
+    const total = internalReports.length;
+    const completed = internalReports.filter(
+      (r) => r.status === "completed",
+    ).length;
+    const closed = internalReports.filter((r) => r.status === "closed").length;
+    const reopenedCount = internalReports.filter(
+      (r) => r.status === "reopened",
+    ).length;
+    const rejectedJobsCount = internalReports.filter(
       (r) => r.status === "rejected",
     ).length;
     // New: current live count of reports sitting in "dropped" — mirrors
     // rejectedJobsCount above.
-    const droppedJobsCount = reports.filter(
+    const droppedJobsCount = internalReports.filter(
       (r) => r.status === "dropped",
     ).length;
-    const overdue = reports.filter(isOverdueEligible).length;
-    const active = reports.filter((r) => isActive(r.status)).length;
+    const overdue = internalReports.filter(isOverdueEligible).length;
+    const active = internalReports.filter((r) => isActive(r.status)).length;
 
     const byStatus = Object.fromEntries(
       Object.keys(STATUS_META).map((s2) => [s2, 0]),
     );
-    reports.forEach((r) => {
+    internalReports.forEach((r) => {
       if (r.status in byStatus) byStatus[r.status]++;
     });
 
     const byPriority = { emergency: 0, urgent: 0, routine: 0 };
-    reports.forEach((r) => {
+    internalReports.forEach((r) => {
       if (r.priorityLevel in byPriority) byPriority[r.priorityLevel]++;
     });
 
     const catCount = {};
-    reports.forEach((r) => {
+    internalReports.forEach((r) => {
       catCount[r.category] = (catCount[r.category] || 0) + 1;
     });
 
@@ -1934,19 +2196,19 @@ export default function Dashboard({
     const getSent = (r) =>
       r.dateSent?.toDate ? r.dateSent.toDate() : new Date(r.dateSent);
 
-    const monthReports = reports.filter((r) => {
+    const monthReports = internalReports.filter((r) => {
       const sent = getSent(r);
       if (Number.isNaN(sent.getTime())) return false;
       return sent >= monthStart && sent < nextMonthStart;
     });
 
-    const yearReports = reports.filter((r) => {
+    const yearReports = internalReports.filter((r) => {
       const sent = getSent(r);
       if (Number.isNaN(sent.getTime())) return false;
       return sent >= yearStart && sent < nextYearStart;
     });
 
-    const lastYearReports = reports.filter((r) => {
+    const lastYearReports = internalReports.filter((r) => {
       const sent = getSent(r);
       if (Number.isNaN(sent.getTime())) return false;
       return sent >= lastYearStart && sent < yearStart;
@@ -1967,7 +2229,7 @@ export default function Dashboard({
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       return {
         label: d.toLocaleString("default", { month: "short" }),
-        value: reports.filter((r) => {
+        value: internalReports.filter((r) => {
           const rd = getSent(r);
           if (Number.isNaN(rd.getTime())) return false;
           return (
@@ -1996,7 +2258,7 @@ export default function Dashboard({
     const isCleanCompletion = (r) =>
       !!r.dateAccepted && !!r.dateCompleted && !r.dateReopened;
 
-    const fleetCleanDurations = reports
+    const fleetCleanDurations = internalReports
       .filter((r) => r.assignedTo && isCleanCompletion(r))
       .map((r) => diffDays(r.dateAccepted, r.dateCompleted));
     const fleetAvgCompletionDays = fleetCleanDurations.length
@@ -2005,7 +2267,9 @@ export default function Dashboard({
       : null;
 
     const workerStatsRaw = workers.map((w) => {
-      const workerReports = reports.filter((r) => r.assignedTo === w.ID);
+      const workerReports = internalReports.filter(
+        (r) => r.assignedTo === w.ID,
+      );
       const assigned = workerReports.length;
       const done = workerReports.filter((r) =>
         ["completed", "closed"].includes(r.status),
@@ -2196,7 +2460,7 @@ export default function Dashboard({
       })
       .sort((a, b) => b.done - a.done); // default order unchanged; ranking view sorts separately
 
-    const recent = [...reports]
+    const recent = [...internalReports]
       .sort(
         (a, b) =>
           (b.dateSent?.toDate?.() ?? new Date(0)) -
@@ -2205,7 +2469,7 @@ export default function Dashboard({
       .slice(0, 10);
 
     // ── recent denial reasons (global, not period-scoped) ────────────────
-    const recentDenials = [...reports]
+    const recentDenials = [...internalReports]
       .filter((r) => r.status === "denied")
       .map((r) => ({ ...r, resolvedDenialReason: getDenialReasonText(r) }))
       .filter((r) => r.resolvedDenialReason != null)
@@ -2241,7 +2505,7 @@ export default function Dashboard({
       return (totalDays / resolved.length).toFixed(1);
     };
 
-    const avgResolutionDays = getResolutionAverage(reports);
+    const avgResolutionDays = getResolutionAverage(internalReports);
 
     const weekAgo = Date.now() - 7 * 86400000;
     const recentUsers = [...users]
@@ -2261,7 +2525,7 @@ export default function Dashboard({
     const getReportTotalCost = (r) =>
       (Number(r.cost) || 0) + (Number(r.maintenanceCost) || 0);
 
-    const reportsWithCost = reports.filter(
+    const reportsWithCost = internalReports.filter(
       (r) =>
         (r.cost != null && !isNaN(r.cost)) ||
         (r.maintenanceCost != null && !isNaN(r.maintenanceCost)),
@@ -2316,7 +2580,7 @@ export default function Dashboard({
 
     // ── Period breakdowns (drives Overview display select + PDF download) ─
     const periodStats = {
-      overall: buildPeriodStats(reports),
+      overall: buildPeriodStats(internalReports),
       month: buildPeriodStats(monthReports),
       year: buildPeriodStats(yearReports),
       lastYear: buildPeriodStats(lastYearReports),
@@ -2384,6 +2648,13 @@ export default function Dashboard({
     };
   }, [reports, users]);
 
+  // ── external-technician stats — fully separate pipeline, see notes on
+  // buildExternalStats and isExternalReport above ──────────────────────────
+  const externalStats = useMemo(
+    () => buildExternalStats(reports.filter(isExternalReport)),
+    [reports],
+  );
+
   const rankedWorkerStats = useMemo(() => {
     return [...stats.workerStats].sort((a, b) => {
       const scoreA = a.performancePct ?? -Infinity;
@@ -2410,14 +2681,16 @@ export default function Dashboard({
   const displayStats =
     stats.periodStats[displayPeriod] ?? stats.periodStats.overall;
 
-  // ── Reports tab: sorted (newest first) + paginated ────────────────────────
+  // ── Reports tab: internal-only, sorted (newest first) + paginated ────────
   const sortedReports = useMemo(
     () =>
-      [...reports].sort(
-        (a, b) =>
-          (b.dateSent?.toDate?.() ?? new Date(0)) -
-          (a.dateSent?.toDate?.() ?? new Date(0)),
-      ),
+      [...reports]
+        .filter((r) => !isExternalReport(r))
+        .sort(
+          (a, b) =>
+            (b.dateSent?.toDate?.() ?? new Date(0)) -
+            (a.dateSent?.toDate?.() ?? new Date(0)),
+        ),
     [reports],
   );
 
@@ -2430,11 +2703,34 @@ export default function Dashboard({
     [sortedReports, reportsPage],
   );
 
-  // Reset to page 1 whenever the underlying report set changes size (e.g.
-  // a manual refresh pulls in new data), so pagination never gets stuck
-  // past the end of a shorter list.
+  // ── External tab: external-only, sorted (newest first) + paginated ───────
+  const sortedExternalReports = useMemo(
+    () =>
+      [...reports]
+        .filter(isExternalReport)
+        .sort(
+          (a, b) =>
+            (b.dateSent?.toDate?.() ?? new Date(0)) -
+            (a.dateSent?.toDate?.() ?? new Date(0)),
+        ),
+    [reports],
+  );
+
+  const externalReportsTotalPages = Math.max(
+    1,
+    Math.ceil(sortedExternalReports.length / EXTERNAL_PAGE_SIZE),
+  );
+  const paginatedExternalReports = useMemo(
+    () => paginate(sortedExternalReports, externalPage, EXTERNAL_PAGE_SIZE),
+    [sortedExternalReports, externalPage],
+  );
+
+  // Reset all report-derived tables to page 1 whenever the underlying
+  // report set changes size (e.g. a manual refresh pulls in new data), so
+  // pagination never gets stuck past the end of a shorter list.
   useEffect(() => {
     setReportsPage(1);
+    setExternalPage(1);
   }, [reports.length]);
 
   const filteredUsers = useMemo(() => {
@@ -2563,9 +2859,18 @@ export default function Dashboard({
 
   // ── tab set per role ──────────────────────────────────────────────────────
   const tabs = (() => {
-    if (isAdmin) return ["overview", "reports", "workers", "activity", "users"];
-    if (isManager) return ["overview", "workers", "activity", "users"];
-    return ["overview", "reports", "workers", "activity"];
+    if (isAdmin)
+      return [
+        "overview",
+        "reports",
+        "external",
+        "workers",
+        "activity",
+        "users",
+      ];
+    if (isManager)
+      return ["overview", "external", "workers", "activity", "users"];
+    return ["overview", "reports", "external", "workers", "activity"];
   })();
 
   const filterRoles = isAdmin
@@ -2616,6 +2921,13 @@ export default function Dashboard({
         </div>
       </div>
     );
+
+  // Combined emergency-overdue count (internal + external) drives the
+  // banner — see EmergencyOverdueBanner's comment for why this one figure
+  // deliberately isn't split like everything else.
+  const combinedEmergencyOverdue =
+    stats.periodStats.overall.overdueByPriority.emergency +
+    (externalStats.overdueByPriority?.emergency || 0);
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -2672,10 +2984,12 @@ export default function Dashboard({
       <style>{`
         @keyframes spin    { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:none; } }
-        .tab-btn { background:none; border:none; cursor:pointer; transition:color .2s; white-space:nowrap; }
+        .tab-btn { background:none; border:none; cursor:pointer; transition:color .2s, background .2s; white-space:nowrap; }
         .tab-btn:hover { color:#ef4444 !important; }
         .act-btn { opacity:0; transition:opacity .15s; }
         tr:hover .act-btn { opacity:1; }
+        .dash-card { transition: transform .18s ease, box-shadow .18s ease; }
+        .dash-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(15,23,42,.10); }
         .kpi-5   { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
         .kpi-4   { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
         .kpi-3   { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
@@ -2692,173 +3006,189 @@ export default function Dashboard({
         style={{ maxWidth: 1120, margin: "0 auto", padding: "88px 16px 64px" }}
       >
         {/* ── header ───────────────────────────────────────────────── */}
-        <div
+        <Card
           style={{
             marginBottom: 24,
             marginTop: 40,
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 12,
+            padding: "22px 26px",
+            background:
+              mode === "dark"
+                ? "linear-gradient(135deg, rgba(255,136,37,0.10), rgba(30,41,59,0.55))"
+                : "linear-gradient(135deg, rgba(255,136,37,0.07), #ffffff 65%)",
           }}
         >
-          <div>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 800,
-                color: "#FF8825",
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-                margin: "0 0 4px",
-              }}
-            >
-              {role} dashboard
-            </p>
-            <h1
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                color: s.textPrimary,
-                margin: "0 0 12px",
-                lineHeight: 1.25,
-              }}
-            >
-              Welcome back, {user?.name?.split(" ")[0]} 👋
-            </h1>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {(isAdmin || isManager) && (
-                <button
-                  onClick={() => setShowGenID(true)}
-                  className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
-                >
-                  + Generate Registration ID
-                </button>
-              )}
-              {canDownloadDashboardPDF && (
-                <div style={{ position: "relative" }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowDownloadMenu((prev) => !prev)}
-                    className="bg-slate-900 hover:bg-slate-700 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
-                  >
-                    Download Dashboard PDF
-                  </button>
-
-                  {showDownloadMenu && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "calc(100% + 8px)",
-                        left: 0,
-                        background: s.card,
-                        border: `1px solid ${s.border}`,
-                        borderRadius: 12,
-                        padding: 12,
-                        boxShadow: "0 10px 30px rgba(15,23,42,.12)",
-                        width: 250,
-                        zIndex: 20,
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: s.textMuted,
-                          marginBottom: 8,
-                          textTransform: "uppercase",
-                          letterSpacing: ".06em",
-                        }}
-                      >
-                        Report period
-                      </label>
-                      <select
-                        value={downloadPeriod}
-                        onChange={(e) => setDownloadPeriod(e.target.value)}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          borderRadius: 10,
-                          border: `1px solid ${s.border}`,
-                          outline: "none",
-                          fontSize: 13,
-                          marginBottom: 10,
-                          background: s.hover,
-                          color: s.textPrimary,
-                        }}
-                      >
-                        <option value="month">Current month</option>
-                        <option value="year">Current year</option>
-                        <option value="lastYear">Last year</option>
-                        <option value="overall">Overall (all time)</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleDownloadDashboardPDF(downloadPeriod)
-                        }
-                        className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm w-full"
-                      >
-                        Download {DOWNLOAD_PERIOD_LABELS[downloadPeriod]} Report
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
               alignItems: "flex-end",
-              gap: 6,
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 12,
             }}
           >
-            <span style={{ fontSize: 12, color: s.textFaint }}>
-              {new Date().toLocaleDateString("en-GB", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
-            </span>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 11,
-                fontWeight: 700,
-                color: isRefreshing ? s.textFaint : s.textMuted,
-                background: "none",
-                border: `1px solid ${s.border}`,
-                borderRadius: 999,
-                padding: "5px 12px",
-                cursor: isRefreshing ? "not-allowed" : "pointer",
-              }}
-            >
-              <span
-                className="material-symbols-outlined"
+            <div>
+              <p
                 style={{
-                  fontSize: 14,
-                  animation: isRefreshing ? "spin 1s linear infinite" : "none",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#FF8825",
+                  letterSpacing: ".1em",
+                  textTransform: "uppercase",
+                  margin: "0 0 4px",
                 }}
               >
-                refresh
+                {role} dashboard
+              </p>
+              <h1
+                style={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  margin: "0 0 12px",
+                  lineHeight: 1.25,
+                  background: "linear-gradient(90deg, #FF8825, #f43f5e)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                Welcome back, {user?.name?.split(" ")[0]} 👋
+              </h1>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(isAdmin || isManager) && (
+                  <button
+                    onClick={() => setShowGenID(true)}
+                    className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                  >
+                    + Generate Registration ID
+                  </button>
+                )}
+                {canDownloadDashboardPDF && (
+                  <div style={{ position: "relative" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowDownloadMenu((prev) => !prev)}
+                      className="bg-slate-900 hover:bg-slate-700 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm"
+                    >
+                      Download Dashboard PDF
+                    </button>
+
+                    {showDownloadMenu && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 8px)",
+                          left: 0,
+                          background: s.card,
+                          border: `1px solid ${s.border}`,
+                          borderRadius: 12,
+                          padding: 12,
+                          boxShadow: "0 10px 30px rgba(15,23,42,.12)",
+                          width: 250,
+                          zIndex: 20,
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: s.textMuted,
+                            marginBottom: 8,
+                            textTransform: "uppercase",
+                            letterSpacing: ".06em",
+                          }}
+                        >
+                          Report period
+                        </label>
+                        <select
+                          value={downloadPeriod}
+                          onChange={(e) => setDownloadPeriod(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            borderRadius: 10,
+                            border: `1px solid ${s.border}`,
+                            outline: "none",
+                            fontSize: 13,
+                            marginBottom: 10,
+                            background: s.hover,
+                            color: s.textPrimary,
+                          }}
+                        >
+                          <option value="month">Current month</option>
+                          <option value="year">Current year</option>
+                          <option value="lastYear">Last year</option>
+                          <option value="overall">Overall (all time)</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDownloadDashboardPDF(downloadPeriod)
+                          }
+                          className="bg-[#F8934C] hover:bg-orange-500 cursor-pointer transition text-white font-bold py-2 px-4 rounded text-sm w-full"
+                        >
+                          Download {DOWNLOAD_PERIOD_LABELS[downloadPeriod]}{" "}
+                          Report
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: 6,
+              }}
+            >
+              <span style={{ fontSize: 12, color: s.textFaint }}>
+                {new Date().toLocaleDateString("en-GB", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
               </span>
-              {isRefreshing
-                ? "Refreshing…"
-                : lastRefreshed
-                  ? `Refreshed ${timeAgo(lastRefreshed)}`
-                  : "Refresh"}
-            </button>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: isRefreshing ? s.textFaint : s.textMuted,
+                  background: "none",
+                  border: `1px solid ${s.border}`,
+                  borderRadius: 999,
+                  padding: "5px 12px",
+                  cursor: isRefreshing ? "not-allowed" : "pointer",
+                }}
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{
+                    fontSize: 14,
+                    animation: isRefreshing
+                      ? "spin 1s linear infinite"
+                      : "none",
+                  }}
+                >
+                  refresh
+                </span>
+                {isRefreshing
+                  ? "Refreshing…"
+                  : lastRefreshed
+                    ? `Refreshed ${timeAgo(lastRefreshed)}`
+                    : "Refresh"}
+              </button>
+            </div>
           </div>
-        </div>
+        </Card>
 
         {/* ── data-health notices ──────────────────────────────────── */}
         {reportsError && (
@@ -2918,10 +3248,9 @@ export default function Dashboard({
         )}
 
         {/* Overdue breakdown by priority — a global "is anything on fire"
-            banner, independent of the Overview period selector. */}
-        <EmergencyOverdueBanner
-          count={stats.periodStats.overall.overdueByPriority.emergency}
-        />
+            banner, independent of the Overview period selector, and the
+            one place internal + external counts are combined. */}
+        <EmergencyOverdueBanner count={combinedEmergencyOverdue} />
 
         {/* ── tab bar ──────────────────────────────────────────────── */}
         <div
@@ -2949,6 +3278,13 @@ export default function Dashboard({
                   color: activeTab === tab ? "#ef4444" : s.textMuted,
                   marginBottom: -2,
                   textTransform: "capitalize",
+                  borderRadius: activeTab === tab ? "10px 10px 0 0" : 0,
+                  background:
+                    activeTab === tab
+                      ? mode === "dark"
+                        ? "rgba(239,68,68,0.12)"
+                        : "#fef2f2"
+                      : "transparent",
                 }}
               >
                 {tab}
@@ -2966,6 +3302,22 @@ export default function Dashboard({
                     }}
                   >
                     {isAdmin ? "ADMIN" : "MGR"}
+                  </span>
+                )}
+                {tab === "external" && externalStats.total > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 5,
+                      fontSize: 9,
+                      background: `${EXTERNAL_ACCENT}22`,
+                      color: EXTERNAL_ACCENT,
+                      borderRadius: 4,
+                      padding: "1px 5px",
+                      fontWeight: 800,
+                      verticalAlign: "middle",
+                    }}
+                  >
+                    {externalStats.total}
                   </span>
                 )}
               </button>
@@ -2989,6 +3341,16 @@ export default function Dashboard({
               <SectionTitle>Report summary</SectionTitle>
               <PeriodSelect value={displayPeriod} onChange={setDisplayPeriod} />
             </div>
+            <p
+              style={{
+                fontSize: 12,
+                color: s.textFaint,
+                margin: "-6px 0 12px",
+              }}
+            >
+              Internal (in-house worker) reports only. External contractor jobs
+              are tracked separately under the External tab.
+            </p>
             <div className="kpi-5" style={{ marginBottom: 20 }}>
               <StatCard
                 label="Total"
@@ -3787,10 +4149,22 @@ export default function Dashboard({
           </>
         )}
 
-        {/* ══════════════════ REPORTS ══════════════════ */}
+        {/* ══════════════════ REPORTS (internal) ══════════════════ */}
         {activeTab === "reports" && (isAdmin || isEstate) && (
           <>
-            <SectionTitle>All reports ({reports.length})</SectionTitle>
+            <SectionTitle>
+              Internal reports ({sortedReports.length})
+            </SectionTitle>
+            <p
+              style={{
+                fontSize: 12.5,
+                color: s.textFaint,
+                margin: "-6px 0 16px",
+              }}
+            >
+              In-house worker assignments only, external contractor jobs live
+              under the External tab.
+            </p>
             <TableWrap>
               <THead
                 cols={[
@@ -3882,7 +4256,7 @@ export default function Dashboard({
               totalItems={sortedReports.length}
               pageSize={REPORTS_PAGE_SIZE}
             />
-            {reports.length === 0 && (
+            {sortedReports.length === 0 && (
               <p
                 style={{
                   textAlign: "center",
@@ -3891,6 +4265,369 @@ export default function Dashboard({
                 }}
               >
                 No reports yet.
+              </p>
+            )}
+          </>
+        )}
+
+        {/* ══════════════════ EXTERNAL ══════════════════ */}
+        {activeTab === "external" && (
+          <>
+            <SectionTitle accent={EXTERNAL_ACCENT}>
+              External work summary
+            </SectionTitle>
+            <p
+              style={{
+                fontSize: 12.5,
+                color: s.textFaint,
+                margin: "-6px 0 16px",
+              }}
+            >
+              Jobs assigned to outside contractors instead of registered
+              workers. Kept separate from every internal metric above, it's a
+              different workforce with no comparable performance history.
+            </p>
+
+            <div className="kpi-4" style={{ marginBottom: 20 }}>
+              <StatCard
+                label="Total External Jobs"
+                value={externalStats.total}
+                icon="🧰"
+                accent={EXTERNAL_ACCENT}
+              />
+              <StatCard
+                label="Active"
+                value={externalStats.active}
+                icon="⚙️"
+                accent="#f97316"
+                sub="In progress"
+              />
+              <StatCard
+                label="Closed"
+                value={externalStats.closed}
+                icon="🔒"
+                accent="#22c55e"
+                sub={`${externalStats.closureRate}% rate`}
+              />
+              <StatCard
+                label="Overdue"
+                value={externalStats.overdue}
+                icon="⚠️"
+                accent="#ef4444"
+                sub="Needs attention"
+              />
+            </div>
+
+            <SectionTitle accent={EXTERNAL_ACCENT}>
+              Status breakdown
+            </SectionTitle>
+            <Card style={{ padding: "18px 20px", marginBottom: 20 }}>
+              {Object.keys(externalStats.byStatus).length === 0 ? (
+                <p style={{ color: s.textFaint, fontSize: 13, margin: 0 }}>
+                  No external jobs recorded yet.
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {Object.entries(externalStats.byStatus).map(
+                    ([status, count]) => {
+                      const m = STATUS_META[status];
+                      return (
+                        <div
+                          key={status}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            background: m?.bg ?? s.hover,
+                            borderRadius: 10,
+                            padding: "10px 14px",
+                            flex: "1 1 120px",
+                            minWidth: 0,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background: m?.color ?? s.textFaint,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                color: m?.text ?? s.textSecondary,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                letterSpacing: ".04em",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {m?.label ?? status}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 20,
+                                fontWeight: 800,
+                                color: m?.text ?? s.textPrimary,
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {count}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              )}
+            </Card>
+
+            <SectionTitle accent={EXTERNAL_ACCENT}>External cost</SectionTitle>
+            <div className="kpi-3" style={{ marginBottom: 20 }}>
+              <StatCard
+                label="Total Spend"
+                value={
+                  externalStats.totalCost
+                    ? `₵${externalStats.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "—"
+                }
+                icon="💰"
+                accent="#10b981"
+                sub={`${externalStats.reportsWithCost} jobs with cost`}
+              />
+              <StatCard
+                label="Avg Cost / Job"
+                value={
+                  externalStats.avgCost
+                    ? `₵${externalStats.avgCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "—"
+                }
+                icon="📊"
+                accent="#3b82f6"
+              />
+              <StatCard
+                label="Highest Job"
+                value={
+                  externalStats.maxCost
+                    ? `₵${externalStats.maxCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "—"
+                }
+                icon="📈"
+                accent="#f97316"
+              />
+            </div>
+
+            <SectionTitle accent={EXTERNAL_ACCENT}>
+              Technician directory ({externalStats.technicians.length})
+            </SectionTitle>
+            {externalStats.technicians.length === 0 ? (
+              <p
+                style={{
+                  color: s.textFaint,
+                  textAlign: "center",
+                  padding: "40px 0",
+                }}
+              >
+                No external technicians assigned yet.
+              </p>
+            ) : (
+              <div className="user-grid" style={{ marginBottom: 20 }}>
+                {externalStats.technicians.map((t, i) => (
+                  <TechnicianCard
+                    key={`${t.name}-${t.phoneNumber}-${i}`}
+                    tech={t}
+                  />
+                ))}
+              </div>
+            )}
+
+            <SectionTitle accent={EXTERNAL_ACCENT}>
+              Recent external activity
+            </SectionTitle>
+            <Card style={{ padding: "4px 20px 8px", marginBottom: 20 }}>
+              {externalStats.recent.length === 0 ? (
+                <p
+                  style={{
+                    textAlign: "center",
+                    padding: "32px 0",
+                    color: s.textFaint,
+                    fontSize: 13,
+                  }}
+                >
+                  No external activity yet.
+                </p>
+              ) : (
+                externalStats.recent.map((r, i) => {
+                  const sm = STATUS_META[r.status];
+                  return (
+                    <div
+                      key={r.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        padding: "12px 0",
+                        borderBottom:
+                          i < externalStats.recent.length - 1
+                            ? `1px solid ${s.cardBorder}`
+                            : "none",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          color: s.textSecondary,
+                          minWidth: 0,
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: s.textPrimary }}>
+                          {r.category}
+                        </span>
+                        {r.externalTechnician?.name && (
+                          <>
+                            {" "}
+                            — assigned to{" "}
+                            <span style={{ fontWeight: 600 }}>
+                              {r.externalTechnician.name}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {sm && (
+                          <Badge bg={sm.bg} text={sm.text}>
+                            {sm.label}
+                          </Badge>
+                        )}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: s.textFaint,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {timeAgo(r.dateSent)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </Card>
+
+            <SectionTitle accent={EXTERNAL_ACCENT}>
+              All external assignments ({sortedExternalReports.length})
+            </SectionTitle>
+            <TableWrap>
+              <THead
+                cols={[
+                  "Reporter",
+                  "Category",
+                  "Technician",
+                  "Status",
+                  "Overdue",
+                  "Sent",
+                ]}
+              />
+              <tbody>
+                {paginatedExternalReports.map((r, i) => {
+                  const sm = STATUS_META[r.status];
+                  return (
+                    <tr
+                      key={r.id}
+                      style={{
+                        borderBottom: `1px solid ${s.cardBorder}`,
+                        background: i % 2 ? s.rowAlt : s.card,
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "11px 14px",
+                          fontWeight: 600,
+                          color: s.textPrimary,
+                        }}
+                      >
+                        {r.reporter}
+                      </td>
+                      <td style={{ padding: "11px 14px", color: s.textMuted }}>
+                        {r.category}
+                      </td>
+                      <td
+                        style={{ padding: "11px 14px", color: s.textSecondary }}
+                      >
+                        {r.externalTechnician?.name || "—"}
+                      </td>
+                      <td style={{ padding: "11px 14px" }}>
+                        {sm ? (
+                          <Badge bg={sm.bg} text={sm.text}>
+                            {sm.label}
+                          </Badge>
+                        ) : (
+                          r.status
+                        )}
+                      </td>
+                      <td style={{ padding: "11px 14px" }}>
+                        {isOverdueEligible(r) ? (
+                          <span
+                            style={{
+                              color: "#ef4444",
+                              fontWeight: 700,
+                              fontSize: 12,
+                            }}
+                          >
+                            ⚠ Yes
+                          </span>
+                        ) : (
+                          <span style={{ color: "#22c55e", fontSize: 12 }}>
+                            No
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "11px 14px",
+                          color: s.textFaint,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {timeAgo(r.dateSent)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </TableWrap>
+            <PaginationControls
+              page={externalPage}
+              totalPages={externalReportsTotalPages}
+              onChange={setExternalPage}
+              totalItems={sortedExternalReports.length}
+              pageSize={EXTERNAL_PAGE_SIZE}
+            />
+            {sortedExternalReports.length === 0 && (
+              <p
+                style={{
+                  textAlign: "center",
+                  padding: "48px 0",
+                  color: s.textFaint,
+                }}
+              >
+                No external assignments yet.
               </p>
             )}
           </>

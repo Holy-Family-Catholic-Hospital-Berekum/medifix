@@ -5,6 +5,7 @@ export default function AdminReOpened() {
     <Home
       bgColor="bg-[#eff6ff]"
       firstReportsStatus="reopened"
+      firstReportsServiceType="internal"
       primaryColor="text-red-800"
       title1="Reopened Works"
       secColor={"bg-yellow-500"}
@@ -21,6 +22,7 @@ export default function AdminReOpened() {
       logoBGColor="md:bg-green-500"
       reopenedRedirect={"/aro"}
       homeRedirect="/ah"
+      externalRedirect={"/aext"}
       closedRedirect={"/acl"}
       dashboardRedirect={"/ad"}
       role={"admin"}

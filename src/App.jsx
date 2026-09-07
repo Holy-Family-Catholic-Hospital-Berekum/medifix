@@ -17,12 +17,14 @@ import EstateInProgress from "../Estate-manager/estateInProgress";
 import EstateReOpened from "../Estate-manager/estateReOpened";
 import EstateClosed from "../Estate-manager/estateClosed";
 import EstateDropped from "../Estate-manager/estateDropped";
+import EstateExternalWorks from "../Estate-manager/externalWorks";
 
 import AdminHome from "../Admin/adminHome";
 import AdminInProgress from "../Admin/adminInProgress";
 import AdminCompleted from "../Admin/adminCompleted";
 import AdminReOpened from "../Admin/adminReOpened";
 import AdminClosed from "../Admin/adminClosed";
+import AdminExternalWorks from "../Admin/adminExternalWorks";
 
 import WorkerCompleted from "../Worker/workerCompleted";
 import WorkerHome from "../Worker/workerHome";
@@ -154,6 +156,15 @@ export default function App() {
       />
 
       <Route
+        path="/aext"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminExternalWorks />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/acl"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
@@ -185,6 +196,14 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["estate"]}>
             <EstateAssigned />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/eext"
+        element={
+          <ProtectedRoute allowedRoles={["estate"]}>
+            <EstateExternalWorks />
           </ProtectedRoute>
         }
       />

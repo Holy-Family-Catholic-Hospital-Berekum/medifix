@@ -264,6 +264,8 @@ export default function ReportForm({ formPopup, onClose }) {
         dateCompleted: null,
 
         dateDue: calculateDueDate(formData.priorityLevel),
+        serviceType: null,
+        externalTechnician: null,
 
         // Report content
         reportDescription: formData.reportDescription,

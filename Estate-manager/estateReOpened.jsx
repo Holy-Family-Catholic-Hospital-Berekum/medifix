@@ -5,6 +5,7 @@ export default function EstateReOpened() {
     <Home
       bgColor="bg-[#eff6ff]"
       firstReportsStatus="reopened"
+      firstReportsServiceType="internal" 
       primaryColor="text-red-800"
       title1="Reopened Jobs"
       secColor={"bg-yellow-500"}
@@ -25,6 +26,7 @@ export default function EstateReOpened() {
       closedRedirect={"/ecl"}
       droppedRedirect={"/edr"}
       homeRedirect="/eh"
+       externalRedirect={"/eext"}
       dashboardRedirect={"/ed"}
       role={"estate"}
     />

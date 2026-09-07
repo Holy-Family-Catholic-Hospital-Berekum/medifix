@@ -19,6 +19,7 @@ import { formatDate } from "../src/utils";
 const ORANGE = "#FF8825";
 const INK = "#131B26";
 const TEAL = "#0E7C86";
+const INDIGO = "#4F46E5"; // used for the "External" technician accent
 
 const FONTS = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -106,6 +107,7 @@ const STATUS_MESSAGES = {
   procured: "Materials have been procured, waiting for technician assignment.",
   assigned:
     "Your work has been assigned to the right technician, it will be attended to shortly.",
+  accepted: "Your technician has accepted the job and will begin work shortly.",
   denied: "Your report was not approved. See the reason below.",
   reopened:
     "You reopened this job. It's back with the Estate Manager for further action.",
@@ -184,6 +186,14 @@ const STATUS_CONFIG = {
     spine: "#8B5CF6",
     icon: "👷",
   },
+  accepted: {
+    label: "Accepted",
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+    dot: "bg-cyan-500",
+    spine: "#06B6D4",
+    icon: "🔧",
+  },
   denied: {
     label: "Denied",
     bg: "bg-red-50",
@@ -230,6 +240,12 @@ const PRIORITY_CONFIG = {
 // percentage bar, which implies granularity that doesn't exist. Only
 // rendered for reports still moving forward through the sequence; denied
 // and reopened reports get their own note blocks below instead.
+//
+// "accepted" is included here even though an externally-assigned job jumps
+// straight from approved/procured to accepted (skipping the "assigned"
+// dot as a literally-visited state) — the stepper is showing progress
+// through the pipeline, not a literal visit log, so filling in the
+// intermediate dots is the right simplification.
 const PIPELINE_STAGES = [
   "incoming",
   "approved",
@@ -237,6 +253,7 @@ const PIPELINE_STAGES = [
   "confirmed",
   "procured",
   "assigned",
+  "accepted",
 ];
 
 function PipelineStepper({ status }) {
@@ -295,8 +312,17 @@ function ReportCard({
   const overdueLabel = useLiveTimeAgo(report.dateDue);
   const denialNote = getDenialNote(report);
   const reopenNote = report.status === "reopened" ? report.reopenReason : null;
+
+  // A technician is "on the job" once the report is either assigned
+  // (internal, awaiting the worker's confirmation) or accepted (internal
+  // confirmed, OR external — which goes straight to accepted since there's
+  // no worker account to confirm through).
+  const isExternalTech = report.serviceType === "external";
+  const showTechnician =
+    (report.status === "assigned" || report.status === "accepted") &&
+    (isExternalTech ? !!report.externalTechnician : !!report.assignedTo);
   const assignedWorker =
-    report.status === "assigned" && report.assignedTo
+    !isExternalTech && report.assignedTo
       ? workerMap[report.assignedTo] || null
       : null;
 
@@ -398,13 +424,63 @@ function ReportCard({
           </div>
         )}
 
-        {/* assigned worker */}
-        {report.status === "assigned" && (
+        {/* assigned technician — internal worker OR external technician */}
+        {showTechnician && (
           <div className="border-t border-gray-100 pt-4 mt-2">
-            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              Assigned Technician
-            </p>
-            {assignedWorker ? (
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                Assigned Technician
+              </p>
+              {isExternalTech && (
+                <span
+                  className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: `${INDIGO}1A`, color: INDIGO }}
+                >
+                  External
+                </span>
+              )}
+            </div>
+
+            {isExternalTech ? (
+              report.externalTechnician ? (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm text-white flex-shrink-0"
+                      style={{ backgroundColor: INDIGO }}
+                    >
+                      {report.externalTechnician.name?.charAt(0)?.toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-sm font-bold text-gray-800 truncate block">
+                        {report.externalTechnician.name}
+                      </span>
+                      {report.externalTechnician.profession && (
+                        <span className="text-xs text-gray-400 truncate block">
+                          {report.externalTechnician.profession}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {report.externalTechnician.phoneNumber && (
+                    <a
+                      href={`tel:${report.externalTechnician.phoneNumber}`}
+                      className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full text-white transition hover:opacity-90 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                      style={{ backgroundColor: INDIGO }}
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        call
+                      </span>
+                      Call
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  Loading technician…
+                </p>
+              )
+            ) : assignedWorker ? (
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <div
@@ -617,6 +693,7 @@ export default function Pending() {
         "pending",
         "confirmed",
         "assigned",
+        "accepted",
         "denied",
         "reopened",
       ]),
@@ -640,7 +717,12 @@ export default function Pending() {
         const ids = [
           ...new Set(
             data
-              .filter((r) => r.status === "assigned" && r.assignedTo)
+              .filter(
+                (r) =>
+                  (r.status === "assigned" || r.status === "accepted") &&
+                  r.serviceType !== "external" &&
+                  r.assignedTo,
+              )
               .map((r) => r.assignedTo),
           ),
         ];
@@ -774,6 +856,7 @@ export default function Pending() {
     { key: "pending", label: "Pending" },
     { key: "confirmed", label: "Confirmed" },
     { key: "assigned", label: "Assigned" },
+    { key: "accepted", label: "Accepted" },
     { key: "denied", label: "Denied" },
     { key: "reopened", label: "Reopened" },
   ];

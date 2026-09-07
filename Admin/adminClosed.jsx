@@ -21,6 +21,7 @@ export default function AdminClosed() {
       closedRedirect={"/acl"}
       logoBGColor="md:bg-green-500"
       homeRedirect="/ah"
+      externalRedirect={"/aext"}
       dashboardRedirect={"/ad"}
       role={"admin"}
     />

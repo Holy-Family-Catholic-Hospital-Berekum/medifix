@@ -23,6 +23,25 @@ import {
 } from "firebase/firestore";
 import { db } from "../src/firebase";
 
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
+// ─── Live auth uid ───────────────────────────────────────────────────────
+// currentUser is only populated once Firebase finishes restoring the
+// session — reading it once at module load nearly always races that and
+// gets `undefined`, which then never updates. onAuthStateChanged fires
+// once the real state is known (and again on sign-in/out), so this stays
+// correct instead of freezing at whatever was true at import time.
+function useAuthUid() {
+  const [uid, setUid] = useState(() => getAuth().currentUser?.uid ?? null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(getAuth(), (u) => {
+      setUid(u?.uid ?? null);
+    });
+    return unsubscribe;
+  }, []);
+  return uid;
+}
+
 // ─── Countdown hook ──────────────────────────────────────────────────────────
 function useCountdown(dateDue) {
   const getTimeLeft = () => {
@@ -852,7 +871,13 @@ const BADGE_FETCH_LIMIT = 150;
 // within it client-side, instead of the entire collection).
 const SEARCH_FETCH_CAP = 500;
 
-function buildBaseConstraints({ statusValue, role, userId, timeFilter }) {
+function buildBaseConstraints({
+  statusValue,
+  role,
+  userId,
+  timeFilter,
+  serviceType,
+}) {
   const constraints = [];
   if (role === "worker" && userId) {
     constraints.push(where("assignedTo", "==", userId));
@@ -862,6 +887,11 @@ function buildBaseConstraints({ statusValue, role, userId, timeFilter }) {
       constraints.push(where("status", "in", statusValue));
   } else if (statusValue) {
     constraints.push(where("status", "==", statusValue));
+  }
+  // New: lets a section scope itself to only external (or internal) jobs,
+  // e.g. the External Jobs tab = status "assigned" + serviceType "external".
+  if (serviceType) {
+    constraints.push(where("serviceType", "==", serviceType));
   }
   const range = getTimeRangeBounds(timeFilter);
   if (range) {
@@ -906,6 +936,7 @@ function useSectionData({
   userId,
   searchQuery,
   timeFilter,
+  serviceType, // ← new
   pageSize = PAGE_SIZE,
 }) {
   const [docsOut, setDocsOut] = useState([]);
@@ -919,14 +950,10 @@ function useSectionData({
   const searchMode = hasStatus && searchQuery.trim() !== "";
   const statusKey = JSON.stringify(statusValue);
 
-  // Reset paging whenever the query "shape" changes (status set, role/user,
-  // time filter, or switching in/out of search mode). dateField no longer
-  // affects the Firestore query itself (see note above), only display
-  // sorting, but it's kept here too in case a caller ever swaps it.
   useEffect(() => {
     setPage(1);
     cursorCacheRef.current = { 1: null };
-  }, [statusKey, dateField, role, userId, timeFilter, searchMode]);
+  }, [statusKey, dateField, role, userId, timeFilter, serviceType, searchMode]);
 
   // Also reset to page 1 whenever the search text itself changes (still in
   // search mode, but it's a new result set).
@@ -944,6 +971,7 @@ function useSectionData({
       role,
       userId,
       timeFilter,
+      serviceType,
     });
 
     const q = query(
@@ -990,6 +1018,7 @@ function useSectionData({
     timeFilter,
     pageSize,
     dateField,
+    serviceType,
   ]);
 
   // Accurate total count for pagination, via a cheap aggregation query
@@ -1003,6 +1032,7 @@ function useSectionData({
       role,
       userId,
       timeFilter,
+      serviceType,
     });
     const q = query(collection(db, "reports"), ...base);
     getCountFromServer(q)
@@ -1020,6 +1050,7 @@ function useSectionData({
       role,
       userId,
       timeFilter,
+      serviceType,
     });
 
     const q = query(
@@ -1058,6 +1089,7 @@ function useSectionData({
     userId,
     timeFilter,
     dateField,
+    serviceType,
   ]);
 
   const displayedDocs = searchMode
@@ -1091,6 +1123,7 @@ export default function Home({
   acceptedRedirect,
   reopenedRedirect,
   droppedRedirect,
+  externalRedirect,
   title1,
   title2,
   reportDate1,
@@ -1098,6 +1131,7 @@ export default function Home({
   firstReportsStatus,
   secondReportsStatus,
   reportsHiddenOnMobileTitle,
+  firstReportsServiceType,
   specificReportsPage,
   closedRedirect,
   homeRedirect,
@@ -1118,7 +1152,7 @@ export default function Home({
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState("overall");
   const [badgeData, setBadgeData] = useState({});
-
+  const uid = useAuthUid();
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   useEffect(() => {
@@ -1160,8 +1194,10 @@ export default function Home({
 
   const isNewForUser = useCallback(
     (report) =>
-      !!user?.ID && report.lastViewedStatus?.[user.ID] !== report.status,
-    [user?.ID],
+      !!uid &&
+      !!user?.ID &&
+      report.lastViewedStatus?.[user.ID] !== report.status,
+    [uid, user?.ID],
   );
 
   const hasFeedback = useCallback(
@@ -1178,6 +1214,7 @@ export default function Home({
     userId: user?.ID,
     searchQuery: debouncedSearchQuery,
     timeFilter,
+    serviceType: firstReportsServiceType, // ← new
   });
 
   const secondSection = useSectionData({
@@ -1231,14 +1268,28 @@ export default function Home({
     const newAssignedCount = allBadgeReports.filter(
       (r) => r.status === "assigned" && isNewForUser(r),
     ).length;
+    // New: external jobs share the "assigned" status but are a distinct
+    // tab (admin/estate own these, no worker acceptance step).
+    const newExternalCount = allBadgeReports.filter(
+      (r) =>
+        ["accepted", "reopened"].includes(r.status) && // ← was status === "assigned"
+        r.serviceType === "external" &&
+        isNewForUser(r),
+    ).length;
     const newRejectedCount = allBadgeReports.filter(
       (r) => r.status === "rejected" && isNewForUser(r),
     ).length;
     const newAcceptedCount = allBadgeReports.filter(
-      (r) => r.status === "accepted" && isNewForUser(r),
+      (r) =>
+        r.serviceType === "internal" &&
+        r.status === "accepted" &&
+        isNewForUser(r),
     ).length;
     const newReopenedCount = allBadgeReports.filter(
-      (r) => r.status === "reopened" && isNewForUser(r),
+      (r) =>
+        r.serviceType === "internal" &&
+        r.status === "reopened" &&
+        isNewForUser(r),
     ).length;
     const newDroppedCount = allBadgeReports.filter(
       (r) => r.status === "dropped" && isNewForUser(r),
@@ -1270,6 +1321,7 @@ export default function Home({
 
     return {
       newAssignedCount,
+      newExternalCount,
       newRejectedCount,
       newAcceptedCount,
       newReopenedCount,
@@ -1291,6 +1343,7 @@ export default function Home({
     newAcceptedCount,
     newReopenedCount,
     newDroppedCount,
+    newExternalCount,
     newCompletedCount,
     newClosedCount,
     completedWithFeedback,
@@ -1307,11 +1360,11 @@ export default function Home({
     setDisplayDetails(true);
 
     if (isNewForUser(report)) {
-      markReportViewed(report.id, user.ID, report.status);
+      markReportViewed(report.id, user.ID, report.status); // was: uid
       const patch = {
         lastViewedStatus: {
           ...(report.lastViewedStatus || {}),
-          [user.ID]: report.status,
+          [user.ID]: report.status, // already correct
         },
       };
       // Optimistic local patch so the "New" badge disappears immediately —
@@ -1467,15 +1520,33 @@ export default function Home({
   // "Mark all as read" button shows up at all. Sourced from the bounded
   // badge data (pageStatuses, when this toolbar is shown, is always a
   // subset of BADGE_STATUS_LIST).
+
+  // Only meaningful when this page is scoped to one serviceType (e.g. the
+  // External Jobs page), so "assigned" doesn't also catch internal jobs
+  // still awaiting a worker's response.
+  const pageServiceType = specificReportsPage ? firstReportsServiceType : null;
+
+  // Unread counts scoped to this page only — drives whether the
+  // "Mark all as read" button shows up at all. Sourced from the bounded
+  // badge data (pageStatuses, when this toolbar is shown, is always a
+  // subset of BADGE_STATUS_LIST).
   const { pageNewCount, pageFeedbackCount } = useMemo(() => {
-    const relevant = allBadgeReports.filter((r) =>
-      pageStatuses.includes(r.status),
+    const relevant = allBadgeReports.filter(
+      (r) =>
+        pageStatuses.includes(r.status) &&
+        (!pageServiceType || r.serviceType === pageServiceType),
     );
     return {
       pageNewCount: relevant.filter((r) => isNewForUser(r)).length,
       pageFeedbackCount: relevant.filter((r) => hasFeedback(r)).length,
     };
-  }, [allBadgeReports, pageStatuses, isNewForUser, hasFeedback]);
+  }, [
+    allBadgeReports,
+    pageStatuses,
+    pageServiceType,
+    isNewForUser,
+    hasFeedback,
+  ]);
 
   const hasUnreadItems = pageNewCount > 0 || pageFeedbackCount > 0;
 
@@ -1487,9 +1558,12 @@ export default function Home({
   // together. Each batch is further chunked to stay under Firestore's
   // 500-operation-per-batch hard limit.
   const handleMarkAllAsRead = useCallback(async () => {
-    if (!user?.ID) return;
-    const relevant = allBadgeReports.filter((r) =>
-      pageStatuses.includes(r.status),
+    if (!user?.ID || !uid) return;
+    
+    const relevant = allBadgeReports.filter(
+      (r) =>
+        pageStatuses.includes(r.status) &&
+        (!pageServiceType || r.serviceType === pageServiceType),
     );
     const toMarkNew = relevant.filter((r) => isNewForUser(r));
     const toMarkFeedback = relevant.filter((r) => hasFeedback(r));
@@ -1498,9 +1572,10 @@ export default function Home({
     try {
       for (const group of chunk(toMarkNew, BATCH_CHUNK_SIZE)) {
         const viewedBatch = writeBatch(db);
+
         group.forEach((r) => {
           viewedBatch.update(doc(db, "reports", r.id), {
-            [`lastViewedStatus.${user.ID}`]: r.status,
+            [`lastViewedStatus.${user.ID}`]: r.status, // was: ${uid}
           });
         });
         await viewedBatch.commit();
@@ -1539,7 +1614,8 @@ export default function Home({
         const next = {};
         for (const [status, docsForStatus] of Object.entries(prev)) {
           next[status] = docsForStatus.map((r) =>
-            pageStatuses.includes(r.status)
+            pageStatuses.includes(r.status) &&
+            (!pageServiceType || r.serviceType === pageServiceType)
               ? { ...r, ...patchForReport(r) }
               : r,
           );
@@ -1558,7 +1634,9 @@ export default function Home({
   }, [
     allBadgeReports,
     pageStatuses,
+    pageServiceType,
     user?.ID,
+    uid,
     isNewForUser,
     hasFeedback,
     firstSection,
@@ -1823,6 +1901,8 @@ export default function Home({
         acceptedRedirect={acceptedRedirect}
         reopenedRedirect={reopenedRedirect}
         droppedRedirect={droppedRedirect}
+        externalRedirect={externalRedirect}
+        newExternalCount={newExternalCount}
         rejectedCount={rejectedCount}
         acceptedCount={acceptedCount}
         reopenedCount={reopenedCount}
@@ -1991,6 +2071,29 @@ export default function Home({
                   {newReopenedCount > 0 && (
                     <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
                       {newReopenedCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          )}
+
+          {externalRedirect && ["admin", "estate"].includes(role) && (
+            <NavLink
+              to={externalRedirect}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium tracking-wide transition-colors duration-150 group ${isActive ? theme.sideNavActive : theme.sideNavIdle}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 flex-shrink-0 ${isActive ? theme.sideNavDotActive : theme.sideNavDotIdle}`}
+                  />
+                  External Jobs
+                  {newExternalCount > 0 && (
+                    <span className="ml-auto bg-sky-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums">
+                      {newExternalCount}
                     </span>
                   )}
                 </>

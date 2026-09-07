@@ -23,6 +23,7 @@ export default function EstateDropped() {
       reopenedRedirect={"/ero"}
       droppedRedirect={"/edr"}
       logoBGColor="md:bg-yellow-500"
+      externalRedirect={"/eext"}
       homeRedirect="/eh"
       closedRedirect={"/ecl"}
       dashboardRedirect={"/ed"}

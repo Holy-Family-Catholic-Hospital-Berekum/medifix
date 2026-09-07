@@ -33,6 +33,17 @@ import {
   canUserDropJob,
 } from "../src/utils";
 
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
+function useAuthReady() {
+  const [ready, setReady] = useState(() => !!getAuth().currentUser);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(getAuth(), (u) => setReady(!!u));
+    return unsub;
+  }, []);
+  return ready;
+}
+
 const EMPTY_MATERIAL = { description: "", quantity: "", specification: "" };
 
 // ─── Status / priority presentation ────────────────────────────────────────
@@ -752,7 +763,11 @@ export default function ReportDetailsContainer({
   const [dropReason, setDropReason] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [lightboxSrc, setLightboxSrc] = useState(null);
-
+  const [externalTech, setExternalTech] = useState({
+    name: "",
+    phoneNumber: "",
+    profession: "",
+  });
   const user = JSON.parse(localStorage.getItem("user"))?.data;
 
   // ── Auto-scroll refs ──────────────────────────────────────────────────
@@ -791,6 +806,8 @@ export default function ReportDetailsContainer({
       setDropReason("");
       setRejectReason("");
       setLightboxSrc(null);
+      setExternalTech({ name: "", phoneNumber: "", profession: "" });
+      setFormData((prev) => ({ ...prev, assignmentType: "internal" }));
     }
   }, [displayDetails]);
 
@@ -824,21 +841,24 @@ export default function ReportDetailsContainer({
     }
   }, [displayDetails]);
 
-  useEffect(() => {
-    if (!displayDetails || !currentReport || currentReport.length === 0) return;
-    const report = currentReport[0];
-    if (!report.feedback) return;
-    if (!report.feedbackViewedBy?.includes(user?.ID)) {
-      updateDoc(doc(db, "reports", report.id), {
-        feedbackViewedBy: arrayUnion(user?.ID),
-      }).catch((err) => console.error("feedbackViewedBy update failed:", err));
-    }
-  }, [displayDetails, currentReport]);
-
   // Images live in a separate reportImages/{reportId} doc so list-view
   // snapshots on `reports` never download photo payloads — they're only
   // fetched here, once, when this detail panel opens.
   const [reportImagesData, setReportImagesData] = useState(null);
+
+  const authReady = useAuthReady();
+
+  useEffect(() => {
+    if (!displayDetails || !currentReport || currentReport.length === 0) return;
+    if (!authReady || !user?.ID) return; // ← new guard
+    const report = currentReport[0];
+    if (!report.feedback) return;
+    if (!report.feedbackViewedBy?.includes(user.ID)) {
+      updateDoc(doc(db, "reports", report.id), {
+        feedbackViewedBy: arrayUnion(user.ID),
+      }).catch((err) => console.error("feedbackViewedBy update failed:", err));
+    }
+  }, [displayDetails, currentReport, authReady, user?.ID]);
 
   useEffect(() => {
     if (!displayDetails || !currentReport || currentReport.length === 0) {
@@ -1043,27 +1063,50 @@ export default function ReportDetailsContainer({
 
   const handleAssignWorker = async () => {
     if (!canUserAssignWorker(user, report)) return;
-    if (!formData.selectedWorker) {
+
+    const isExternal = formData.assignmentType === "external";
+
+    if (isExternal) {
+      if (!externalTech.name.trim() || !externalTech.phoneNumber.trim()) {
+        alert("Please enter the external technician's name and phone number");
+        return;
+      }
+    } else if (!formData.selectedWorker) {
       alert("Please select a worker");
       return;
     }
+
     setLoading(true);
     try {
-      // If the report already has (or previously had) an assigned worker
-      // — e.g. that worker rejected/dropped the job, or staff reopened a
-      // completed report — this is a reassignment rather than a first-time
-      // assignment. `droppedBy` is checked too because dropping clears
-      // `assignedTo` back to null.
       const isReassignment =
-        Boolean(report.assignedTo) || Boolean(report.droppedBy);
+        Boolean(report.assignedTo) ||
+        Boolean(report.droppedBy) ||
+        Boolean(report.externalTechnician);
 
-      const updatePayload = {
-        assignedTo: formData.selectedWorker,
-        status: "assigned",
-        ...(isReassignment
-          ? { dateReAssigned: serverTimestamp() }
-          : { dateAssigned: serverTimestamp() }),
-      };
+      const updatePayload = isExternal
+        ? {
+            assignedTo: null,
+            serviceType: "external",
+            externalTechnician: {
+              name: externalTech.name.trim(),
+              phoneNumber: externalTech.phoneNumber.trim(),
+              profession: externalTech.profession.trim() || "",
+            },
+            status: "accepted",
+            dateAccepted: serverTimestamp(),
+            ...(isReassignment
+              ? { dateReAssigned: serverTimestamp() }
+              : { dateAssigned: serverTimestamp() }),
+          }
+        : {
+            assignedTo: formData.selectedWorker,
+            serviceType: "internal",
+            externalTechnician: null,
+            status: "assigned",
+            ...(isReassignment
+              ? { dateReAssigned: serverTimestamp() }
+              : { dateAssigned: serverTimestamp() }),
+          };
 
       if (formData.instructions.trim()) {
         updatePayload.instructions = formData.instructions.trim();
@@ -1071,19 +1114,33 @@ export default function ReportDetailsContainer({
 
       await updateDoc(doc(db, "reports", report.id), updatePayload);
 
-      const msg =
-        report.status === "approved"
+      const msg = isExternal
+        ? "Work assigned to external technician!"
+        : report.status === "approved"
           ? "Work assigned directly (no materials required)!"
           : isReassignment
             ? "Work reassigned to worker!"
             : "Work assigned to worker!";
       alert(msg);
-      setFormData({ ...formData, selectedWorker: "", instructions: "" });
-      setDisplayDetails(false);
-      notifyOnStatusChange(report.status, "assigned", {
-        ...report,
-        assignedTo: formData.selectedWorker,
+
+      setFormData({
+        ...formData,
+        selectedWorker: "",
+        instructions: "",
+        assignmentType: "internal",
       });
+      setExternalTech({ name: "", phoneNumber: "", profession: "" });
+      setDisplayDetails(false);
+
+      notifyOnStatusChange(
+        report.status,
+        isExternal ? "accepted" : "assigned",
+        {
+          ...report,
+          assignedTo: isExternal ? null : formData.selectedWorker,
+          serviceType: isExternal ? "external" : "internal",
+        },
+      );
     } catch (error) {
       console.error("Error assigning worker:", error);
       alert("Failed to assign worker");
@@ -1367,6 +1424,12 @@ export default function ReportDetailsContainer({
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <StatusBadge status={report.status} />
           <PriorityBadge level={report.priorityLevel} />
+
+          {report.serviceType === "external" && (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border bg-indigo-100 text-indigo-700 border-indigo-300 whitespace-nowrap">
+              External Technician
+            </span>
+          )}
         </div>
         <button
           onClick={() => setDisplayDetails(false)}
@@ -1404,14 +1467,26 @@ export default function ReportDetailsContainer({
                 label={report.reporter}
               />
             </InfoItem>
-            {report.assignedTo && ["admin", "estate"].includes(user?.role) && (
-              <InfoItem label="Technician" theme={theme}>
-                <PhoneCallButton
-                  phoneNumber={assignedWorker?.phoneNumber}
-                  label={assignedWorker?.name}
-                />
-              </InfoItem>
-            )}
+            {(report.assignedTo || report.externalTechnician) &&
+              ["admin", "estate"].includes(user?.role) && (
+                <InfoItem label="Technician" theme={theme}>
+                  {report.serviceType === "external" ? (
+                    <PhoneCallButton
+                      phoneNumber={report.externalTechnician?.phoneNumber}
+                      label={`${report.externalTechnician?.name || ""}${
+                        report.externalTechnician?.profession
+                          ? ` (${report.externalTechnician.profession})`
+                          : ""
+                      } · External`}
+                    />
+                  ) : (
+                    <PhoneCallButton
+                      phoneNumber={assignedWorker?.phoneNumber}
+                      label={assignedWorker?.name}
+                    />
+                  )}
+                </InfoItem>
+              )}
           </div>
 
           <div>
@@ -1724,38 +1799,142 @@ export default function ReportDetailsContainer({
                   title="Assign Worker"
                   hint={
                     report.status === "dropped"
-                      ? "This job was dropped by the previous worker — see the Activity log above for the reason."
+                      ? "This job was dropped — see the Activity log above for the reason."
                       : undefined
                   }
                   theme={theme}
                 >
-                  <label
-                    className={`block text-sm font-medium ${theme.surfaceHeading}`}
-                  >
-                    Select a registered worker
-                  </label>
-                  <select
-                    value={formData.selectedWorker}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        selectedWorker: e.target.value,
-                      })
-                    }
-                    className={inputClasses}
-                  >
-                    <option value="">Choose worker</option>
-                    {workers.map((worker) => (
-                      <option key={worker.id} value={worker.ID || worker.id}>
-                        {worker.name}{" "}
-                        {worker.profession ? `(${worker.profession})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {workers.length === 0 && (
-                    <p className={`text-sm ${theme.surfaceHint}`}>
-                      No registered workers found. Please add workers first.
-                    </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, assignmentType: "internal" })
+                      }
+                      className={`flex-1 text-sm font-semibold py-2 px-3 rounded-lg border transition ${
+                        (formData.assignmentType || "internal") === "internal"
+                          ? "bg-purple-500 text-white border-purple-500"
+                          : `${theme.inputBg} ${theme.inputBorder} ${theme.surfaceHeading}`
+                      }`}
+                    >
+                      Internal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, assignmentType: "external" })
+                      }
+                      className={`flex-1 text-sm font-semibold py-2 px-3 rounded-lg border transition ${
+                        formData.assignmentType === "external"
+                          ? "bg-purple-500 text-white border-purple-500"
+                          : `${theme.inputBg} ${theme.inputBorder} ${theme.surfaceHeading}`
+                      }`}
+                    >
+                      External
+                    </button>
+                  </div>
+
+                  {(formData.assignmentType || "internal") === "internal" ? (
+                    <>
+                      <label
+                        className={`block text-sm font-medium ${theme.surfaceHeading}`}
+                      >
+                        Select a registered worker
+                      </label>
+                      <select
+                        value={formData.selectedWorker}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            selectedWorker: e.target.value,
+                          })
+                        }
+                        className={inputClasses}
+                      >
+                        <option value="">Choose worker</option>
+                        {workers.map((worker) => (
+                          <option
+                            key={worker.id}
+                            value={worker.ID || worker.id}
+                          >
+                            {worker.name}{" "}
+                            {worker.profession ? `(${worker.profession})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {workers.length === 0 && (
+                        <p className={`text-sm ${theme.surfaceHint}`}>
+                          No registered workers found. Please add workers first.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className={`text-xs ${theme.surfaceHint}`}>
+                        For issues needing an outside contractor. Their details
+                        are stored on this report only — they won't get an app
+                        account.
+                      </p>
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
+                        >
+                          Technician Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Kwame Mensah"
+                          value={externalTech.name}
+                          onChange={(e) =>
+                            setExternalTech({
+                              ...externalTech,
+                              name: e.target.value,
+                            })
+                          }
+                          className={inputClasses}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
+                        >
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="e.g. 024xxxxxxx"
+                          value={externalTech.phoneNumber}
+                          onChange={(e) =>
+                            setExternalTech({
+                              ...externalTech,
+                              phoneNumber: e.target.value,
+                            })
+                          }
+                          className={inputClasses}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
+                        >
+                          Profession / Trade{" "}
+                          <span className={`font-normal ${theme.surfaceHint}`}>
+                            (optional)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Refrigeration Technician"
+                          value={externalTech.profession}
+                          onChange={(e) =>
+                            setExternalTech({
+                              ...externalTech,
+                              profession: e.target.value,
+                            })
+                          }
+                          className={inputClasses}
+                        />
+                      </div>
+                    </div>
                   )}
 
                   <div>
@@ -1768,7 +1947,7 @@ export default function ReportDetailsContainer({
                       </span>
                     </label>
                     <textarea
-                      placeholder="Add work instructions for the worker..."
+                      placeholder="Add work instructions..."
                       value={formData.instructions}
                       onChange={(e) =>
                         setFormData({
@@ -1783,17 +1962,27 @@ export default function ReportDetailsContainer({
 
                   <button
                     onClick={handleAssignWorker}
-                    disabled={loading || !formData.selectedWorker}
+                    disabled={
+                      loading ||
+                      ((formData.assignmentType || "internal") === "internal"
+                        ? !formData.selectedWorker
+                        : !externalTech.name.trim() ||
+                          !externalTech.phoneNumber.trim())
+                    }
                     className={`font-semibold py-2 px-4 rounded-lg w-full text-white transition ${
-                      loading || !formData.selectedWorker
+                      loading ||
+                      ((formData.assignmentType || "internal") === "internal"
+                        ? !formData.selectedWorker
+                        : !externalTech.name.trim() ||
+                          !externalTech.phoneNumber.trim())
                         ? "bg-purple-300 cursor-not-allowed"
                         : "bg-purple-500 hover:bg-purple-600 cursor-pointer"
                     }`}
                   >
-                    {loading ? "Processing..." : "Assign Worker"}
+                    {loading ? "Processing..." : "Assign"}
                   </button>
 
-                  {report.assignedTo && (
+                  {(report.assignedTo || report.externalTechnician) && (
                     <div
                       className={`pt-3 border-t space-y-2 ${theme.tableCellBorder}`}
                     >
@@ -1803,7 +1992,7 @@ export default function ReportDetailsContainer({
                         Update Instructions
                       </h4>
                       <textarea
-                        placeholder="Replace or add new instructions for the worker..."
+                        placeholder="Replace or add new instructions..."
                         value={formData.instructions}
                         onChange={(e) =>
                           setFormData({
@@ -2017,9 +2206,13 @@ export default function ReportDetailsContainer({
         {canUserDownloadPDF(user, report) && (
           <button
             onClick={() => {
-              const workerName =
-                assignedWorker?.name || report.assignedTo || "";
-              const workerPhone = assignedWorker?.phoneNumber || "";
+              const isExternal = report.serviceType === "external";
+              const workerName = isExternal
+                ? report.externalTechnician?.name || ""
+                : assignedWorker?.name || report.assignedTo || "";
+              const workerPhone = isExternal
+                ? report.externalTechnician?.phoneNumber || ""
+                : assignedWorker?.phoneNumber || "";
               const estateManagerName = user?.name || "";
               const estateManagerPhone = user?.phoneNumber || "";
               generatePDFReport(

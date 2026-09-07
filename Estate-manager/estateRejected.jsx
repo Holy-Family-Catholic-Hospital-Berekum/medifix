@@ -25,6 +25,7 @@ export default function Rejected() {
       homeRedirect="/eh"
       dashboardRedirect={"/ed"}
       closedRedirect={"/ecl"}
+      externalRedirect={"/eext"}
       droppedRedirect={"/edr"}
       role={"estate"}
     />

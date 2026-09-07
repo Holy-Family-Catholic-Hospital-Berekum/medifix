@@ -25,6 +25,7 @@ export default function AdminHome() {
       reopenedRedirect={"/aro"}
       closedRedirect={"/acl"}
       homeRedirect="/ah"
+      externalRedirect={"/aext"}
       dashboardRedirect={"/ad"}
       role={"admin"}
     />
