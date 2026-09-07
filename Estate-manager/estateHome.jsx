@@ -7,7 +7,7 @@ export default function EstateHome() {
       firstReportsStatus={["approved", "costDenied"]}
       secondReportsStatus="procured"
       primaryColor="text-yellow-300"
-      title1="Approved / Denied Reports"
+      title1="Approved / Denied"
       title2="Procured Reports"
       secColor="bg-blue-500"
       titleBgColor="bg-yellow-500"

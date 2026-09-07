@@ -60,6 +60,16 @@ function overdueStatusClause(report) {
   return `It's currently ${statusLabel(report?.status)} and with ${holderLabel(report?.status)}.`;
 }
 
+// Reopened reports with serviceType "external" live on the Estate role's
+// External Jobs page (same feed as the "assigned" external jobs, see
+// Home.jsx's newExternalCount, which already treats
+// status:"reopened" + serviceType:"external" as an external-jobs item),
+// not on the regular Reopened page. Routing an estate user to /ero for
+// one of these would land them on a page that doesn't show it.
+function estateReopenedRoute(report) {
+  return report?.serviceType === "external" ? "/eext" : "/ero";
+}
+
 export const TRANSITIONS = {
   "*->incoming": {
     targets: [{ audience: "role", role: "admin", route: () => "/ah" }],
@@ -136,7 +146,10 @@ export const TRANSITIONS = {
   },
   "completed->reopened": {
     targets: [
-      { audience: "role", role: "estate", route: () => "/ero" },
+      // ← was a flat "/ero" for every reopened report; external-service
+      // reports now route estate users to the External Jobs page instead
+      // (see estateReopenedRoute above).
+      { audience: "role", role: "estate", route: estateReopenedRoute },
       { audience: "assignedWorker", route: () => "/wro" },
     ],
     title: "Report Reopened",
