@@ -103,7 +103,6 @@ export async function markOverdueReports(user) {
 export async function markReportViewed(reportId, uid, status) {
   if (!reportId || !uid || !status) return;
   try {
-    
     await updateDoc(doc(db, "reports", reportId), {
       [`lastViewedStatus.${uid}`]: status,
     });
@@ -583,6 +582,7 @@ export const generateDashboardStatsPDF = (
   roleLabel,
   userName = "User",
   period = "month",
+  externalStats = {},
 ) => {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
 
@@ -1200,6 +1200,141 @@ export const generateDashboardStatsPDF = (
   });
 
   y += 100;
+
+  // ---------------------------------------------------------------------------
+  // EXTERNAL CONTRACTOR WORK
+  // ---------------------------------------------------------------------------
+
+  ensureSpace(200);
+
+  addSectionTitle(
+    "External Contractor Work",
+    "Jobs assigned to outside contractors — tracked separately from in-house workers",
+  );
+
+  const extKpiY = y;
+
+  addKpiCard(
+    margin,
+    extKpiY,
+    cardWidth,
+    cardHeight,
+    "TOTAL JOBS",
+    externalStats?.total ?? 0,
+    COLORS.purple,
+  );
+
+  addKpiCard(
+    margin + cardWidth + gap,
+    extKpiY,
+    cardWidth,
+    cardHeight,
+    "ACTIVE",
+    externalStats?.active ?? 0,
+    COLORS.orange,
+  );
+
+  addKpiCard(
+    margin + (cardWidth + gap) * 2,
+    extKpiY,
+    cardWidth,
+    cardHeight,
+    "CLOSED",
+    externalStats?.closed ?? 0,
+    COLORS.green,
+    `${externalStats?.closureRate ?? 0}% rate`,
+  );
+
+  addKpiCard(
+    margin + (cardWidth + gap) * 3,
+    extKpiY,
+    cardWidth,
+    cardHeight,
+    "OVERDUE",
+    externalStats?.overdue ?? 0,
+    COLORS.red,
+  );
+
+  y += cardHeight + 22;
+
+  addMiniMetric(
+    margin,
+    y,
+    financialWidth,
+    "External Spend",
+    formatCedis(externalStats?.totalCost),
+    COLORS.primary,
+  );
+
+  addMiniMetric(
+    margin + financialWidth + gap,
+    y,
+    financialWidth,
+    "Avg Cost / Job",
+    formatCedis(externalStats?.avgCost),
+    COLORS.blue,
+  );
+
+  addMiniMetric(
+    margin + (financialWidth + gap) * 2,
+    y,
+    financialWidth,
+    "Highest Job",
+    formatCedis(externalStats?.maxCost),
+    COLORS.red,
+  );
+
+  y += 68;
+
+  // External status breakdown — two columns since external jobs tend to
+  // span fewer distinct statuses than the internal pipeline.
+  const extStatusEntries = Object.entries(externalStats?.byStatus || {})
+    .filter(([, count]) => Number(count) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+
+  ensureSpace(150);
+
+  const extStatusCardHeight = 140;
+  drawRoundedCard(margin, y, contentWidth, extStatusCardHeight, COLORS.white);
+
+  setFont(10, true, COLORS.navy);
+  doc.text("External Status Breakdown", margin + 15, y + 22);
+
+  if (extStatusEntries.length === 0) {
+    setFont(8, false, COLORS.lightText);
+    doc.text("No external jobs recorded yet.", margin + 15, y + 45);
+  } else {
+    const maxExtStatus = Math.max(
+      ...extStatusEntries.map(([, count]) => Number(count)),
+      1,
+    );
+    const halfWidth = (contentWidth - 45) / 2;
+
+    extStatusEntries.slice(0, 8).forEach(([status, count], index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      const rowX = margin + 15 + col * (halfWidth + 15);
+      const rowY = y + 42 + row * 19;
+      const normalizedStatus =
+        String(status).charAt(0).toUpperCase() + String(status).slice(1);
+
+      setFont(7.5, false, COLORS.slate);
+      doc.text(normalizedStatus, rowX, rowY);
+
+      setFont(7.5, true, COLORS.navy);
+      doc.text(String(count), rowX + halfWidth - 10, rowY, { align: "right" });
+
+      drawProgressBar(
+        rowX,
+        rowY + 5,
+        halfWidth - 10,
+        (Number(count) / maxExtStatus) * 100,
+        COLORS.purple,
+      );
+    });
+  }
+
+  y += extStatusCardHeight + 25;
 
   // ---------------------------------------------------------------------------
   // OPERATIONAL BREAKDOWN

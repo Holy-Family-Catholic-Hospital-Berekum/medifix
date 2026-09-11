@@ -2779,6 +2779,7 @@ export default function Dashboard({
       role?.toUpperCase?.() || role,
       user?.name || "User",
       period,
+      externalStats,
     );
     setShowDownloadMenu(false);
   };
