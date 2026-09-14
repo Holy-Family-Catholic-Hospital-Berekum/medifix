@@ -200,18 +200,17 @@ function ActionSection({ innerRef, title, hint, children, theme }) {
   );
 }
 
-// Denial reasons live in the report's `notes` array instead of the old
-// `alerts` field. A note entry looks like:
-// { type: "denial", content: "<reason>", date: <JS Date>, by: "<name>" }
+// Notes of every kind (denial reasons, and now cost confirm/deny notes)
+// live in the report's `notes` array rather than scattered top-level
+// fields. Each entry looks like:
+// { type: "<denial|costConfirmation|costDenial>", content: "<text>",
+//   date: <JS Date>, by: "<name>" }
+// This is the single read path every note type goes through — see
+// buildTimelineEntries below for where each type is surfaced.
 function getLatestNote(report, type) {
   if (!report) return null;
   const notes = (report.notes || []).filter((n) => n?.type === type);
   return notes.length ? notes[notes.length - 1] : null;
-}
-
-function getDenialNote(report) {
-  if (!report || report.status !== "denied") return null;
-  return getLatestNote(report, "denial")?.content || null;
 }
 
 // ─── Timeline ───────────────────────────────────────────────────────────
@@ -246,8 +245,28 @@ function buildTimelineEntries(report) {
   }
 
   push(report.dateCostAdded, "Materials submitted");
-  push(report.dateCostDenied, "Materials denied");
-  push(report.dateConfirmed, "Materials confirmed");
+
+  // Cost denial note — previously the admin's note here was collected in
+  // the UI but never persisted to Firestore, so it could never appear
+  // here. handleDenyCost now writes it as a "costDenial" note.
+  {
+    const costDenial = getLatestNote(report, "costDenial");
+    push(report.dateCostDenied, "Materials denied", {
+      note: costDenial?.content,
+      by: costDenial?.by,
+      tone: "danger",
+    });
+  }
+
+  // Cost confirmation note — same fix as above, for handleConfirmCost.
+  {
+    const costConfirmation = getLatestNote(report, "costConfirmation");
+    push(report.dateConfirmed, "Materials confirmed", {
+      note: costConfirmation?.content,
+      by: costConfirmation?.by,
+    });
+  }
+
   push(report.dateProcured, "Materials procured", {
     note:
       report.cost != null
@@ -999,9 +1018,25 @@ export default function ReportDetailsContainer({
     if (!canUserConfirmCost(user, report)) return;
     setLoading(true);
     try {
+      // FIX: the optional note typed in "Review & Confirm Materials" was
+      // being collected into formData.note but never sent to Firestore,
+      // so it could never show up in the Activity timeline. It's now
+      // persisted as a "costConfirmation" note (same array/shape as the
+      // existing denial notes) whenever the admin actually typed one.
+      const note = formData.note.trim();
       await updateDoc(doc(db, "reports", report.id), {
         status: "confirmed",
         dateConfirmed: serverTimestamp(),
+        ...(note
+          ? {
+              notes: arrayUnion({
+                type: "costConfirmation",
+                content: note,
+                date: new Date(),
+                by: user?.name || user?.role || "",
+              }),
+            }
+          : {}),
       });
       alert("Materials confirmed!");
       setFormData({ ...formData, note: "" });
@@ -1019,9 +1054,22 @@ export default function ReportDetailsContainer({
     if (!canUserConfirmCost(user, report)) return;
     setLoading(true);
     try {
+      // FIX: same issue as handleConfirmCost above — the note was never
+      // persisted. Saved here as a "costDenial" note.
+      const note = formData.note.trim();
       await updateDoc(doc(db, "reports", report.id), {
         status: "costDenied",
         dateCostDenied: serverTimestamp(),
+        ...(note
+          ? {
+              notes: arrayUnion({
+                type: "costDenial",
+                content: note,
+                date: new Date(),
+                by: user?.name || user?.role || "",
+              }),
+            }
+          : {}),
       });
       alert("Materials denied!");
       setFormData({ ...formData, note: "" });
@@ -1711,6 +1759,7 @@ export default function ReportDetailsContainer({
                 <ActionSection
                   innerRef={confirmCostRef}
                   title="Review & Confirm Materials"
+                  hint="An optional note here is saved to the report's Activity log."
                   theme={theme}
                 >
                   {Array.isArray(report.materials) &&
