@@ -1918,11 +1918,7 @@ export default function ReportDetailsContainer({
                     </>
                   ) : (
                     <div className="space-y-3">
-                      <p className={`text-xs ${theme.surfaceHint}`}>
-                        For issues needing an outside contractor. Their details
-                        are stored on this report only — they won't get an app
-                        account.
-                      </p>
+                      
                       <div>
                         <label
                           className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
