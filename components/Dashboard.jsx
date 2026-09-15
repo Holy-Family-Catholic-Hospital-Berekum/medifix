@@ -3116,8 +3116,8 @@ export default function Dashboard({
                             color: s.textPrimary,
                           }}
                         >
-                          <option value="month">Current month</option>
-                          <option value="year">Current year</option>
+                          <option value="month">This month</option>
+                          <option value="year">This year</option>
                           <option value="lastYear">Last year</option>
                           <option value="overall">Overall (all time)</option>
                         </select>

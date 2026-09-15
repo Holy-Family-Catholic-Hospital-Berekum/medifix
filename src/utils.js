@@ -131,6 +131,9 @@ export const formatDate = (timestamp) => {
 /**
  * Generate a PDF report with a materials table and signatures
  */
+/**
+ * Generate a PDF report with a materials table and signatures
+ */
 export const generatePDFReport = (
   report,
   workerName,
@@ -390,33 +393,58 @@ export const generatePDFReport = (
     addLine(`GHS ${Number(report.cost).toLocaleString()}`);
   }
 
-  // ── Confirmation Alert ─────────────────────────────────────────────────────
+  // ── Admin Confirmation / Denial Note ────────────────────────────────────────
+  // FIX: this used to read `report.alerts[].sentBy/sentTo/type/subtype`,
+  // a schema nothing in the app ever writes to. The admin's note from
+  // "Review & Confirm Materials" is actually persisted by
+  // handleConfirmCost / handleDenyCost in reportDetails.jsx as an entry
+  // in `report.notes[]`: { type: "costConfirmation" | "costDenial",
+  // content, date, by }. `date` is a plain JS Date (not a
+  // serverTimestamp — Firestore rejects those inside arrayUnion
+  // elements), so it's read the same way the in-app Activity timeline
+  // reads it, via formatDate() below rather than assuming a raw ISO
+  // string as the old `new Date(confirmationAlert.date)` call did.
+  //
+  // If a report has been denied and resubmitted more than once, several
+  // notes of these types can exist — this surfaces only the most recent
+  // one, mirroring what the report's current cost-review state actually
+  // reflects.
+  const latestAdminCostNote = (() => {
+    const notes = (report.notes || []).filter(
+      (n) => n?.type === "costConfirmation" || n?.type === "costDenial",
+    );
+    if (!notes.length) return null;
 
-  const confirmationAlert =
-    [...(report.alerts || [])]
-      .filter(
-        (a) =>
-          a.sentBy === "admin" &&
-          a.sentTo === "estate" &&
-          a.type === "pending" &&
-          a.subtype === "confirmed",
-      )
-      .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
+    const toMillis = (d) => {
+      if (!d) return 0;
+      if (typeof d.toMillis === "function") return d.toMillis();
+      if (typeof d.seconds === "number") return d.seconds * 1000;
+      if (d instanceof Date) return d.getTime();
+      const parsed = new Date(d).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    };
 
-  if (confirmationAlert?.content) {
+    return [...notes].sort((a, b) => toMillis(b.date) - toMillis(a.date))[0];
+  })();
+
+  if (latestAdminCostNote?.content) {
     addSectionGap(4);
 
-    addLine("Admin Confirmation Note", 11, true);
-
-    addLine(confirmationAlert.content);
-
     addLine(
-      `Note Date: ${
-        confirmationAlert.date
-          ? new Date(confirmationAlert.date).toLocaleDateString()
-          : "N/A"
-      }`,
+      latestAdminCostNote.type === "costDenial"
+        ? "Admin Denial Note"
+        : "Admin Confirmation Note",
+      11,
+      true,
     );
+
+    addLine(latestAdminCostNote.content);
+
+    addLine(`Note Date: ${formatDate(latestAdminCostNote.date)}`);
+
+    if (latestAdminCostNote.by) {
+      addLine(`Noted by: ${latestAdminCostNote.by}`);
+    }
   }
 
   // ── Assigned Technician ─────────────────────────────────────────────────────
