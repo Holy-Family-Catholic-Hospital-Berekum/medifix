@@ -42,7 +42,7 @@ export default function ReportsHiddenOnMobile({
         <div className="w-12 h-1 rounded-full bg-white/20 mt-3 mb-2 flex-shrink-0" />
 
         <h1
-          className={`text-xl font-black tracking-widest uppercase ${titleColor}`}
+          className={`text-xl md:text-2xl font-bold tracking-tight leading-tight ${titleColor}`}
         >
           {reportsHiddenOnMobileTitle}
         </h1>

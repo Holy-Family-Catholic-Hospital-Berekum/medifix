@@ -160,18 +160,46 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     }
   }, [navigate, user, loading]);
 
-  if (loading) {
+  function Preloader({ theme }) {
+    const {
+      spinnerOuter = "border-t-sky-400",
+      spinnerInner = "border-t-cyan-500/60",
+      dotColor = "bg-sky-400",
+      textColor = "text-sky-500/70",
+    } = theme;
     return (
-      <div className="flex flex-col justify-center items-center w-full h-screen gap-4 bg-white">
-        <div className="relative w-16 h-16">
-          <div className="absolute inset-0 rounded-full border-4 border-red-100" />
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-red-400 animate-spin" />
+      <div className="flex flex-col justify-center items-center w-full min-h-screen gap-5">
+        <div className="relative w-10 h-10">
+          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
+          <div
+            className={`absolute inset-0 rounded-full border-2 border-transparent ${spinnerOuter} animate-spin`}
+          />
+          <div
+            className={`absolute inset-2 rounded-full border border-transparent ${spinnerInner} animate-spin [animation-direction:reverse] [animation-duration:0.7s]`}
+          />
         </div>
-        <p className="text-red-400 font-semibold text-sm tracking-wide animate-pulse">
-          Loading...
-        </p>
+        <div className="flex flex-col items-center gap-1.5">
+          <p
+            className={`text-xs font-medium tracking-[0.2em] uppercase ${textColor}`}
+          >
+            Loading...
+          </p>
+          <div className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className={`w-1 h-1 ${dotColor} rounded-full animate-bounce`}
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     );
+  }
+
+  if (loading) {
+    return <Preloader theme={""} />;
   }
 
   if (!user) return null;
