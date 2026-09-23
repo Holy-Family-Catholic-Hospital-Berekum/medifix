@@ -427,6 +427,19 @@ export const generatePDFReport = (
     return [...notes].sort((a, b) => toMillis(b.date) - toMillis(a.date))[0];
   })();
 
+  const latestApprovalNote = (() => {
+    const notes = (report.notes || []).filter((n) => n?.type === "approval");
+    return notes.length ? notes[notes.length - 1] : null;
+  })();
+
+  if (latestApprovalNote?.content) {
+    addSectionGap(4);
+    addLine("Admin Approval Note", 11, true);
+    addLine(latestApprovalNote.content);
+    addLine(`Note Date: ${formatDate(latestApprovalNote.date)}`);
+    if (latestApprovalNote.by) addLine(`Noted by: ${latestApprovalNote.by}`);
+  }
+
   if (latestAdminCostNote?.content) {
     addSectionGap(4);
 

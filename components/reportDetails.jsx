@@ -233,7 +233,13 @@ function buildTimelineEntries(report) {
   };
 
   push(report.dateSent, "Report submitted");
-  push(report.dateApproved, "Approved");
+  {
+    const approval = getLatestNote(report, "approval");
+    push(report.dateApproved, "Approved", {
+      note: approval?.content,
+      by: approval?.by,
+    });
+  }
 
   if (report.status === "denied") {
     const denial = getLatestNote(report, "denial");
@@ -352,6 +358,75 @@ function Timeline({ entries, theme }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Admin notes ────────────────────────────────────────────────────────
+const ADMIN_NOTE_TYPES = {
+  approval: { label: "Approval note", tone: "success" },
+  denial: { label: "Denial reason", tone: "danger" },
+  costConfirmation: { label: "Materials confirmation note", tone: "success" },
+  costDenial: { label: "Materials denial reason", tone: "danger" },
+};
+
+// Every admin note on the report, newest first.
+function getAdminNotes(report) {
+  return (report?.notes || [])
+    .filter((n) => n?.content && ADMIN_NOTE_TYPES[n.type])
+    .sort((a, b) => toMillis(b.date) - toMillis(a.date));
+}
+
+function AdminNotes({ notes, theme }) {
+  if (!notes.length) return null;
+  const dark = theme.mode === "dark";
+
+  const tones = {
+    success: {
+      box: dark
+        ? "bg-emerald-500/10 border-emerald-500/40 border-l-emerald-400"
+        : "bg-emerald-50 border-emerald-200 border-l-emerald-500",
+      label: dark ? "text-emerald-300" : "text-emerald-700",
+    },
+    danger: {
+      box: dark
+        ? "bg-red-500/10 border-red-500/40 border-l-red-400"
+        : "bg-red-50 border-red-200 border-l-red-500",
+      label: dark ? "text-red-300" : "text-red-700",
+    },
+  };
+
+  return (
+    <SectionCard title="Admin Notes" theme={theme}>
+      <div className="space-y-3">
+        {notes.map((n, i) => {
+          const meta = ADMIN_NOTE_TYPES[n.type];
+          const t = tones[meta.tone];
+          return (
+            <div
+              key={i}
+              className={`rounded-lg border border-l-4 px-4 py-3 ${t.box}`}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 mb-1.5">
+                <span
+                  className={`text-xs font-bold uppercase tracking-wide ${t.label}`}
+                >
+                  {meta.label}
+                </span>
+                <span className={`text-xs ${theme.surfaceHint}`}>
+                  {n.by ? `${n.by} · ` : ""}
+                  {formatDate(n.date)}
+                </span>
+              </div>
+              <p
+                className={`text-sm md:text-base leading-relaxed whitespace-pre-wrap ${theme.detailsValueColor}`}
+              >
+                {n.content}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -934,14 +1009,28 @@ export default function ReportDetailsContainer({
   const report = currentReport[0];
   const assignedWorker = workers.find((w) => w.ID === report.assignedTo);
   const timelineEntries = buildTimelineEntries(report);
+  const adminNotes = getAdminNotes(report);
 
   const handleApprove = async () => {
     if (!canUserApprove(user, report)) return;
     setLoading(true);
     try {
+      const note = formData.note.trim();
       await updateDoc(doc(db, "reports", report.id), {
         status: "approved",
         dateApproved: serverTimestamp(),
+        ...(note
+          ? {
+              // Must be a plain Date, not serverTimestamp(): Firestore
+              // rejects sentinels inside arrayUnion() elements.
+              notes: arrayUnion({
+                type: "approval",
+                content: note,
+                date: new Date(),
+                by: user?.name || user?.role || "",
+              }),
+            }
+          : {}),
       });
       alert("Report approved!");
       setFormData({ ...formData, note: "" });
@@ -1582,6 +1671,8 @@ export default function ReportDetailsContainer({
           )}
         </SectionCard>
 
+        <AdminNotes notes={adminNotes} theme={theme} />
+
         {/* Unified activity timeline — replaces the old wall of individual
             "Date X" rows and standalone reject/drop/reopen reason boxes. */}
         {timelineEntries.length > 0 && (
@@ -1688,7 +1779,7 @@ export default function ReportDetailsContainer({
                 <ActionSection
                   innerRef={approveDenyRef}
                   title="Approve or Deny"
-                  hint="A reason is required to deny — it will be shown to the reporter."
+                  hint="Optional note when approving (shown to the Estate Manager). A reason is required to deny."
                   theme={theme}
                 >
                   <textarea
@@ -1918,7 +2009,6 @@ export default function ReportDetailsContainer({
                     </>
                   ) : (
                     <div className="space-y-3">
-                      
                       <div>
                         <label
                           className={`block text-sm font-medium mb-1 ${theme.surfaceHeading}`}
